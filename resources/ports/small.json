@@ -1,0 +1,22 @@
+{
+  "21": "FTP",
+  "22": "SSH",
+  "23": "Telnet",
+  "25": "SMTP",
+  "53": "DNS",
+  "80": "HTTP",
+  "110": "POP3",
+  "115": "SFTP",
+  "135": "MSRPC",
+  "139": "NetBIOS",
+  "143": "IMAP",
+  "161": "SNMP",
+  "194": "IRC",
+  "443": "HTTPS",
+  "445": "SMB",
+  "465": "SMTPS",
+  "587": "SMTP (mail submission)",
+  "993": "IMAPS",
+  "995": "POP3S",
+  "1433": "Microsoft SQL Server"
+}

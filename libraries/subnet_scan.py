@@ -14,6 +14,7 @@ from time import time
 from libraries.decorators import job_tracker
 import traceback
 from libraries.mac_lookup import lookup_mac
+from pathlib import Path
 
 JOB_DIR = './jobs/'
 
@@ -69,6 +70,8 @@ class SubnetScanner:
 
 
     def save_job_state(self):
+        Path(JOB_DIR).mkdir(parents=True, exist_ok=True)
+
         state = {
             'results': self.results,
             'stats': self.stats,
@@ -84,6 +87,9 @@ class SubnetScanner:
             json.dump(state, f, indent=2)
 
     def debug_active_scan(self):
+        """
+            Run this after running scan_subnet_threaded to see the progress of the scan
+        """
         while self.running:
             os.system('cls' if os.name == 'nt' else 'clear')
             print(f"Running jobs:  {self.job_stats['running']}")

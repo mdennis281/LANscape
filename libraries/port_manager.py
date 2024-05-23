@@ -1,11 +1,14 @@
 import json
 import os
 from typing import List
+from pathlib import Path
 
 PORT_DIR = './resources/ports/'
 
 class PortManager:
     def __init__(self):
+        Path(PORT_DIR).mkdir(parents=True, exist_ok=True)
+        
         self.port_lists = self.get_port_lists()
 
     def get_port_lists(self) -> List[str]:

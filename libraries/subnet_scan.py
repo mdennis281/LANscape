@@ -29,7 +29,7 @@ class SubnetScanner:
         self.subnet_str = subnet
         self.results = []
         self.stats = {"open_ports": 0, "pingable": 0, "dead": 0, "scanned": 0}
-        self.job_stats = {'running': {}, 'finished': {}}
+        self.job_stats = {'running': {}, 'finished': {}, 'timing': {}}
         self.errors = []
         self.start_time = time()
 
@@ -81,7 +81,7 @@ class SubnetScanner:
             'uid': self.uid,
             'subnet': self.subnet_str,
             'run_time': time() - self.start_time,
-            'ip_count': len(self.subnet.hosts()),
+            'ip_count': len(list(self.subnet.hosts())),
         }
         with open(f'{JOB_DIR}{self.uid}.json', 'w') as f:
             json.dump(state, f, indent=2)
@@ -94,6 +94,7 @@ class SubnetScanner:
             os.system('cls' if os.name == 'nt' else 'clear')
             print(f"Running jobs:  {self.job_stats['running']}")
             print(f"Finished jobs: {self.job_stats['finished']}")
+            print(f"Job timing:    {self.job_stats['timing']}")
             sleep(1)
 
 

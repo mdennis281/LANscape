@@ -8,7 +8,7 @@ def lookup_mac(mac: str) -> str:
     """
     if mac:
         for m in DB:
-            if mac.upper().startswith(m.upper()):
+            if mac.upper().startswith(str(m).upper()):
                 return DB[m]
     return None
         

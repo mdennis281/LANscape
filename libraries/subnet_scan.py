@@ -109,10 +109,12 @@ class SubnetScanner:
         # add host to results, modify as pass by ref moving forward
         host_info = {'ip': host}
         self.results.append(host_info)
+        host_info['is_loading'] = True
         host_info['hostname'] = self._get_hostname(host)
         host_info['mac'] = self._get_mac_address(host)
         host_info['manufacturer'] = self._get_manufacturer(host_info['mac'])
         host_info['open_ports'] = self._scan_ports(host)
+        host_info.pop('is_loading')
 
         return host_info
     

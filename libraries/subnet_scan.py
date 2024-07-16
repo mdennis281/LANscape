@@ -15,13 +15,14 @@ from libraries.decorators import job_tracker
 import traceback
 from libraries.mac_lookup import lookup_mac
 from pathlib import Path
+from libraries.net_tools import get_host_ip_mask
 
 JOB_DIR = './jobs/'
 
 
 class SubnetScanner:
     def __init__(self, subnet: str, ports: dict):
-        self.subnet = IPv4Network(subnet)
+        self.subnet = IPv4Network(get_host_ip_mask(subnet))
         self.ports = ports
         self.running = False
         self.uid = str(uuid.uuid4())
@@ -36,9 +37,13 @@ class SubnetScanner:
     def scan_subnet_threaded(self):
         threading.Thread(target=self.scan_subnet).start()
 
+    @staticmethod
+    def get_scan(scan_id):
+        with open(f'{JOB_DIR}{scan_id}.json', 'r') as f:
+            return json.load(f)
+    
     def scan_subnet(self):
         self.running = True
-        print(f"Scanning subnet {self.subnet}...")
         with ThreadPoolExecutor(max_workers=256) as executor:
             futures = {executor.submit(self._get_host_details, str(ip)): str(ip) for ip in self.subnet}
             for future in futures:
@@ -208,128 +213,3 @@ class SubnetScanner:
             sleep(retry_delay)
         return False
             
-    
-
-
-common_ports = {
-    21: 'FTP',
-    22: 'SSH',
-    23: 'Telnet',
-    25: 'SMTP',
-    53: 'DNS',
-    80: 'HTTP',
-    110: 'POP3',
-    115: 'SFTP',
-    135: 'MSRPC',
-    139: 'NetBIOS',
-    143: 'IMAP',
-    161: 'SNMP',
-    194: 'IRC',
-    443: 'HTTPS',
-    445: 'SMB',
-    465: 'SMTPS',
-    587: 'SMTP (mail submission)',
-    993: 'IMAPS',
-    995: 'POP3S',
-    1433: 'Microsoft SQL Server',
-}
-
-if __name__ == "__main__":
-    # Define your subnet and ports to scan
-    subnet = '10.0.10.0/24'
-    ports_to_scan = common_ports.keys()  # Example ports, add more as needed
-
-    # Create a SubnetScanner instance and start scanning
-    scanner = SubnetScanner(subnet, ports_to_scan)
-    scanner.scan_subnet_threaded()
-
-    while scanner.running:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"Running jobs:  {scanner.job_stats['running']}")
-        print(f"Finished jobs: {scanner.job_stats['finished']}")
-        sleep(1)
-
-# subnet = IPv4Network('10.0.0.0/20')
-# ports_to_scan = common_ports.keys()  # Example ports, add more as needed
-# scanner = SubnetScanner(subnet, ports_to_scan)
-# print(scanner._ping('10.0.0.1'))
-# print(scanner._ping('10.0.0.35'))
-
-
-# def ping(host):
-#     """
-#     Ping the given host and return True if it's reachable, False otherwise.
-#     """
-#     ping_command = ['ping', '-n', '1'] if platform.system().lower() == "windows" else ['ping', '-c', '1']
-#     with open(os.devnull, 'w') as DEVNULL:
-#         try:
-#             subprocess.check_call(ping_command + [host], stdout=DEVNULL, stderr=DEVNULL)
-#             return True
-#         except subprocess.CalledProcessError:
-#             return False
-        
-    
-
-# def scan_ports(host, ports):
-#     """
-#     Scan the specified ports on the given host and return a dictionary
-#     indicating which ports are open.
-#     """
-#     open_ports = []
-#     with ThreadPoolExecutor(max_workers=20) as executor:
-#         futures = {executor.submit(scan_port, host, port): port for port in ports}
-#         for future in futures:
-#             port = futures[future]
-#             if future.result():
-#                 open_ports.append(port)
-        
-#     return open_ports
-
-# def scan_port(host, port):
-#     """
-#     Scan a single port on the given host and return True if the port is open, False otherwise.
-#     """
-#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     sock.settimeout(1)
-#     result = sock.connect_ex((host, port))
-#     sock.close()
-#     return result == 0
-
-
-
-# def scan_subnet(subnet, ports):
-#     """
-#     Scan all IPs in the specified subnet and store the findings in a JSON file.
-#     """
-#     start_time = time()
-#     results = []
-#     stats = {"alive": 0, "pingable": 0, "dead": 0}
-#     print(f"Scanning subnet {subnet}...")
-#     with ThreadPoolExecutor(max_workers=128) as executor:
-#         futures = {executor.submit(ping, str(ip)): str(ip) for ip in subnet}
-#         for future in futures:
-#             ip = futures[future]
-#             try:
-#                 if future.result():
-#                     open_ports = scan_ports(ip, ports)
-#                     mac = get_mac_address(ip)
-#                     if open_ports:
-#                         stats["alive"] += 1
-#                         results.append({"ip": ip, "status": "alive", "mac": mac, "open_ports": open_ports})
-#                     else:
-#                         stats["pingable"] += 1
-#                         results.append({"ip": ip, "status": "pingable", "mac": mac,  "open_ports": []})
-#                 else:
-#                     stats['dead'] += 1
-#             except Exception as e:
-#                 print(f"Error scanning IP {ip}: {e}")
-#     end_time = time()
-#     print(f"Scanning completed in {end_time - start_time:.2f} seconds.")
-#     print(f"Alive hosts: {stats['alive']}")
-#     print(f"Pingable hosts: {stats['pingable']}")
-#     print(f"Dead hosts: {stats['dead']}")
-
-#     # Write results to a JSON file
-#     with open('scan_results.json', 'w') as f:
-#         json.dump(results, f, indent=4)
-#     print("Results saved to scan_results.json")

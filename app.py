@@ -34,10 +34,9 @@ def delete_port_list(port_list):
 @app.route('/api/scan', methods=['POST'])
 def scan_subnet():
     data = request.get_json()
-    ports_to_scan = PortManager().get_port_list(data['port_list']).keys()
 
     try:
-        scanner = SubnetScanner(data['subnet'], ports_to_scan)
+        scanner = SubnetScanner(data['subnet'], data['port_list'])
         scanner.scan_subnet_threaded()
         return jsonify({'status': 'running', 'scan_id': scanner.uid})
     except:
@@ -46,9 +45,8 @@ def scan_subnet():
 @app.route('/api/scan/async', methods=['POST'])
 def scan_subnet_async():
     data = request.get_json()
-    ports_to_scan = PortManager().get_port_list(data['port_list']).keys()
 
-    scanner = SubnetScanner(data['subnet'], ports_to_scan)
+    scanner = SubnetScanner(data['subnet'], data['port_list'])
     scanner.scan_subnet()
     return jsonify({'status': 'complete', 'scan_id': scanner.uid})
 

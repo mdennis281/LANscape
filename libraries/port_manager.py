@@ -12,10 +12,10 @@ class PortManager:
         self.port_lists = self.get_port_lists()
 
     def get_port_lists(self) -> List[str]:
-        return [f.rstrip('.json') for f in os.listdir(PORT_DIR) if f.endswith('.json')]
+        return [f.replace('.json','') for f in os.listdir(PORT_DIR) if f.endswith('.json')]
     
     def get_port_list(self, port_list: str) -> dict:
-        if port_list not in self.port_lists: return None
+        if port_list not in self.port_lists: raise ValueError(f"Port list '{port_list}' does not exist. Available port lists: {self.port_lists}")
 
         with open(f'{PORT_DIR}{port_list}.json', 'r') as f:
             data = json.load(f)

@@ -16,14 +16,16 @@ import traceback
 from libraries.mac_lookup import lookup_mac
 from pathlib import Path
 from libraries.net_tools import get_host_ip_mask
+from libraries.port_manager import PortManager
 
 JOB_DIR = './jobs/'
 
 
 class SubnetScanner:
-    def __init__(self, subnet: str, ports: dict):
+    def __init__(self, subnet: str, port_list: str = ""):
         self.subnet = IPv4Network(get_host_ip_mask(subnet))
-        self.ports = ports
+        self.port_list = port_list
+        self.ports: list = PortManager().get_port_list(port_list).keys()
         self.running = False
         self.uid = str(uuid.uuid4())
 
@@ -87,6 +89,7 @@ class SubnetScanner:
             'subnet': self.subnet_str,
             'run_time': time() - self.start_time,
             'ip_count': len(list(self.subnet.hosts())),
+            'port_list': self.port_list
         }
         with open(f'{JOB_DIR}{self.uid}.json', 'w') as f:
             json.dump(state, f, indent=2)
@@ -212,4 +215,6 @@ class SubnetScanner:
                 pass  # Ping failed
             sleep(retry_delay)
         return False
+    
+
             

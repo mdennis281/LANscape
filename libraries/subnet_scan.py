@@ -13,9 +13,8 @@ from ipaddress import IPv4Network
 from time import time
 from libraries.decorators import job_tracker
 import traceback
-from libraries.mac_lookup import lookup_mac
 from pathlib import Path
-from libraries.net_tools import get_host_ip_mask
+from libraries.net_tools import get_host_ip_mask, DeviceInfo
 from libraries.port_manager import PortManager
 
 JOB_DIR = './jobs/'
@@ -115,63 +114,19 @@ class SubnetScanner:
         if not is_alive:
             return None
         # add host to results, modify as pass by ref moving forward
+        device = DeviceInfo(host)
         host_info = {'ip': host}
         self.results.append(host_info)
         host_info['is_loading'] = True
-        host_info['hostname'] = self._get_hostname(host)
-        host_info['mac'] = self._get_mac_address(host)
-        host_info['manufacturer'] = self._get_manufacturer(host_info['mac'])
+        host_info['hostname'] = device.hostname
+        host_info['mac'] = device.mac_addr
+        host_info['manufacturer'] = device.manufacturer
         host_info['open_ports'] = self._scan_ports(host)
         host_info.pop('is_loading')
 
         return host_info
-    
-    def _get_mac_address(self, ip_address):
-        """
-        Get the MAC address of a network device given its IP address.
-        """
-        os = platform.system().lower()
-        if os == "windows":
-            arp_command = ['arp', '-a', ip_address]
-        else:
-            arp_command = ['arp', ip_address]
-        try:
-            output = subprocess.check_output(arp_command, stderr=subprocess.STDOUT, universal_newlines=True)
-            output = output.replace('-', ':')
-            mac = re.search(r'..:..:..:..:..:..', output)
-            return mac.group() if mac else None
-        except:
-            return None
         
-    @job_tracker
-    def _get_manufacturer(self, mac_address: str):
-        return lookup_mac(mac_address)
-
-    @job_tracker
-    def _get_hostname(self, ip_address):
-        try:
-            hostname = socket.gethostbyaddr(ip_address)[0]
-            return hostname
-        except socket.herror:
-            return None
-
-    @job_tracker
-    def _get_mac_address(self, ip_address):
-        """
-        Get the MAC address of a network device given its IP address.
-        """
-        os = platform.system().lower()
-        if os == "windows":
-            arp_command = ['arp', '-a', ip_address]
-        else:
-            arp_command = ['arp', ip_address]
-        try:
-            output = subprocess.check_output(arp_command, stderr=subprocess.STDOUT, universal_newlines=True)
-            output = output.replace('-', ':')
-            mac = re.search(r'..:..:..:..:..:..', output)
-            return mac.group() if mac else None
-        except:
-            return None
+    
 
     def _scan_ports(self, host):
         open_ports = []

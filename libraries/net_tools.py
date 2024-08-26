@@ -5,8 +5,54 @@ import subprocess
 import re
 import psutil
 import ipaddress
+from libraries.mac_lookup import lookup_mac
+
+
+class DeviceInfo:
+    def __init__(self,ip:str):
+        self.ip = ip
+        self.hostname = self.get_hostname()
+        self.mac_addr = self.get_mac_address()
+        self.manufacturer = self.get_manufacturer()
+    
+    def get_mac_address(self):
+        """
+        Get the MAC address of a network device given its IP address.
+        """
+        os = platform.system().lower()
+        if os == "windows":
+            arp_command = ['arp', '-a', self.ip]
+        else:
+            arp_command = ['arp', self.ip]
+        try:
+            output = subprocess.check_output(arp_command, stderr=subprocess.STDOUT, universal_newlines=True)
+            output = output.replace('-', ':')
+            mac = re.search(r'..:..:..:..:..:..', output)
+            return mac.group() if mac else None
+        except:
+            return None
+        
+    def get_hostname(self):
+        """
+        Get the hostname of a network device given its IP address.
+        """
+        try:
+            hostname = socket.gethostbyaddr(self.ip)[0]
+            return hostname
+        except socket.herror:
+            return None
+        
+    def get_manufacturer(self):
+        """
+        Get the manufacturer of a network device given its MAC address.
+        """
+        return lookup_mac(self.mac_addr) if self.mac_addr else None
+    
 
 def get_ip_address(interface: str):
+    """
+    Get the IP address of a network interface.
+    """
     def linux():
         try:
             import fcntl
@@ -31,6 +77,9 @@ def get_ip_address(interface: str):
     return linux()
 
 def get_netmask(interface: str):
+    """
+    Get the netmask of a network interface.
+    """
     def linux():
         try:
             import fcntl
@@ -55,10 +104,16 @@ def get_netmask(interface: str):
     return linux()
 
 def get_cidr_from_netmask(netmask: str):
+    """
+    Get the CIDR notation of a netmask.
+    """
     binary_str = ''.join([bin(int(x)).lstrip('0b').zfill(8) for x in netmask.split('.')])
     return str(len(binary_str.rstrip('0')))
 
 def get_primary_interface():
+    """
+    Get the primary network interface.
+    """
     addrs = psutil.net_if_addrs()
     gateways = psutil.net_if_stats()
     
@@ -69,11 +124,17 @@ def get_primary_interface():
     return None
 
 def get_host_ip_mask(ip_with_cidr: str):
+    """
+    Get the IP address and netmask of a network interface.
+    """
     cidr = ip_with_cidr.split('/')[1]
     network = ipaddress.ip_network(ip_with_cidr, strict=False)
     return f'{network.network_address}/{cidr}'
 
 def get_primary_network_subnet():
+    """
+    Get the primary network interface and subnet.
+    """
     primary_interface = get_primary_interface() 
     ip_address = get_ip_address(primary_interface)
     netmask = get_netmask(primary_interface)

@@ -1,0 +1,118 @@
+/* General styling */
+body {
+    background-color: #181818;
+    color: #e0e0e0;
+}
+
+/* Card styling */
+.card {
+    background-color: #282828;
+    border-color: #444;
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    border-bottom: 1px solid #444;
+}
+
+/* Table container styling */
+.table-container {
+    max-width: 90vw;
+    overflow-x: auto;
+    margin: auto;
+}
+
+/* Table styling */
+.table {
+    color: #e0e0e0;
+    width: 100%;
+}
+
+.table th, .table td {
+    background-color: #282828;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+.table thead th {
+    background-color: #333;
+}
+
+/* Alternate row background colors */
+.table-striped tbody tr:nth-of-type(odd) td {
+    background-color: #232323;
+}
+
+.table-striped tbody tr:nth-of-type(even) td {
+    background-color: #2b2b2b;
+}
+
+/* Hover effect on table rows */
+.table tbody tr:hover {
+    background-color: #3a3a3a;
+}
+
+/* Badge styling */
+.badge-warning {
+    background-color: #ffcc00;
+    color: #000;
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: #ffffff;
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+/* Link styling */
+a {
+    color: #66b2ff;
+}
+
+
+/* make selectors for buttons that alternate through 4 colors
+ the length can be any number of buttons, alternating through the colors
+*/
+.colorful-buttons a:nth-of-type(4n+1) {
+    background-color: #007bff;
+    border-color: #0064cf;
+}
+.colorful-buttons a:nth-of-type(4n+1):hover {
+    background-color: #0056b3;
+    border-color: #004b9e;
+}
+.colorful-buttons a:nth-of-type(4n+2) {
+    background-color: #27a946;
+    border-color: #1e7e34;
+}
+.colorful-buttons a:nth-of-type(4n+2):hover {
+    background-color: #1f7d35;
+    border-color: #1a6e2e;
+}
+.colorful-buttons a:nth-of-type(4n+3) {
+    background-color: #bf9a06;
+    border-color: #8b7002;
+}
+.colorful-buttons a:nth-of-type(4n+3):hover {
+    background-color: #a47f05;
+    border-color: #7a6a03;
+}
+.colorful-buttons a:nth-of-type(4n+4) {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+.colorful-buttons a:nth-of-type(4n+4):hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}

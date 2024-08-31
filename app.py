@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,render_template
 from libraries.port_manager import PortManager
 from libraries.subnet_scan import SubnetScanner
+
 import traceback
 
 app = Flask(__name__)
@@ -54,3 +55,10 @@ def scan_subnet_async():
 def get_scan(scan_id):
     scan = SubnetScanner.get_scan(scan_id)
     return jsonify(scan)
+
+# Template Renderer
+############################################
+@app.route('/scan/<scan_id>', methods=['GET'])
+def render_scan(scan_id):
+    data = SubnetScanner.get_scan(scan_id)
+    return render_template('scan.html', data=data) 

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include 'core/head.html' %}
+</head>
+<body>
+    <div class="container-fluid my-4">
+        {% block content %}{% endblock %}
+    </div>
+    {% include 'core/scripts.html' %}
+</body>
+</html>

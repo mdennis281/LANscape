@@ -1,0 +1,109 @@
+<h2 class="mt-5 mb-3">IP Details</h2>
+<div class="table-container">
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th scope="col">IP Address</th>
+                <th scope="col">MAC Address</th>
+                <th scope="col">Manufacturer</th>
+                <th scope="col">Open Ports</th>
+                <th scope="col">Scanning</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for result in data.results %}
+            <tr>
+                <td>{{ result.ip }}</td>
+                <td>{{ result.mac }}</td>
+                <td>{{ result.manufacturer or 'Unknown' }}</td>
+                <td>{{ result.open_ports | join(", ") }}</td>
+                <td>
+                    {% if result.is_loading %}
+                        <span class="badge badge-warning">Scanning</span>
+                    {% else %}
+                        <span class="badge badge-success">Completed</span>
+                    {% endif %}
+                </td>
+                <td class="colorful-buttons">
+                    {% if '80' in result.open_ports %} 
+                        <a href="http://{{ result.ip }}" class="btn btn-sm" target="_blank">HTTP</a>
+                    {% endif %}
+                    {% if '443' in result.open_ports %} 
+                        <a href="https://{{ result.ip }}" class="btn btn-sm" target="_blank">HTTPS</a>
+                    {% endif %}
+                    {% if '22' in result.open_ports %} 
+                        <a href="ssh://{{ result.ip }}" class="btn btn-sm " target="_blank">SSH</a>
+                    {% endif %}
+                    {% if '21' in result.open_ports %} 
+                        <a href="ftp://{{ result.ip }}" class="btn btn-sm " target="_blank">FTP</a>
+                    {% endif %}
+                    {% if '23' in result.open_ports %} 
+                        <a href="telnet://{{ result.ip }}" class="btn btn-sm " target="_blank">Telnet</a>
+                    {% endif %}
+                    {% if '445' in result.open_ports %} 
+                        <a href="smb://{{ result.ip }}" class="btn btn-sm " target="_blank">SMB</a>
+                    {% endif %}
+                    {% if '3306' in result.open_ports %} 
+                        <a href="mysql://{{ result.ip }}" class="btn btn-sm " target="_blank">MySQL</a>
+                    {% endif %}
+                    {% if '5432' in result.open_ports %} 
+                        <a href="postgresql://{{ result.ip }}" class="btn btn-sm " target="_blank">PostgreSQL</a>
+                    {% endif %}
+                    {% if '3389' in result.open_ports %} 
+                        <a href="rdp://{{ result.ip }}" class="btn btn-sm " target="_blank">RDP</a>
+                    {% endif %}
+                    {% if '5900' in result.open_ports %} 
+                        <a href="vnc://{{ result.ip }}" class="btn btn-sm " target="_blank">VNC</a>
+                    {% endif %}
+                    {% if '27017' in result.open_ports %} 
+                        <a href="mongodb://{{ result.ip }}" class="btn btn-sm " target="_blank">MongoDB</a>
+                    {% endif %}
+                    {% if '6379' in result.open_ports %} 
+                        <a href="redis://{{ result.ip }}" class="btn btn-sm " target="_blank">Redis</a>
+                    {% endif %}
+                    {% if '11211' in result.open_ports %} 
+                        <a href="memcached://{{ result.ip }}" class="btn btn-sm " target="_blank">Memcached</a>
+                    {% endif %}
+                    {% if '1433' in result.open_ports %} 
+                        <a href="mssql://{{ result.ip }}" class="btn btn-sm " target="_blank">MSSQL</a>
+                    {% endif %}
+                    {% if '1521' in result.open_ports %} 
+                        <a href="oracle://{{ result.ip }}" class="btn btn-sm " target="_blank">Oracle</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="source://{{ result.ip }}" class="btn btn-sm " target="_blank">Source</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="minecraft://{{ result.ip }}" class="btn btn-sm " target="_blank">Minecraft</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="teamspeak://{{ result.ip }}" class="btn btn-sm " target="_blank">Teamspeak</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="gmod://{{ result.ip }}" class="btn btn-sm " target="_blank">Garry's Mod</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="rust://{{ result.ip }}" class="btn btn-sm " target="_blank">Rust</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="ark://{{ result.ip }}" class="btn btn-sm " target="_blank">ARK</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="terraria://{{ result.ip }}" class="btn btn-sm " target="_blank">Terraria</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="factorio://{{ result.ip }}" class="btn btn-sm " target="_blank">Factorio</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="starmade://{{ result.ip }}" class="btn btn-sm " target="_blank">StarMade</a>
+                    {% endif %}
+                    {% if '27015' in result.open_ports %} 
+                        <a href="7dtd://{{ result.ip }}" class="btn btn-sm " target="_blank">7 Days to Die</a>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>

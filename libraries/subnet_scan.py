@@ -21,12 +21,18 @@ JOB_DIR = './jobs/'
 
 
 class SubnetScanner:
-    def __init__(self, subnet: str, port_list: str = ""):
+    def __init__(
+            self, 
+            subnet: str, 
+            port_list: str,
+            parallelism: float = 1.0
+        ):
         self.subnet = IPv4Network(get_host_ip_mask(subnet))
         self.port_list = port_list
         self.ports: list = PortManager().get_port_list(port_list).keys()
         self.running = False
         self.uid = str(uuid.uuid4())
+        self.parallelism = parallelism
 
         self.subnet_str = subnet
         self.results = []
@@ -45,7 +51,7 @@ class SubnetScanner:
     
     def scan_subnet(self):
         self.running = True
-        with ThreadPoolExecutor(max_workers=256) as executor:
+        with ThreadPoolExecutor(max_workers=self._t_cnt(256)) as executor:
             futures = {executor.submit(self._get_host_details, str(ip)): str(ip) for ip in self.subnet}
             for future in futures:
                 ip = futures[future]
@@ -86,6 +92,7 @@ class SubnetScanner:
             'running': self.running,
             'uid': self.uid,
             'subnet': self.subnet_str,
+            'parallelism': self.parallelism,
             'run_time': time() - self.start_time,
             'ip_count': len(list(self.subnet.hosts())),
             'port_list': self.port_list
@@ -130,7 +137,7 @@ class SubnetScanner:
 
     def _scan_ports(self, host):
         open_ports = []
-        with ThreadPoolExecutor(max_workers=128) as executor:
+        with ThreadPoolExecutor(max_workers=self._t_cnt(128)) as executor:
             futures = {executor.submit(self._scan_port, host, int(port)): port for port in self.ports}
             for future in futures:
                 port = futures[future]
@@ -171,5 +178,17 @@ class SubnetScanner:
             sleep(retry_delay)
         return False
     
+    def _t_cnt(self, base_threads: int) -> int:
+        return int(base_threads * self.parallelism)
+    
 
             
+def cleanup_old_jobs(all=False):
+    """
+    Delete all job files older than 24 hours.
+    """
+    for file in os.listdir(JOB_DIR):
+        if file.endswith('.json'):
+            file_path = f'{JOB_DIR}{file}'
+            if time() - os.path.getmtime(file_path) > 86400 or all:
+                os.remove(file_path)

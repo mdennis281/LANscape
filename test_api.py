@@ -2,6 +2,7 @@ import unittest
 import json
 from app import app
 from libraries.net_tools import get_primary_network_subnet
+from libraries.subnet_scan import cleanup_old_jobs
 
 
 class AppTestCase(unittest.TestCase):
@@ -55,7 +56,7 @@ class AppTestCase(unittest.TestCase):
     def test_scan(self):
         # Delete the new port list if it exists
         self.app.delete('/api/port/list/test_port_list_scan')
-        
+
         # Create a new port list
         new_port_list = {'80': 'http', '443': 'https'}
         response = self.app.post('/api/port/list/test_port_list_scan', json=new_port_list)
@@ -70,6 +71,10 @@ class AppTestCase(unittest.TestCase):
         # Delete the new port list
         response = self.app.delete('/api/port/list/test_port_list_scan')
         self.assertEqual(response.status_code, 200)
+
+        cleanup_old_jobs(True)
+
+        
         
 
 

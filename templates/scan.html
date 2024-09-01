@@ -3,4 +3,17 @@
 {% block content %}
     {% include 'scan/overview.html' %}
     {% include 'scan/ip-table.html' %}
+    {% if data.running %}
+        <script>
+                setTimeout(function() {
+                    // get current page via ajax, and replace the current page with the new one
+                    setTimeout( function() {
+                        $.get(document.location.href, function(data) {
+                            $("body").html(data);
+                        });
+                    }, 1000);
+                }, 2500);
+        </script>
+    {% endif %}
 {% endblock %}
+

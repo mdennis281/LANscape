@@ -19,10 +19,14 @@
                 <td>{{ result.manufacturer or 'Unknown' }}</td>
                 <td>{{ result.open_ports | join(", ") }}</td>
                 <td>
-                    {% if result.is_loading %}
-                        <span class="badge badge-warning">Scanning</span>
+                    {% if result.is_loading == False %}
+                        <span class="badge badge-success">complete</span>
+                    {% elif result.stage == 'found' %}
+                        <span class="badge badge-warning">found</span>
+                    {% elif result.stage == 'scanning' %}
+                        <span class="badge badge-info">scanning</span>
                     {% else %}
-                        <span class="badge badge-success">Completed</span>
+                        <span class="badge badge-warning">{{result.stage}}</span>
                     {% endif %}
                 </td>
                 <td class="colorful-buttons">

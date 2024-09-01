@@ -45,9 +45,15 @@ class SubnetScanner:
         threading.Thread(target=self.scan_subnet).start()
 
     @staticmethod
-    def get_scan(scan_id):
-        with open(f'{JOB_DIR}{scan_id}.json', 'r') as f:
-            return json.load(f)
+    def get_scan(scan_id,tried=0):
+        if tried < 5:
+            try:
+                with open(f'{JOB_DIR}{scan_id}.json', 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                sleep(1)
+                return SubnetScanner.get_scan(scan_id, tried+1)
+        raise json.JSONDecodeError('Could not load scan data')
     
     def scan_subnet(self):
         self.running = True
@@ -73,6 +79,9 @@ class SubnetScanner:
                 
                 self.stats['scanned'] += 1
                 self.save_job_state()
+
+        self.save_job_state()
+        self._scan_network_ports()
 
         self.running = False
         self.save_job_state()
@@ -106,6 +115,7 @@ class SubnetScanner:
         """
         while self.running:
             os.system('cls' if os.name == 'nt' else 'clear')
+            print(f'{self.uid} - {self.subnet_str}')
             print(f"Running jobs:  {self.job_stats['running']}")
             print(f"Finished jobs: {self.job_stats['finished']}")
             print(f"Job timing:    {self.job_stats['timing']}")
@@ -128,22 +138,29 @@ class SubnetScanner:
         host_info['hostname'] = device.hostname
         host_info['mac'] = device.mac_addr
         host_info['manufacturer'] = device.manufacturer
-        host_info['open_ports'] = self._scan_ports(host)
-        host_info.pop('is_loading')
-
+        host_info['stage'] = 'found'
+        host_info['open_ports'] = []
         return host_info
         
-    
+    def _scan_network_ports(self):
+        with ThreadPoolExecutor(max_workers=self._t_cnt(10)) as executor:
+            futures = {executor.submit(self._scan_ports, host): host for host in self.results}
+            for future in futures:
+                future.result()
 
+    @job_tracker
     def _scan_ports(self, host):
-        open_ports = []
+        host['stage'] = 'scanning'
+        self.save_job_state()
         with ThreadPoolExecutor(max_workers=self._t_cnt(128)) as executor:
-            futures = {executor.submit(self._scan_port, host, int(port)): port for port in self.ports}
+            futures = {executor.submit(self._scan_port, host['ip'], int(port)): port for port in self.ports}
             for future in futures:
                 port = futures[future]
                 if future.result():
-                    open_ports.append(port)
-        return open_ports
+                    host['open_ports'].append(port)
+                    self.save_job_state()
+        host['is_loading'] = False
+        host['stage'] = 'complete'
     
     @job_tracker
     def _scan_port(self,host, port):

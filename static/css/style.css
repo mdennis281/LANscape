@@ -63,6 +63,14 @@ body {
     background-color: #28a745;
     color: #ffffff;
 }
+.badge-info {
+    background-color: #17a2b8;
+    color: #ffffff;
+}
+.badge-secondary {
+    background-color: #6c757d;
+    color: #ffffff;
+}
 
 /* Button styling */
 .btn-primary {

@@ -4,16 +4,7 @@
     {% include 'scan/overview.html' %}
     {% include 'scan/ip-table.html' %}
     {% if data.running %}
-        <script>
-                setTimeout(function() {
-                    // get current page via ajax, and replace the current page with the new one
-                    setTimeout( function() {
-                        $.get(document.location.href, function(data) {
-                            $("body").html(data);
-                        });
-                    }, 1000);
-                }, 2500);
-        </script>
+        <script src="{{ url_for('static', filename='js/quietReload.js') }}"></script>
     {% endif %}
 {% endblock %}
 

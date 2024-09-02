@@ -6,16 +6,81 @@ import re
 import psutil
 import ipaddress
 from libraries.mac_lookup import lookup_mac
+from scapy.all import ARP, Ether, srp
+from time import sleep
+from typing import List
 
 
-class DeviceInfo:
+class IPAlive:
+    def is_alive(self,ip:str) -> bool:
+        try:
+            self.alive = self._arp_lookup(ip)
+        except:
+            self.alive = self._ping_lookup(ip)
+
+        return self.alive
+
+    def _arp_lookup(self,ip,timeout=4):
+        arp_request = ARP(pdst=ip)
+        broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
+        arp_request_broadcast = broadcast / arp_request
+
+        # Send the packet and receive the response
+        answered, _ = srp(arp_request_broadcast, timeout=timeout, verbose=False)
+
+        for sent, received in answered:
+            if received.psrc == ip:
+                return True
+        return False
+
+    def _ping_lookup(self,host, retries=1, retry_delay=1, ping_count=2, timeout=1000):
+            """
+            Ping the given host and return True if it's reachable, False otherwise.
+            """
+            os = platform.system().lower()
+            if os == "windows":
+                ping_command = ['ping', '-n', str(ping_count), '-w', str(timeout)]  
+            else:
+                ping_command = ['ping', '-c', str(ping_count), '-W', str(timeout)]
+                
+            for _ in range(retries):
+                try:
+                    output = subprocess.check_output(ping_command + [host], stderr=subprocess.STDOUT, universal_newlines=True)
+                    # Check if 'TTL' or 'time' is in the output to determine success
+                    if 'TTL' in output.upper():
+                        return True
+                except subprocess.CalledProcessError:
+                    pass  # Ping failed
+                sleep(retry_delay)
+            return False
+
+class Device(IPAlive):
     def __init__(self,ip:str):
-        self.ip = ip
-        self.hostname = self.get_hostname()
-        self.mac_addr = self.get_mac_address()
-        self.manufacturer = self.get_manufacturer()
+        self.ip: str = ip
+        self.alive: bool = None
+        self.hostname: str = None
+        self.mac_addr: str = None
+        self.manufacturer: str = None
+        self.ports: List[int] = []
+        self.stage: str = 'found'
+
+    def get_metadata(self):
+        if self.alive:
+            self.hostname = self._get_hostname()
+            self.mac_addr = self._get_mac_address()
+            self.manufacturer = self._get_manufacturer()
     
-    def get_mac_address(self):
+    def test_port(self,port:int) -> bool:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex((self.ip, port))
+        sock.close()
+        if result == 0:
+            self.ports.append(port)
+            return True
+        return False
+
+    def _get_mac_address(self):
         """
         Get the MAC address of a network device given its IP address.
         """
@@ -32,7 +97,7 @@ class DeviceInfo:
         except:
             return None
         
-    def get_hostname(self):
+    def _get_hostname(self):
         """
         Get the hostname of a network device given its IP address.
         """
@@ -42,7 +107,7 @@ class DeviceInfo:
         except socket.herror:
             return None
         
-    def get_manufacturer(self):
+    def _get_manufacturer(self):
         """
         Get the manufacturer of a network device given its MAC address.
         """
@@ -143,3 +208,6 @@ def get_primary_network_subnet():
     ip_mask = f'{ip_address}/{cidr}'
 
     return get_host_ip_mask(ip_mask)
+
+
+

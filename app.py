@@ -37,7 +37,11 @@ def scan_subnet():
     data = request.get_json()
 
     try:
-        scanner = SubnetScanner(data['subnet'], data['port_list'])
+        scanner = SubnetScanner(
+            data['subnet'], 
+            data['port_list'],
+            parallelism=data.get('parallelism', 1.0)
+        )
         scanner.scan_subnet_threaded()
         return jsonify({'status': 'running', 'scan_id': scanner.uid})
     except:

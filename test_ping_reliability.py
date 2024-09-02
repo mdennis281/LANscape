@@ -10,7 +10,7 @@ def test_ping_reliability(threads=128,scans=2):
     def scan_host():
         count = 0
         with ThreadPoolExecutor(max_workers=threads) as executor:
-            futures = {executor.submit(scanner._ping, Device(ip)): str(ip) for ip in scanner.subnet}
+            futures = {executor.submit(scanner._ping, Device(str(ip))): str(ip) for ip in scanner.subnet}
             for future in futures:
                 ans = future.result()
                 if ans:

@@ -1,217 +1,4 @@
-/* Card styling */
-.card {
-    background-color: #282828;
-    border-color: #444;
-}
-
-.card-header {
-    background-color: rgba(0, 0, 0, 0.5);
-    color: #ffffff;
-    border-bottom: 1px solid #444;
-}
-
-/* Input and form styling */
-form {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.form-group {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-label {
-    color: #ffffff;
-    font-weight: 500;
-    margin-bottom: 5px;
-}
-
-input[type="text"], input[type="number"], select {
-    background-color: #232323;
-    border: 1px solid #444;
-    color: #e0e0e0;
-    padding: 8px 10px;
-    font-size: 1rem;
-    border-radius: 5px;
-}
-
-input[type="range"] {
-    width: 100%;
-    margin: 5px 0;
-}
-
-button {
-    margin-left: 15px;
-    padding: 10px 20px;
-}
-
-/* Slider styling */
-input[type="range"] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 8px;
-    background-color: #444;
-    outline: none;
-    border-radius: 5px;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #007bff;
-    cursor: pointer;
-}
-
-input[type="range"]::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #007bff;
-    cursor: pointer;
-}
-
-/* Button styling */
-button.btn-primary {
-    background-color: #007bff;
-    border: none;
-    padding: 10px 20px;
-    color: #fff;
-    font-size: 1rem;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: background-color 0.2s ease;
-}
-
-button.btn-primary:hover {
-    background-color: #0056b3;
-}
-
-/* Clean up the layout for the input form */
-#scan-form {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 15px;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-}
-.title span {
-    color: #007bff;
-}
-/* Table container styling */
-.table-container {
-    width: 100vw;
-    height: 100vh;
-    overflow: auto;
-    margin: auto;
-}
-
-/* Table styling */
-.table {
-    color: #e0e0e0;
-    width: 100%;
-}
-
-.table th, .table td {
-    background-color: #282828;
-    border-color: #444;
-    color: #e0e0e0;
-}
-
-.table thead th {
-    background-color: #333;
-}
-
-/* Alternate row background colors */
-.table-striped tbody tr:nth-of-type(odd) td {
-    background-color: #232323;
-}
-
-.table-striped tbody tr:nth-of-type(even) td {
-    background-color: #2b2b2b;
-}
-
-/* Hover effect on table rows */
-.table tbody tr:hover {
-    background-color: #3a3a3a;
-}
-
-/* Badge styling */
-.badge-warning {
-    background-color: #ffcc00;
-    color: #000;
-}
-
-.badge-success {
-    background-color: #28a745;
-    color: #ffffff;
-}
-.badge-info {
-    background-color: #17a2b8;
-    color: #ffffff;
-}
-.badge-secondary {
-    background-color: #6c757d;
-    color: #ffffff;
-}
-
-/* Link styling */
-a {
-    color: #66b2ff;
-}
-
-/* Buttons styling for alternating colors */
-.colorful-buttons a:nth-of-type(4n+1) {
-    background-color: #007bff;
-    border-color: #0064cf;
-}
-.colorful-buttons a:nth-of-type(4n+1):hover {
-    background-color: #0056b3;
-    border-color: #004b9e;
-}
-.colorful-buttons a:nth-of-type(4n+2) {
-    background-color: #27a946;
-    border-color: #1e7e34;
-}
-.colorful-buttons a:nth-of-type(4n+2):hover {
-    background-color: #1f7d35;
-    border-color: #1a6e2e;
-}
-.colorful-buttons a:nth-of-type(4n+3) {
-    background-color: #bf9a06;
-    border-color: #8b7002;
-}
-.colorful-buttons a:nth-of-type(4n+3):hover {
-    background-color: #a47f05;
-    border-color: #7a6a03;
-}
-.colorful-buttons a:nth-of-type(4n+4) {
-    background-color: #dc3545;
-    border-color: #dc3545;
-}
-.colorful-buttons a:nth-of-type(4n+4):hover {
-    background-color: #c82333;
-    border-color: #bd2130;
-}
-
-
-
-
-
-
-
+/* General Styles */
 body {
     background-color: #1e1e1e;
     color: #ffffff;
@@ -233,48 +20,28 @@ body {
     margin-top: 10px;
 }
 
-.overview-container {
-    display: flex;
-    justify-content: space-around;
-    width: 100vw;
-}
-
-/* Section dividers */
-hr {
-    border-color: #444;
-    margin: 20px 0;
-}
-
-/* Header styles */
 h1, h2, h3 {
     font-weight: 600;
     color: #e0e0e0;
 }
 
-/* Form styles */
-.form-group {
-    margin-bottom: 15px;
+hr {
+    border-color: #444;
+    margin: 20px 0;
 }
 
-.form-control {
-    background-color: #3a3a3a;
-    color: #ffffff;
-    border: 1px solid #555;
+.title span {
+    color: #007bff;
 }
 
-/* Input focus */
-.form-control:focus {
-    background-color: #4a4a4a;
-    border-color: #007bff;
+.overview-container {
+    display: flex;
+    justify-content: space-around;
+    width: 100vw;
+    height: 100px;
 }
 
-/* Button styling */
-.btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
-}
-
-/* Advanced details styling */
+/* Layout Styles */
 details {
     background-color: #333;
     border: 1px solid #555;
@@ -282,28 +49,283 @@ details {
     border-radius: 5px;
 }
 
-/* Utility tool sections */
 #scan-results {
     margin-top: 20px;
 }
 
-/* Full height container for iframe and form */
 #overview-frame, #ip-table-frame {
     width: 100%;
 }
 
+#overview-frame {
+    height: 120px;
+}
+
 .table-frame-container {
     width: 100%;
-    height: 350px; /* TODO: calc height based on screen size */
+    height: 350px;
     overflow-y: auto;
 }
 
-/* Smooth transitions */
-input, select, button, details {
-    transition: all 0.3s ease-in-out;
+#scan-form {
+    width: 500px
 }
 
-/* Input placeholders */
+
+/* Card Styles */
+.card {
+    background-color: #282828;
+    border-color: #444;
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    border-bottom: 1px solid #444;
+}
+
+
+/* Form / Input Styles */
+form {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+label {
+    color: #ffffff;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+input[type="text"], input[type="number"], select, .form-control {
+    background-color: #232323;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 8px 10px;
+    font-size: 1rem;
+    border-radius: 5px;
+}
+
+input[type="text"]:focus, select:focus, .form-control:focus {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-color: #4a90e2;
+    outline: none;
+}
+
 input::placeholder {
-    color: #bbb;
+    color: #bbb !important;
+}
+
+button {
+    margin-left: 15px;
+    padding: 10px 20px;
+}
+
+/* Button Styling */
+.btn-primary, button.btn-primary {
+    background-color: #007bff;
+    border: none;
+    padding: 10px 20px;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background-color: #444;
+    outline: none;
+    border-radius: 5px;
+    margin: 5px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb,
+input[type="range"]::-moz-range-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+}
+.port-list-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.port-list {
+    position: relative;
+    background-color: #232323;
+    border: 1px solid #555;
+    color: #e0e0e0;
+    padding: 10px;
+    cursor: pointer;
+    width: 100%;
+    user-select: none;
+    appearance: none;  /* Hide default arrow */
+}
+
+.port-list:focus {
+    border-color: #4a90e2;
+    outline: none;
+}
+
+.port-list-wrapper::after {
+    content: '▼';
+    position: absolute;
+    top: 14px;
+    right: 10px;
+    pointer-events: none;
+    color: #e0e0e0;
+}
+
+.port-list-dropdown {
+    display: none;
+    position: absolute;
+    background-color: #232323;
+    border: 1px solid #555;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+}
+
+.port-list-dropdown.open {
+    display: block;
+}
+
+.port-list-dropdown div {
+    padding: 10px;
+    color: #e0e0e0;
+    cursor: pointer;
+}
+
+.port-list-dropdown div:hover {
+    background-color: #4a90e2;
+    color: white;
+}
+
+
+/* Table Styles */
+.table-container {
+    width: 100vw;
+    margin: auto;
+}
+
+.table {
+    color: #e0e0e0;
+    width: 100%;
+}
+
+.table th, .table td {
+    background-color: #282828;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+.table thead th {
+    background-color: #333;
+}
+
+.table-striped tbody tr:nth-of-type(odd) td {
+    background-color: #232323;
+}
+
+.table-striped tbody tr:nth-of-type(even) td {
+    background-color: #2b2b2b;
+}
+
+.table tbody tr:hover {
+    background-color: #3a3a3a;
+}
+
+
+/* Badge Styles */
+.badge-warning {
+    background-color: #ffcc00;
+    color: #000;
+}
+
+.badge-success, .badge-info, .badge-secondary {
+    color: #ffffff;
+}
+
+.badge-success {
+    background-color: #28a745;
+}
+
+.badge-info {
+    background-color: #17a2b8;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+}
+
+
+/* Protocol Open Button Styles */
+.colorful-buttons a:nth-of-type(4n+1) {
+    background-color: #007bff;
+    border-color: #0064cf;
+}
+
+.colorful-buttons a:nth-of-type(4n+1):hover {
+    background-color: #0056b3;
+    border-color: #004b9e;
+}
+
+.colorful-buttons a:nth-of-type(4n+2) {
+    background-color: #27a946;
+    border-color: #1e7e34;
+}
+
+.colorful-buttons a:nth-of-type(4n+2):hover {
+    background-color: #1f7d35;
+    border-color: #1a6e2e;
+}
+
+.colorful-buttons a:nth-of-type(4n+3) {
+    background-color: #bf9a06;
+    border-color: #8b7002;
+}
+
+.colorful-buttons a:nth-of-type(4n+3):hover {
+    background-color: #a47f05;
+    border-color: #7a6a03;
+}
+
+.colorful-buttons a:nth-of-type(4n+4) {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.colorful-buttons a:nth-of-type(4n+4):hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+
+/* Transitions */
+input, select, button, details {
+    transition: all 0.3s ease-in-out;
 }

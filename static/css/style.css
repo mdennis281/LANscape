@@ -4,9 +4,6 @@ body {
     color: #ffffff;
     font-family: Arial, sans-serif;
     height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     overflow: hidden; /* No body scrolling */
 }
 
@@ -16,9 +13,24 @@ body {
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0,0,0,0.8);
     width: 90%;
-    max-width: 1200px;
     margin-top: 10px;
 }
+
+#header {
+    background-color: #2a2a2a;
+    padding: 20px;
+    margin: 0;
+    display: block;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    width: 100vw;
+}
+
+#scan-container {
+    width: 100vw;
+    height: 100%;
+    overflow-y: auto;
+}
+
 
 h1, h2, h3 {
     font-weight: 600;
@@ -61,11 +73,7 @@ details {
     height: 120px;
 }
 
-.table-frame-container {
-    width: 100%;
-    height: 350px;
-    overflow-y: auto;
-}
+
 
 #scan-form {
     width: 500px
@@ -166,6 +174,10 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 50%;
     background: #007bff;
     cursor: pointer;
+}
+#parallelism-value span {
+    color: #fa7a7a;
+    font-weight: 500;
 }
 .port-list-wrapper {
     position: relative;

@@ -1,10 +1,15 @@
 $(document).ready(function() {
     // Load port lists into the dropdown
     getPortLists();
+    rightSizeScanContainer();
     $('#parallelism').on('input', function() {
-        const value = $(this).val() + (value < 1) ? '' : ' Warning: Increasing parallelism may inaccuracy in the scan results.';
+        const val = $('#parallelism').val();
+        let ans = val;
 
-        $('#parallelism-value').text($(this).val());
+        if (parseFloat(val) > 1) {
+            ans += ' <span>Warning: Increased parallelism may have inaccurate results<span>'
+        }
+        $('#parallelism-value').html(ans);
     });
     const url = new URL(window.location.href);
     if (url.searchParams.get('scan_id')) {
@@ -64,9 +69,6 @@ function getPortLists() {
             customSelectDropdown.append('<div>' + portList + '</div>');
         });
     
-        // Set the default value
-        customSelect.text('medium');
-    
         // Handle dropdown click
         customSelect.on('click', function() {
             customSelectDropdown.toggleClass('open');
@@ -114,3 +116,22 @@ $('#ip-table-frame').on('load', function() {
     resizeIframe(this); // Initial resizing after iframe loads
     observeIframeContent(this); // Start observing for dynamic changes
 });
+
+$(window).on('resize', function() {
+    rightSizeScanContainer();
+});
+
+
+function rightSizeScanContainer() {
+    setTimeout(() => {
+        const scanContainer = $('#scan-container');
+        const headerHeight = $('#header').outerHeight();
+        const viewportHeight = $(window).height();
+
+        console.log('headerHeight', headerHeight, 'viewportHeight', viewportHeight);
+
+
+        const newHeight = viewportHeight - headerHeight;
+        scanContainer.height(newHeight);
+    },20);
+}

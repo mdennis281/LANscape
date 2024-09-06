@@ -1,6 +1,6 @@
 import unittest
 import json
-from app import app
+from blueprints import app
 from libraries.net_tools import get_primary_network_subnet
 from libraries.subnet_scan import cleanup_old_jobs
 

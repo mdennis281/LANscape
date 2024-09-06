@@ -17,4 +17,5 @@ def is_substring_in_values(results: dict, substring: str) -> bool:
 
 app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 
-
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5001, debug=True)

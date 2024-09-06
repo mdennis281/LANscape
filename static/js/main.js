@@ -92,7 +92,9 @@ $(document).on('click', function(event) {
 
 function resizeIframe(iframe) {
     // Adjust the height of the iframe to match the content
-    iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+    setTimeout( () => {
+        iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+    },100);
 }
 
 function observeIframeContent(iframe) {
@@ -119,6 +121,7 @@ $('#ip-table-frame').on('load', function() {
 
 $(window).on('resize', function() {
     rightSizeScanContainer();
+    resizeIframe($('#ip-table-frame')[0]);
 });
 
 

@@ -2,9 +2,9 @@
 body {
     background-color: #1e1e1e;
     color: #ffffff;
-    font-family: Arial, sans-serif;
-    height: 100vh;
+    font-family: "Roboto Mono", monospace;
     overflow: hidden; /* No body scrolling */
+    height: fit-content;
 }
 
 .container-fluid {
@@ -18,7 +18,7 @@ body {
 
 #header {
     background-color: #2a2a2a;
-    padding: 20px;
+    padding: 8px 20px;
     margin: 0;
     display: block;
     box-shadow: 0 0 10px rgba(0,0,0,0.8);
@@ -74,9 +74,12 @@ details {
 }
 
 
-
 #scan-form {
-    width: 500px
+    width: 500px;
+    margin: 0;
+}
+#scan-form label {
+    margin-bottom: 0;
 }
 
 
@@ -340,4 +343,28 @@ input[type="range"]::-moz-range-thumb {
 /* Transitions */
 input, select, button, details {
     transition: all 0.3s ease-in-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 12px;  /* Width of the scrollbar */
+}
+
+::-webkit-scrollbar-track {
+    background-color: #232323; /* Background of the scrollbar track */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #444; /* Darker thumb for the scrollbar */
+    border-radius: 10px;
+    border: 3px solid #232323; /* Adds padding between the thumb and track */
+}
+
+
+
+/* For Firefox */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: #444 #232323;
 }

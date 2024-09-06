@@ -14,6 +14,7 @@ import traceback
 from pathlib import Path
 from libraries.net_tools import get_host_ip_mask, Device
 from libraries.port_manager import PortManager
+from libraries.ip_parser import parse_ip_input
 import subprocess
 import sys
 
@@ -28,7 +29,7 @@ class SubnetScanner:
             parallelism: float = 1.0,
             uid: str = str(uuid.uuid4())
         ):
-        self.subnet = IPv4Network(get_host_ip_mask(subnet))
+        self.subnet = parse_ip_input(subnet)
         self.port_list = port_list
         self.ports: list = PortManager().get_port_list(port_list).keys()
         self.running = False
@@ -55,7 +56,7 @@ class SubnetScanner:
         scan.running = True
         scan.results.save()
 
-        p = subprocess.Popen(
+        subprocess.Popen(
             [sys.executable, 'scanner.py', scan.uid],
             stdout=None, stderr=None, stdin=None, close_fds=True, shell=True
         )

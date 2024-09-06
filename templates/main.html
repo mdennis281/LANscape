@@ -36,13 +36,17 @@
 <div id="scan-container">
     <div class="container-fluid my-4">
         <!-- Scan Results -->
-        <div id="scan-results">
+        <div id="scan-results" class="div-hide">
             <h2>Scan Results</h2>
             <iframe id="overview-frame" src=""></iframe>
             <input type="text" id="filter" placeholder="Filter results" class="form-control mb-3 mt-3">
             <div class="table-frame-container">
                 <iframe id="ip-table-frame" src=""></iframe>
             </div>
+        </div>
+        <div id="no-scan">
+            <h2>No results to show</h2>
+            <p>Submit a scan above</p>
         </div>
     </div>
 </div>

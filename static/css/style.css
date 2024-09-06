@@ -142,6 +142,9 @@ button {
     margin-left: 15px;
     padding: 10px 20px;
 }
+.div-hide {
+    display: none !important;
+}
 
 /* Button Styling */
 .btn-primary, button.btn-primary {

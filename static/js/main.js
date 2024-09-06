@@ -48,7 +48,8 @@ $(document).ready(function() {
 });
 
 function showScan(scanId) {
-    $('#scan-results').show();
+    $('#no-scan').addClass('div-hide');
+    $('#scan-results').removeClass('div-hide');
     $('#overview-frame').attr('src', '/scan/' + scanId + '/overview');
     $('#ip-table-frame').attr('src', '/scan/' + scanId + '/table');
     // set url query string 'scan_id' to the scan_id

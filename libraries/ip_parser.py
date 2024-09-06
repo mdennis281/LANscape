@@ -9,7 +9,8 @@ def parse_ip_input(ip_input):
     for entry in entries:
         # Handle CIDR notation or IP/32
         if '/' in entry:
-            ip_ranges.append(ipaddress.IPv4Network(entry, strict=False))
+            for ip in ipaddress.IPv4Network(entry).hosts():
+                ip_ranges.append(ip) 
         
         # Handle IP range (e.g., 10.0.0.15-10.0.0.25)
         elif '-' in entry:

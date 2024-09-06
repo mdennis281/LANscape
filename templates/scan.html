@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-    {% include 'scan/overview.html' %}
-    {% include 'scan/ip-table.html' %}
+    {% if section != 'table' %}
+        {% include 'scan/overview.html' %}
+    {% endif %}
+    {% if section != 'overview' %}
+        {% include 'scan/ip-table.html' %}
+    {% endif %}
     {% if data.running %}
         <script src="{{ url_for('static', filename='js/quietReload.js') }}"></script>
     {% endif %}

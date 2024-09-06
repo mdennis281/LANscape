@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     {% include 'core/head.html' %}
+    {% include 'core/scripts.html' %}
 </head>
 <body>
-    <div class="container-fluid my-4">
-        {% block content %}{% endblock %}
-    </div>
-    {% include 'core/scripts.html' %}
+    
+    {% block content %}{% endblock %}
+
 </body>
 </html>

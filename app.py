@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify,render_template
+from flask import Flask, request, jsonify,render_template, request
 from libraries.port_manager import PortManager
 from libraries.subnet_scan import SubnetScanner
+from libraries.net_tools import get_primary_network_subnet
 
 import traceback
 
@@ -37,21 +38,27 @@ def scan_subnet():
     data = request.get_json()
 
     try:
-        scanner = SubnetScanner(
+        uid = SubnetScanner.scan_subnet_standalone(
             data['subnet'], 
             data['port_list'],
-            parallelism=data.get('parallelism', 1.0)
+            float(data.get('parallelism', 1.0))
         )
-        scanner.scan_subnet_threaded()
-        return jsonify({'status': 'running', 'scan_id': scanner.uid})
+
+        return jsonify({'status': 'running', 'scan_id': uid})
     except:
         return jsonify({'status': 'error', 'traceback': traceback.format_exc()}), 500
+    
+
     
 @app.route('/api/scan/async', methods=['POST'])
 def scan_subnet_async():
     data = request.get_json()
 
-    scanner = SubnetScanner(data['subnet'], data['port_list'])
+    scanner = SubnetScanner(
+        data['subnet'], 
+        data['port_list'], 
+        data.get('parallelism', 1.0)
+    )
     scanner.scan_subnet()
     return jsonify({'status': 'complete', 'scan_id': scanner.uid})
 
@@ -62,7 +69,18 @@ def get_scan(scan_id):
 
 # Template Renderer
 ############################################
+@app.route('/', methods=['GET'])
+def index():
+    return render_template('main.html',subnet=get_primary_network_subnet())    
+
+def is_substring_in_values(results: dict, substring: str) -> bool:
+    return any(substring.lower() in str(v).lower() for v in results.values()) if substring else True
+
+app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
+
 @app.route('/scan/<scan_id>', methods=['GET'])
-def render_scan(scan_id):
+@app.route('/scan/<scan_id>/<section>', methods=['GET'])
+def render_scan(scan_id, section='all'):
     data = SubnetScanner.get_scan(scan_id)
-    return render_template('scan.html', data=data) 
+    filter = request.args.get('filter')
+    return render_template('scan.html', data=data,section=section,filter=filter) 

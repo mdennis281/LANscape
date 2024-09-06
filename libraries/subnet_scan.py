@@ -14,6 +14,8 @@ import traceback
 from pathlib import Path
 from libraries.net_tools import get_host_ip_mask, Device
 from libraries.port_manager import PortManager
+import subprocess
+import sys
 
 JOB_DIR = './jobs/'
 
@@ -23,37 +25,57 @@ class SubnetScanner:
             self, 
             subnet: str, 
             port_list: str,
-            parallelism: float = 1.0
+            parallelism: float = 1.0,
+            uid: str = str(uuid.uuid4())
         ):
         self.subnet = IPv4Network(get_host_ip_mask(subnet))
         self.port_list = port_list
         self.ports: list = PortManager().get_port_list(port_list).keys()
         self.running = False
-        self.parallelism = parallelism
+        self.parallelism: float = float(parallelism)
         self.subnet_str = subnet
         self.job_stats = {'running': {}, 'finished': {}, 'timing': {}}
-        self.uid = str(uuid.uuid4())
-
+        self.uid = uid
         self.results = ScannerResults(self)
 
-    def scan_subnet_threaded(self):
+    def scan_subnet_threaded(self) -> threading.Thread:
         """
         Start a new thread to scan the subnet.
         """
         t = threading.Thread(target=self.scan_subnet)
         t.start()
         return t
+    
+    @staticmethod
+    def scan_subnet_standalone(subnet: str, port_list: str, parallelism: float = 1.0):
+        """
+        Start a new thread to scan the subnet.
+        """
+        scan = SubnetScanner(subnet, port_list, parallelism)
+        scan.running = True
+        scan.results.save()
+
+        p = subprocess.Popen(
+            [sys.executable, 'scanner.py', scan.uid],
+            stdout=None, stderr=None, stdin=None, close_fds=True, shell=True
+        )
+        return scan.uid
+    
+    @staticmethod
+    def instantiate_scan(scan_id: str) -> 'SubnetScanner':
+        """
+        Load a scan by its unique ID.
+        """
+        scan = SubnetScanner.get_scan(scan_id)
+        return SubnetScanner(scan['subnet'], scan['port_list'], scan['parallelism'], scan['uid'])
+    
 
     @staticmethod
-    def get_scan(scan_id,tried=0):
-        if tried < 5:
-            try:
-                with open(f'{JOB_DIR}{scan_id}.json', 'r') as f:
-                    return json.load(f)
-            except json.JSONDecodeError:
-                sleep(1)
-                return SubnetScanner.get_scan(scan_id, tried+1)
-        raise json.JSONDecodeError('Could not load scan data')
+    def get_scan(scan_id) -> dict:
+        """
+        Load a scan by its unique ID.
+        """
+        return ScannerResults.get_scan(scan_id)
     
     def scan_subnet(self):
         """
@@ -80,6 +102,7 @@ class SubnetScanner:
 
         self.results.stage = 'complete'
         self.running = False
+        return self.results
         
 
     def debug_active_scan(self):
@@ -168,13 +191,26 @@ class ScannerResults:
         self.errors: List[str] = []        
         self.running: bool = False
         self.start_time: float = time()
-        self.run_time: float = 0
+        self.run_time: int = 0
         self.stage = 'instantiated'
+
+    @staticmethod
+    def get_scan(scan_id: str):
+        """
+        load scan by scan id
+        """
+
+        for i in range(5):
+            try:
+                with open(f'{JOB_DIR}{scan_id}.json', 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                sleep(1)
+
+        raise json.JSONDecodeError('Could not load scan data')
 
     def scanned(self):
         self.devices_scanned += 1
-
-    
         
     def auto_save(self):
         threading.Thread(target=self._save_thread).start()
@@ -183,7 +219,7 @@ class ScannerResults:
         Path(JOB_DIR).mkdir(parents=True, exist_ok=True)
 
         self.running = self.scan.running
-        self.run_time = time() - self.start_time
+        self.run_time = int(round(time() - self.start_time,0))
         self.devices_alive = len(self.devices)
 
         out = vars(self).copy()

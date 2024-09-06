@@ -1,0 +1,94 @@
+<tr>
+    <td>{{ device.ip }}</td>
+    <td>{{ device.mac_addr }}</td>
+    <td>{{ device.manufacturer or 'Unknown' }}</td>
+    <td>{{ device.ports | join(", ") }}</td>
+    <td>
+        {% if device.stage == 'complete' %}
+            <span class="badge badge-success">complete</span>
+        {% elif device.stage == 'found' %}
+            <span class="badge badge-secondary">found</span>
+        {% elif device.stage == 'scanning' %}
+            <span class="badge badge-info">scanning</span>
+        {% else %}
+            <span class="badge badge-warning">{{device.stage}}</span>
+        {% endif %}
+    </td>
+    <td class="colorful-buttons">
+        {% if 80 in device.ports %} 
+            <a href="http://{{ device.ip }}" class="btn btn-sm" target="_blank">HTTP</a>
+        {% endif %}
+        {% if 443 in device.ports %} 
+            <a href="https://{{ device.ip }}" class="btn btn-sm" target="_blank">HTTPS</a>
+        {% endif %}
+        {% if 22 in device.ports %} 
+            <a href="ssh://{{ device.ip }}" class="btn btn-sm " target="_blank">SSH</a>
+        {% endif %}
+        {% if 21 in device.ports %} 
+            <a href="ftp://{{ device.ip }}" class="btn btn-sm " target="_blank">FTP</a>
+        {% endif %}
+        {% if 23 in device.ports %} 
+            <a href="telnet://{{ device.ip }}" class="btn btn-sm " target="_blank">Telnet</a>
+        {% endif %}
+        {% if 445 in device.ports %} 
+            <a href="smb://{{ device.ip }}" class="btn btn-sm " target="_blank">SMB</a>
+        {% endif %}
+        {% if 3306 in device.ports %} 
+            <a href="mysql://{{ device.ip }}" class="btn btn-sm " target="_blank">MySQL</a>
+        {% endif %}
+        {% if 5432 in device.ports %} 
+            <a href="postgresql://{{ device.ip }}" class="btn btn-sm " target="_blank">PostgreSQL</a>
+        {% endif %}
+        {% if 3389 in device.ports %} 
+            <a href="rdp://{{ device.ip }}" class="btn btn-sm " target="_blank">RDP</a>
+        {% endif %}
+        {% if 5900 in device.ports %} 
+            <a href="vnc://{{ device.ip }}" class="btn btn-sm " target="_blank">VNC</a>
+        {% endif %}
+        {% if 27017 in device.ports %} 
+            <a href="mongodb://{{ device.ip }}" class="btn btn-sm " target="_blank">MongoDB</a>
+        {% endif %}
+        {% if 6379 in device.ports %} 
+            <a href="redis://{{ device.ip }}" class="btn btn-sm " target="_blank">Redis</a>
+        {% endif %}
+        {% if 11211 in device.ports %} 
+            <a href="memcached://{{ device.ip }}" class="btn btn-sm " target="_blank">Memcached</a>
+        {% endif %}
+        {% if 1433 in device.ports %} 
+            <a href="mssql://{{ device.ip }}" class="btn btn-sm " target="_blank">MSSQL</a>
+        {% endif %}
+        {% if 1521 in device.ports %} 
+            <a href="oracle://{{ device.ip }}" class="btn btn-sm " target="_blank">Oracle</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="source://{{ device.ip }}" class="btn btn-sm " target="_blank">Source</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="minecraft://{{ device.ip }}" class="btn btn-sm " target="_blank">Minecraft</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="teamspeak://{{ device.ip }}" class="btn btn-sm " target="_blank">Teamspeak</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="gmod://{{ device.ip }}" class="btn btn-sm " target="_blank">Garry's Mod</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="rust://{{ device.ip }}" class="btn btn-sm " target="_blank">Rust</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="ark://{{ device.ip }}" class="btn btn-sm " target="_blank">ARK</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="terraria://{{ device.ip }}" class="btn btn-sm " target="_blank">Terraria</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="factorio://{{ device.ip }}" class="btn btn-sm " target="_blank">Factorio</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="starmade://{{ device.ip }}" class="btn btn-sm " target="_blank">StarMade</a>
+        {% endif %}
+        {% if 27015 in device.ports %} 
+            <a href="7dtd://{{ device.ip }}" class="btn btn-sm " target="_blank">7 Days to Die</a>
+        {% endif %}
+    </td>
+</tr>

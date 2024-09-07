@@ -7,7 +7,7 @@ from typing import List
 from copy import deepcopy
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from ipaddress import IPv4Network
+import ipaddress
 from time import time
 from libraries.decorators import job_tracker
 import traceback
@@ -226,8 +226,9 @@ class ScannerResults:
         out = vars(self).copy()
         out.pop('scan')
         
-        devices = out.pop('devices')
-        out['devices'] = [vars(device) for device in devices]
+        devices: Device = out.pop('devices')
+        sortedDevices = sorted(devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
+        out['devices'] = [vars(device) for device in sortedDevices]
         with open(f'{JOB_DIR}{self.uid}.json', 'w') as f:
             json.dump(out, f,indent=2)
     def _save_thread(self):

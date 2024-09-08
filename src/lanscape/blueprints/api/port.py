@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from . import api_bp
-from libraries.port_manager import PortManager
+from ...libraries.port_manager import PortManager
 
 # Port Manager API
 ############################################

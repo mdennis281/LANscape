@@ -2,8 +2,9 @@ import json
 import os
 from typing import List
 from pathlib import Path
+import importlib.resources as pkg_resources
 
-PORT_DIR = './resources/ports/'
+PORT_DIR = 'lanscape.resources.ports'
 
 class PortManager:
     def __init__(self):
@@ -12,13 +13,25 @@ class PortManager:
         self.port_lists = self.get_port_lists()
 
     def get_port_lists(self) -> List[str]:
-        return [f.replace('.json','') for f in os.listdir(PORT_DIR) if f.endswith('.json')]
+        json_files = []
+        
+        package_dir = pkg_resources.files(PORT_DIR)
+        
+        if hasattr(package_dir, 'iterdir'):
+            # Traverse directory and collect JSON files
+            for item in package_dir.iterdir():
+                if item.is_file() and item.suffix == '.json':
+                    json_files.append(item.stem)
+        else:
+            raise RuntimeError(f"{PORT_DIR} is not a valid directory or cannot be accessed")
+        
+        return json_files
     
     def get_port_list(self, port_list: str) -> dict:
         if port_list not in self.port_lists: raise ValueError(f"Port list '{port_list}' does not exist. Available port lists: {self.port_lists}")
 
-        with open(f'{PORT_DIR}{port_list}.json', 'r') as f:
-            data = json.load(f)
+        
+        data = json.load(pkg_resources.open_text(PORT_DIR, f'{port_list}.json'))
 
         return data if self.validate_port_data(data) else None
         

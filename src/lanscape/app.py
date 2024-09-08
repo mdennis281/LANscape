@@ -3,8 +3,8 @@ from flask import Flask
 app = Flask(__name__)
 
 # Import Blueprints
-from blueprints.api import api_bp
-from blueprints.web import web_bp
+from .blueprints.api import api_bp
+from .blueprints.web import web_bp
 
 # Register Blueprints
 app.register_blueprint(api_bp)

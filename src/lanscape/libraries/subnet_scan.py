@@ -9,14 +9,15 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 import ipaddress
 from time import time
-from libraries.decorators import job_tracker
+from .decorators import job_tracker
 import traceback
 from pathlib import Path
-from libraries.net_tools import get_host_ip_mask, Device
-from libraries.port_manager import PortManager
-from libraries.ip_parser import parse_ip_input
+from .net_tools import get_host_ip_mask, Device
+from .port_manager import PortManager
+from .ip_parser import parse_ip_input
 import subprocess
 import sys
+import importlib
 
 JOB_DIR = './jobs/'
 
@@ -56,8 +57,13 @@ class SubnetScanner:
         scan.running = True
         scan.results.save()
 
+        try:
+            scanner_path = importlib.util.find_spec('lanscape').origin.replace('__init__.py', 'scanner.py')
+        except:
+            scanner_path = 'scanner.py'
+
         subprocess.Popen(
-            [sys.executable, 'scanner.py', scan.uid],
+            [sys.executable, scanner_path, scan.uid],
             stdout=None, stderr=None, stdin=None, close_fds=True, shell=True
         )
         return scan.uid

@@ -1,7 +1,7 @@
 from flask import render_template, request
 from . import web_bp
-from libraries.subnet_scan import SubnetScanner
-from libraries.net_tools import get_primary_network_subnet
+from ...libraries.subnet_scan import SubnetScanner
+from ...libraries.net_tools import get_primary_network_subnet
 
 # Template Renderer
 ############################################

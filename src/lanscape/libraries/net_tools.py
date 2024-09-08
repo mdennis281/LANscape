@@ -5,7 +5,7 @@ import subprocess
 import re
 import psutil
 import ipaddress
-from libraries.mac_lookup import lookup_mac
+from .mac_lookup import lookup_mac
 from scapy.all import ARP, Ether, srp
 from time import sleep
 from typing import List

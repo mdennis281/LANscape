@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from . import api_bp
-from libraries.subnet_scan import SubnetScanner
+from ...libraries.subnet_scan import SubnetScanner
 import traceback
 
 # Subnet Scanner API

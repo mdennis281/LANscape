@@ -1,3 +1,6 @@
+# Used to spin up a new process outside of the main
+# Flask application to perform the subnet scan.
+
 from libraries.subnet_scan import SubnetScanner
 import sys
 

@@ -1,5 +1,7 @@
+import _to_parent
 from libraries.subnet_scan import SubnetScanner, cleanup_old_jobs
 import subprocess
+
 
 def copy2clip(txt):
     cmd='echo '+txt.strip()+'|clip'

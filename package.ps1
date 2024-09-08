@@ -1,4 +1,4 @@
-Remove-Item -Path .\dist\ -Recurse -Force
+Remove-Item -Path .\dist\* -Recurse -Force
 py -m pip install --upgrade pip
 py -m pip install --upgrade build
 py -m build

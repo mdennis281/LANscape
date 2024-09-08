@@ -1,15 +1,23 @@
 import threading
 import webview
+import logging
 from .app import app
 
 
-def start_server() -> int:
-    app.run(host='0.0.0.0', port=5001, debug=False)
+def start_webserver(debug: bool) -> int:
+    if not debug:
+        disable_flask_logging()
+    app.run(host='0.0.0.0', port=5001, debug=debug)
+
+def disable_flask_logging() -> None:
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.logger.disabled = True
 
 
-def start_webview() -> None:
+def start_webview(debug = False) -> None:
     # Start Flask server in a separate thread
-    server_thread = threading.Thread(target=start_server)
+    server_thread = threading.Thread(target=start_webserver, args=(debug,))
     server_thread.daemon = True
     server_thread.start()
 

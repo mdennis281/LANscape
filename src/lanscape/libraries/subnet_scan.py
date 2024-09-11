@@ -19,7 +19,7 @@ import subprocess
 import sys
 import importlib
 
-JOB_DIR = './jobs/'
+JOB_DIR = './lanscape-jobs/'
 
 
 class SubnetScanner:

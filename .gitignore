@@ -153,4 +153,4 @@ cython_debug/
 
 
 # Runtime generated
-jobs/*.json
+lanscape-jobs/*.json

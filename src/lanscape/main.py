@@ -1,7 +1,8 @@
 from .webviewer import start_webview
-from .app import start_webserver
+from .app import start_webserver_thread
 import webbrowser
 import argparse
+import time
 
 
 
@@ -9,11 +10,15 @@ import argparse
 def main():
     args = parse_args()
     def no_gui():
-        webbrowser.open(f'http://127.0.0.1:{args.port}', new=2)
-        start_webserver(
+        proc = start_webserver_thread(
             debug=args.debug,
             port=args.port
         )
+        # Wait for flask to start
+        time.sleep(1)
+        webbrowser.open(f'http://127.0.0.1:{args.port}', new=2)
+        proc.join()
+        
         
     try:
         if args.nogui:

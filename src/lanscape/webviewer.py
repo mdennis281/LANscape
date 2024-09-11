@@ -1,6 +1,6 @@
-import threading
+import multiprocessing
 import webview
-from .app import start_webserver
+from .app import start_webserver_thread
 import sys
 
 
@@ -9,13 +9,17 @@ debug = sys.argv[1] if len(sys.argv) > 1 else False
 
 def start_webview(debug = False,port:int = 5001) -> None:
     # Start Flask server in a separate thread
-    server_thread = threading.Thread(target=start_webserver, args=(debug,port))
-    server_thread.daemon = True
-    server_thread.start()
+    proc = start_webserver_thread(debug, port)
 
-    # Start the Pywebview window
-    webview.create_window('LANscape', f'http://127.0.0.1:{port}')
-    webview.start()
+    try:
+        # Start the Pywebview window
+        webview.create_window('LANscape', f'http://127.0.0.1:{port}')
+        webview.start()
+    except Exception as e:
+        # If the webview fails to start, kill the Flask server
+        proc.terminate()
+        raise e
+    proc.terminate()
 
 
     

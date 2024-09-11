@@ -1,4 +1,5 @@
 from flask import Flask
+import logging
 
 app = Flask(__name__)
 
@@ -17,5 +18,15 @@ def is_substring_in_values(results: dict, substring: str) -> bool:
 
 app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 
+def start_webserver(debug: bool=True, port: int=5001) -> int:
+    if not debug:
+        disable_flask_logging()
+    app.run(host='0.0.0.0', port=port, debug=debug)
+
+def disable_flask_logging() -> None:
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.logger.disabled = True
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    start_webserver(True)

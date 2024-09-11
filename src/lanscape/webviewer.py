@@ -1,19 +1,25 @@
 import threading
 import webview
-from .app import app
+from .app import start_webserver
+import sys
 
 
-def start_server() -> int:
-    app.run(host='0.0.0.0', port=5001, debug=False)
+debug = sys.argv[1] if len(sys.argv) > 1 else False
+
+
+def start_webview(debug = False,port:int = 5001) -> None:
+    # Start Flask server in a separate thread
+    server_thread = threading.Thread(target=start_webserver, args=(debug,port))
+    server_thread.daemon = True
+    server_thread.start()
+
+    # Start the Pywebview window
+    webview.create_window('LANscape', f'http://127.0.0.1:{port}')
+    webview.start()
 
 
     
 if __name__ == "__main__":
     # Start Flask server in a separate thread
-    server_thread = threading.Thread(target=start_server)
-    server_thread.daemon = True
-    server_thread.start()
+    start_webview(True)
 
-    # Start the Pywebview window
-    webview.create_window('LANscape', 'http://127.0.0.1:5001')
-    webview.start()

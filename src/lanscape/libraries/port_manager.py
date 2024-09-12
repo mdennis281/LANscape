@@ -2,63 +2,49 @@ import json
 import os
 from typing import List
 from pathlib import Path
-import importlib.resources as pkg_resources
+from .resource_manager import ResourceManager
 
-PORT_DIR = 'lanscape.resources.ports'
+PORT_DIR = 'ports'
 
 class PortManager:
     def __init__(self):
         Path(PORT_DIR).mkdir(parents=True, exist_ok=True)
-
-        self.port_lists = self.get_port_lists()
+        self.rm = ResourceManager(PORT_DIR)
 
     def get_port_lists(self) -> List[str]:
-        json_files = []
-        
-        package_dir = pkg_resources.files(PORT_DIR)
-        
-        if hasattr(package_dir, 'iterdir'):
-            # Traverse directory and collect JSON files
-            for item in package_dir.iterdir():
-                if item.is_file() and item.suffix == '.json':
-                    json_files.append(item.stem)
-        else:
-            raise RuntimeError(f"{PORT_DIR} is not a valid directory or cannot be accessed")
-        
-        return json_files
+        return [f.replace('.json','') for f in self.rm.list() if f.endswith('.json')]
     
     def get_port_list(self, port_list: str) -> dict:
-        if port_list not in self.port_lists: raise ValueError(f"Port list '{port_list}' does not exist. Available port lists: {self.port_lists}")
+        
+        if port_list not in self.get_port_lists(): 
+            raise ValueError(f"Port list '{port_list}' does not exist. Available port lists: {self.get_port_lists()}")
 
         
-        data = json.load(pkg_resources.open_text(PORT_DIR, f'{port_list}.json'))
+        data = json.loads(self.rm.get(f'{port_list}.json'))
 
         return data if self.validate_port_data(data) else None
         
     def create_port_list(self, port_list: str, data: dict) -> bool:
-        if port_list in self.port_lists: return False
+        if port_list in self.get_port_lists(): return False
         if not self.validate_port_data(data): return False
 
-        with open(f'{PORT_DIR}{port_list}.json', 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        self.port_lists = self.get_port_lists()
+        self.rm.create(f'{port_list}.json', json.dumps(data, indent=2))
+
         return True
     
     def update_port_list(self, port_list: str, data: dict) -> bool:
-        if port_list not in self.port_lists: return False
+        if port_list not in self.get_port_lists(): return False
         if not self.validate_port_data(data): return False
 
-        with open(f'{PORT_DIR}{port_list}.json', 'w') as f:
-            json.dump(data, f, indent=2)
+        self.rm.update(f'{port_list}.json', json.dumps(data, indent=2))
         
         return True
     
     def delete_port_list(self, port_list: str) -> bool:
-        if port_list not in self.port_lists: return False
+        if port_list not in self.get_port_lists(): return False
 
-        os.remove(f'{PORT_DIR}{port_list}.json')
-        self.port_lists = self.get_port_lists()
+        self.rm.delete(f'{port_list}.json')
+
         return True
 
     def validate_port_data(self, port_data: dict) -> bool:

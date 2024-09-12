@@ -1,7 +1,7 @@
 import json
-import importlib.resources as pkg_resources
+from .resource_manager import ResourceManager
 
-DB = json.load(pkg_resources.open_text('lanscape.resources.mac_addresses', 'mac_db.json'))
+DB = json.loads(ResourceManager('mac_addresses').get('mac_db.json'))
 
 
 def lookup_mac(mac: str) -> str:

@@ -6,5 +6,11 @@
 
 tasks:
   - init: pip install -r requirements.txt
+    command: python localrun.py --port 8080 --nogui --debug
 
 
+ports:
+    - name: Web App
+      description: The main application web server
+      port: 8080
+      onOpen: open-browser

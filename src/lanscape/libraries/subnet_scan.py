@@ -54,18 +54,26 @@ class SubnetScanner:
         Start a new thread to scan the subnet.
         """
         scan = SubnetScanner(subnet, port_list, parallelism)
-        scan.running = True
         scan.results.save()
 
         try:
-            scanner_path = importlib.util.find_spec('lanscape').origin.replace('__init__.py', 'scanner.py')
+            scanner_path = Path(__file__).parent.parent / 'scanner.py'
         except:
             scanner_path = 'scanner.py'
 
-        subprocess.Popen(
-            [sys.executable, scanner_path, scan.uid],
-            stdout=None, stderr=None, stdin=None, close_fds=True
-        )
+        try:
+            subprocess.Popen(
+                [sys.executable, scanner_path, scan.uid],
+                stdout=None, stderr=None, stdin=None, close_fds=True
+            )
+            sleep(1)
+            if not ScannerResults.get_scan(scan.uid)['running']:
+                raise Exception('Could not start scanner in new process')
+
+            
+        except Exception as e:
+            print(e)
+            scan.scan_subnet_threaded()
         return scan.uid
     
     @staticmethod

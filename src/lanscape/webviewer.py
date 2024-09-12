@@ -7,9 +7,9 @@ import sys
 debug = sys.argv[1] if len(sys.argv) > 1 else False
 
 
-def start_webview(debug = False,port:int = 5001) -> None:
+def start_webview(port:int = 5001) -> None:
     # Start Flask server in a separate thread
-    proc = start_webserver_thread(debug, port)
+    proc = start_webserver_thread(False, port)
 
     try:
         # Start the Pywebview window

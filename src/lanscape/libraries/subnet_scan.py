@@ -58,7 +58,7 @@ class SubnetScanner:
         scan.results.save()
 
         try:
-            scanner_path = importlib.util.find_spec('lanscape').origin.replace('__init__.py', 'scanner.py')
+            scanner_path = Path(__file__).parent / 'scanner.py'
         except:
             scanner_path = 'scanner.py'
 
@@ -67,7 +67,6 @@ class SubnetScanner:
                 [sys.executable, scanner_path, scan.uid],
                 stdout=None, stderr=None, stdin=None, close_fds=True
             )
-            sleep(1)
             if process.returncode:
                 raise Exception('Could not start scanner in new process')
 

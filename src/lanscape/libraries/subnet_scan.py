@@ -54,26 +54,25 @@ class SubnetScanner:
         Start a new thread to scan the subnet.
         """
         scan = SubnetScanner(subnet, port_list, parallelism)
-        scan.running = True
         scan.results.save()
 
         try:
-            scanner_path = Path(__file__).parent / 'scanner.py'
+            scanner_path = Path(__file__).parent.parent / 'scanner.py'
         except:
             scanner_path = 'scanner.py'
 
         try:
-            process = subprocess.Popen(
+            subprocess.Popen(
                 [sys.executable, scanner_path, scan.uid],
                 stdout=None, stderr=None, stdin=None, close_fds=True
             )
-            if process.returncode:
+            sleep(1)
+            if not ScannerResults.get_scan(scan.uid)['running']:
                 raise Exception('Could not start scanner in new process')
 
             
         except Exception as e:
             print(e)
-            print('Could not start scanner in new process')
             scan.scan_subnet_threaded()
         return scan.uid
     

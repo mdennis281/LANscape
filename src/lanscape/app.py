@@ -1,4 +1,6 @@
 from flask import Flask
+import logging
+import multiprocessing
 
 app = Flask(__name__)
 
@@ -17,5 +19,24 @@ def is_substring_in_values(results: dict, substring: str) -> bool:
 
 app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 
+
+## Webserver creation functions
+################################
+
+def start_webserver_thread(debug: bool=True, port: int=5001) -> multiprocessing.Process:
+    proc = multiprocessing.Process(target=start_webserver, args=(debug,port))
+    proc.start()
+    return proc
+
+def start_webserver(debug: bool=True, port: int=5001) -> int:
+    if not debug:
+        disable_flask_logging()
+    app.run(host='0.0.0.0', port=port, debug=debug)
+
+def disable_flask_logging() -> None:
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.logger.disabled = True
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    start_webserver(True)

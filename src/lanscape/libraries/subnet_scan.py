@@ -19,7 +19,7 @@ import subprocess
 import sys
 import importlib
 
-JOB_DIR = './jobs/'
+JOB_DIR = './lanscape-jobs/'
 
 
 class SubnetScanner:
@@ -64,7 +64,7 @@ class SubnetScanner:
 
         subprocess.Popen(
             [sys.executable, scanner_path, scan.uid],
-            stdout=None, stderr=None, stdin=None, close_fds=True, shell=True
+            stdout=None, stderr=None, stdin=None, close_fds=True
         )
         return scan.uid
     

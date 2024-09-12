@@ -1,4 +1,4 @@
-from .main import start_webview
+from .main import main
 
 if __name__ == "__main__":
-    start_webview()
+    main()

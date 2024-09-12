@@ -1,29 +1,48 @@
-import threading
-import webview
-import logging
-from .app import app
+from .webviewer import start_webview
+from .app import start_webserver_thread
+import webbrowser
+import argparse
+import time
 
 
-def start_webserver(debug: bool) -> int:
-    if not debug:
-        disable_flask_logging()
-    app.run(host='0.0.0.0', port=5001, debug=debug)
 
-def disable_flask_logging() -> None:
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-    app.logger.disabled = True
-
-
-def start_webview(debug = False) -> None:
-    # Start Flask server in a separate thread
-    server_thread = threading.Thread(target=start_webserver, args=(debug,))
-    server_thread.daemon = True
-    server_thread.start()
-
-    # Start the Pywebview window
-    webview.create_window('LANscape', 'http://127.0.0.1:5001')
-    webview.start()
     
+def main():
+    args = parse_args()
+    def no_gui():
+        proc = start_webserver_thread(
+            debug=args.debug,
+            port=args.port
+        )
+        # Wait for flask to start
+        time.sleep(1)
+        webbrowser.open(f'http://127.0.0.1:{args.port}', new=2)
+        proc.join()
+        
+        
+    try:
+        if args.nogui:
+            no_gui()
+        else:
+            start_webview(
+                debug=args.debug,
+                port=args.port
+            )
+    except Exception as e:
+        print(e)
+        print('falling back to no gui mode')
+        no_gui()
+        
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='LANscape')
+    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+    parser.add_argument('--port', type=int, default=5001, help='Port to run the webserver on')
+    parser.add_argument('--nogui', action='store_true', help='Run in standalone mode')
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    start_webview()
+    main()
+        

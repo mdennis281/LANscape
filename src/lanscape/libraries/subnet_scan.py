@@ -64,7 +64,7 @@ class SubnetScanner:
 
         subprocess.Popen(
             [sys.executable, scanner_path, scan.uid],
-            stdout=None, stderr=None, stdin=None, close_fds=True, shell=True
+            stdout=None, stderr=None, stdin=None, close_fds=True
         )
         return scan.uid
     

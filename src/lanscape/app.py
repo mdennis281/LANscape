@@ -1,6 +1,7 @@
 from flask import Flask
 import logging
 import multiprocessing
+import threading
 
 app = Flask(__name__)
 
@@ -24,9 +25,17 @@ app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 ################################
 
 def start_webserver_thread(debug: bool=True, port: int=5001) -> multiprocessing.Process:
-    proc = multiprocessing.Process(target=start_webserver, args=(debug,port))
-    proc.start()
-    return proc
+    if not debug:
+        proc = multiprocessing.Process(target=start_webserver, args=(debug,port))
+        proc.start()
+        return proc
+    else: 
+        proc = threading.Thread(target=start_webserver, args=(debug,port))
+        proc.daemon = True # Kill thread when main thread exits
+        proc.start()
+
+        
+
 
 def start_webserver(debug: bool=True, port: int=5001) -> int:
     if not debug:

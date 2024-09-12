@@ -1,23 +1,25 @@
 from .webviewer import start_webview
-from .app import start_webserver_thread
+from .app import start_webserver
+import threading
 import webbrowser
 import argparse
 import time
 
 
 
-    
+
 def main():
     args = parse_args()
+    if args.debug and not args.nogui:
+        print('Debug mode can only be used with --nogui')
+        return
     def no_gui():
-        proc = start_webserver_thread(
+        open_browser(f'http://127.0.0.1:{args.port}')
+        start_webserver(
             debug=args.debug,
             port=args.port
         )
-        # Wait for flask to start
-        time.sleep(1)
-        webbrowser.open(f'http://127.0.0.1:{args.port}', new=2)
-        proc.join()
+        
         
         
     try:
@@ -25,7 +27,6 @@ def main():
             no_gui()
         else:
             start_webview(
-                debug=args.debug,
                 port=args.port
             )
     except Exception as e:
@@ -41,6 +42,17 @@ def parse_args():
     parser.add_argument('--nogui', action='store_true', help='Run in standalone mode')
 
     return parser.parse_args()
+
+def open_browser(url: str,wait=2):
+    """
+    Open a browser window to the specified
+    url after waiting for the server to start
+    """
+    def do_open():
+        time.sleep(wait)
+        webbrowser.open(url, new=2)
+
+    threading.Thread(target=do_open).start()
 
 
 if __name__ == "__main__":

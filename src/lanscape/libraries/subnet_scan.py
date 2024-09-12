@@ -63,15 +63,20 @@ class SubnetScanner:
             scanner_path = 'scanner.py'
 
         try:
-            subprocess.Popen(
+            process = subprocess.Popen(
                 [sys.executable, scanner_path, scan.uid],
                 stdout=None, stderr=None, stdin=None, close_fds=True
             )
-            return scan.uid
+            sleep(1)
+            if process.returncode:
+                raise Exception('Could not start scanner in new process')
+
+            
         except Exception as e:
             print(e)
             print('Could not start scanner in new process')
             scan.scan_subnet_threaded()
+        return scan.uid
     
     @staticmethod
     def instantiate_scan(scan_id: str) -> 'SubnetScanner':

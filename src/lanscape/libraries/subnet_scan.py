@@ -71,7 +71,7 @@ class SubnetScanner:
         except Exception as e:
             print(e)
             print('Could not start scanner in new process')
-            threading.Thread(target=scan.scan_subnet).start()
+            scan.scan_subnet_threaded()
     
     @staticmethod
     def instantiate_scan(scan_id: str) -> 'SubnetScanner':

@@ -20,7 +20,7 @@ class PortManager:
             raise ValueError(f"Port list '{port_list}' does not exist. Available port lists: {self.get_port_lists()}")
 
         
-        data = json.load(self.rm.get(f'{port_list}.json'))
+        data = json.loads(self.rm.get(f'{port_list}.json'))
 
         return data if self.validate_port_data(data) else None
         

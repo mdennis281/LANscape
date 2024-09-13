@@ -12,6 +12,7 @@ def job_tracker(func):
             running[fxn] -= 1
             finished[fxn] += 1
             timing[fxn] = round(((finished[fxn]-1 * timing[fxn] ) + elapsed ) / finished[fxn], 4)
+            if running[fxn] == 0: running.pop(fxn)
             return result
         
         def init_job_tracker(class_instance):

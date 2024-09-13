@@ -1,25 +1,25 @@
 import os
-import socket
-from time import sleep
-import json
-import threading
-from typing import List
-from copy import deepcopy
-import uuid
-from concurrent.futures import ThreadPoolExecutor
-import ipaddress
-from time import time
-from .decorators import job_tracker
-import traceback
-from pathlib import Path
-from .net_tools import get_host_ip_mask, Device
-from .port_manager import PortManager
-from .ip_parser import parse_ip_input
-import subprocess
 import sys
-import importlib
+import json
+import uuid
+import logging
+import ipaddress
+import traceback
+import threading
+import subprocess
+from time import time
+from time import sleep
+from typing import List
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+
+from .net_tools import Device
+from .decorators import job_tracker
+from .ip_parser import parse_ip_input
+from .port_manager import PortManager
 
 JOB_DIR = './lanscape-jobs/'
+
 
 
 class SubnetScanner:
@@ -39,6 +39,9 @@ class SubnetScanner:
         self.job_stats = {'running': {}, 'finished': {}, 'timing': {}}
         self.uid = uid
         self.results = ScannerResults(self)
+        self.log: logging.Logger = logging.getLogger('SubnetScanner')
+        self.log.debug(f'Instantiated with uid: {self.uid}')
+        self.log.debug(f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
 
     def scan_subnet_threaded(self) -> threading.Thread:
         """
@@ -51,7 +54,7 @@ class SubnetScanner:
     @staticmethod
     def scan_subnet_standalone(subnet: str, port_list: str, parallelism: float = 1.0):
         """
-        Start a new thread to scan the subnet.
+        Use shell to start a new process for subnet scan.
         """
         scan = SubnetScanner(subnet, port_list, parallelism)
         scan.results.save()
@@ -71,8 +74,9 @@ class SubnetScanner:
                 raise Exception('Could not start scanner in new process')
 
             
-        except Exception as e:
-            print(e)
+        except Exception:
+            scan.log.debug(traceback.format_exc())
+            scan.log.warning('unable to start standalone scanner')
             scan.scan_subnet_threaded()
         return scan.uid
     
@@ -96,7 +100,7 @@ class SubnetScanner:
         """
         Scan the subnet for devices and open ports.
         """
-        self.results.stage = 'scanning devices'
+        self._set_stage('scanning devices')
         self.running = True
         self.results.auto_save()
         with ThreadPoolExecutor(max_workers=self._t_cnt(256)) as executor:
@@ -106,16 +110,17 @@ class SubnetScanner:
                 try:
                     future.result()
                 except Exception as e:
+                    self.log.error(f'[{ip}] scan failed. details below:\n{traceback.format_exc()}')
                     self.results.errors.append({
                         'basic': f"Error scanning IP {ip}: {e}",
                         'traceback': traceback.format_exc(),
                     })
                 
-
-        self.results.stage = 'testing ports'
+        
+        self._set_stage('testing ports')
         self._scan_network_ports()
 
-        self.results.stage = 'complete'
+        self._set_stage('complete')
         self.running = False
         return self.results
         
@@ -146,6 +151,7 @@ class SubnetScanner:
         self.results.scanned()
         if not is_alive:
             return None
+        self.log.debug(f'[{host}] is alive, getting metadata')
         
         device.get_metadata()
         self.results.devices.append(device)
@@ -159,12 +165,13 @@ class SubnetScanner:
 
     @job_tracker
     def _scan_ports(self, device: Device):
+        self.log.debug(f'[{device.ip}] Initiating port scan')
         device.stage = 'scanning'
         with ThreadPoolExecutor(max_workers=self._t_cnt(128)) as executor:
             futures = {executor.submit(self._test_port, device, int(port)): port for port in self.ports}
             for future in futures:
                 future.result()
-
+        self.log.debug(f'[{device.ip}] Completed port scan')
         device.stage = 'complete'
     
     @job_tracker
@@ -174,6 +181,7 @@ class SubnetScanner:
         Device class handles tracking open ports.
         """
         return host.test_port(port)
+    
         
 
     @job_tracker
@@ -189,6 +197,10 @@ class SubnetScanner:
         of threads and the parallelism factor.
         """
         return int(base_threads * self.parallelism)
+    
+    def _set_stage(self,stage):
+        self.log.debug(f'[{self.uid}] Moving to Stage: {stage}')
+        self.results.stage = stage
     
 class ScannerResults:
     def __init__(self,scan: SubnetScanner):
@@ -208,6 +220,9 @@ class ScannerResults:
         self.start_time: float = time()
         self.run_time: int = 0
         self.stage = 'instantiated'
+
+        self.log = logging.getLogger('ScannerResults')
+        self.log.debug(f'Instantiated Logger For Scan: {self.scan.uid}')
 
     @staticmethod
     def get_scan(scan_id: str):
@@ -232,6 +247,7 @@ class ScannerResults:
     
     def save(self):
         Path(JOB_DIR).mkdir(parents=True, exist_ok=True)
+        self.log.debug(f'Saving Results. Threads: ${self.scan.job_stats.get('running')}')
 
         self.running = self.scan.running
         self.run_time = int(round(time() - self.start_time,0))
@@ -239,10 +255,13 @@ class ScannerResults:
 
         out = vars(self).copy()
         out.pop('scan')
+        out.pop('log')
         
         devices: Device = out.pop('devices')
         sortedDevices = sorted(devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
-        out['devices'] = [vars(device) for device in sortedDevices]
+        out['devices'] = [vars(device).copy() for device in sortedDevices]
+        for device in out['devices']: device.pop('log') 
+
         with open(f'{JOB_DIR}{self.uid}.json', 'w') as f:
             json.dump(out, f,indent=2)
     def _save_thread(self):

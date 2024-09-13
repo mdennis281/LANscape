@@ -5,6 +5,7 @@ import subprocess
 import re
 import psutil
 import ipaddress
+import logging
 from .mac_lookup import lookup_mac
 from scapy.all import ARP, Ether, srp
 from time import sleep
@@ -16,6 +17,7 @@ class IPAlive:
         try:
             self.alive = self._arp_lookup(ip)
         except:
+            self.log.debug('failed ARP, falling back to ping')
             self.alive = self._ping_lookup(ip)
 
         return self.alive
@@ -30,6 +32,8 @@ class IPAlive:
 
         for sent, received in answered:
             if received.psrc == ip:
+                if received.hwsrc:
+                    self.mac_addr = received.hwsrc
                 return True
         return False
 
@@ -63,12 +67,14 @@ class Device(IPAlive):
         self.manufacturer: str = None
         self.ports: List[int] = []
         self.stage: str = 'found'
+        self.log = logging.getLogger('Device')
 
     def get_metadata(self):
         if self.alive:
             self.hostname = self._get_hostname()
-            self.mac_addr = self._get_mac_address()
             self.manufacturer = self._get_manufacturer()
+            if not self.mac_addr:
+                self.mac_addr = self._get_mac_address()
     
     def test_port(self,port:int) -> bool:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -24,15 +24,10 @@ app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 ## Webserver creation functions
 ################################
 
-def start_webserver_thread(debug: bool=True, port: int=5001) -> multiprocessing.Process:
-    if not debug:
-        proc = multiprocessing.Process(target=start_webserver, args=(debug,port))
-        proc.start()
-        return proc
-    else: 
-        proc = threading.Thread(target=start_webserver, args=(debug,port))
-        proc.daemon = True # Kill thread when main thread exits
-        proc.start()
+def start_webserver_dameon(debug: bool=True, port: int=5001) -> multiprocessing.Process:
+    proc = threading.Thread(target=start_webserver, args=(debug,port))
+    proc.daemon = True # Kill thread when main thread exits
+    proc.start()
 
         
 
@@ -45,7 +40,7 @@ def start_webserver(debug: bool=True, port: int=5001) -> int:
 def disable_flask_logging() -> None:
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
-    app.logger.disabled = True
+    #app.logger.disabled = True
 
 if __name__ == "__main__":
     start_webserver(True)

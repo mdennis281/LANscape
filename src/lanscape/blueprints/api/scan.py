@@ -6,7 +6,25 @@ import traceback
 # Subnet Scanner API
 ############################################
 @api_bp.route('/api/scan', methods=['POST'])
-def scan_subnet():
+@api_bp.route('/api/scan/threaded', methods=['POST'])
+def scan_subnet_threaded():
+    try:
+        data = request.get_json()
+
+        scanner = SubnetScanner(
+            data['subnet'], 
+            data['port_list'], 
+            data.get('parallelism', 1.0)
+        )
+        scanner.scan_subnet_threaded()
+
+        return jsonify({'status': 'running', 'scan_id': scanner.uid})
+    except:
+        return jsonify({'status': 'error', 'traceback': traceback.format_exc()}), 500
+
+
+@api_bp.route('/api/scan/standalone', methods=['POST'])
+def scan_subnet_standalone():
     data = request.get_json()
 
     try:

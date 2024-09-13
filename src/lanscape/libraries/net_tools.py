@@ -37,13 +37,13 @@ class IPAlive:
                 return True
         return False
 
-    def _ping_lookup(self,host, retries=1, retry_delay=1, ping_count=2, timeout=1000):
+    def _ping_lookup(self,host, retries=1, retry_delay=1, ping_count=2, timeout=1):
             """
             Ping the given host and return True if it's reachable, False otherwise.
             """
             os = platform.system().lower()
             if os == "windows":
-                ping_command = ['ping', '-n', str(ping_count), '-w', str(timeout)]  
+                ping_command = ['ping', '-n', str(ping_count), '-w', str(timeout*1000)]  
             else:
                 ping_command = ['ping', '-c', str(ping_count), '-W', str(timeout)]
                 

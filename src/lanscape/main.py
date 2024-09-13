@@ -13,7 +13,7 @@ log = logging.getLogger('core')
 
 def main():
     args = parse_args()
-    configure_logging(args.loglevel, args.logtype)
+    configure_logging(args.loglevel, args.logfile)
     def no_gui():
         open_browser(f'http://127.0.0.1:{args.port}')
         start_webserver(
@@ -42,8 +42,8 @@ def parse_args():
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')
     parser.add_argument('--port', type=int, default=5001, help='Port to run the webserver on')
     parser.add_argument('--nogui', action='store_true', help='Run in standalone mode')
+    parser.add_argument('--logfile', action='store_true', help='Log output to lanscape.log')
     parser.add_argument('--loglevel', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Set the log level')
-    parser.add_argument('--logtype', default='console', choices=['console', 'file'], help='Choose log output type: console or file')
 
     return parser.parse_args()
 

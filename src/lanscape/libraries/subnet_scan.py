@@ -1,24 +1,22 @@
 import os
-import socket
-from time import sleep
-import json
-import threading
-from typing import List
-from copy import deepcopy
-import uuid
-from concurrent.futures import ThreadPoolExecutor
-import ipaddress
-from time import time
-from .decorators import job_tracker
-import traceback
-from pathlib import Path
-from .net_tools import Device
-from .port_manager import PortManager
-from .ip_parser import parse_ip_input
-import subprocess
 import sys
+import json
+import uuid
 import logging
+import ipaddress
 import traceback
+import threading
+import subprocess
+from time import time
+from time import sleep
+from typing import List
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+
+from .net_tools import Device
+from .decorators import job_tracker
+from .ip_parser import parse_ip_input
+from .port_manager import PortManager
 
 JOB_DIR = './lanscape-jobs/'
 
@@ -249,7 +247,7 @@ class ScannerResults:
     
     def save(self):
         Path(JOB_DIR).mkdir(parents=True, exist_ok=True)
-        self.log.debug(f'Saving Results for scan: {self.scan.uid}')
+        self.log.debug(f'Saving Results. Threads: ${self.scan.job_stats.get('running')}')
 
         self.running = self.scan.running
         self.run_time = int(round(time() - self.start_time,0))

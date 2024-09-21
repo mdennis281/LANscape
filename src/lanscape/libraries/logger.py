@@ -6,7 +6,6 @@ def configure_logging(loglevel:str, logfile:bool):
     numeric_level = getattr(logging, loglevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f'Invalid log level: {loglevel}')
-    print(f'loglevel: {numeric_level} - {loglevel}')
     
     
     logging.basicConfig(level=numeric_level, format='[%(name)s] %(levelname)s - %(message)s')

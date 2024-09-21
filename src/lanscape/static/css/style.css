@@ -31,6 +31,12 @@ body {
     overflow-y: auto;
 }
 
+.scroll-container {
+    width: 100vw;
+    height: 100vh;
+    overflow-y: auto;
+}
+
 
 h1, h2, h3 {
     font-weight: 600;
@@ -80,6 +86,36 @@ details {
 }
 #scan-form label {
     margin-bottom: 0;
+}
+#scan-form input {
+    z-index: 2;
+    transition: all .2s ease-in-out;
+}
+.label-container {
+    display: flex;
+    justify-content: space-between;
+}
+#subnet-info {
+    margin-right: 5px;
+    font-size: .8em;
+    padding: 2px 5px;
+    background-color: #333;
+    border: 1px solid #444;
+    border-bottom: none;
+    border-radius: 5px 5px 0 0;
+    color: #aaa;
+    transition: all .2s ease-in-out;
+    height: 25px;
+}
+#scan-form.error #subnet-info,
+#scan-form.error input
+ {
+    color: #a66;
+    border-color: #722;
+    outline: 0 none;
+}
+#scan-form.error input:focus {
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset, 0 0 8px rgba(200, 85, 85, 0.6);
 }
 
 
@@ -364,7 +400,13 @@ input, select, button, details {
     border: 3px solid #232323; /* Adds padding between the thumb and track */
 }
 
-
+.error-container {
+    height: 300px;
+    overflow-y: scroll;
+    margin: 10px;
+    padding: 5px;
+    background-color: #7776;
+}
 
 /* For Firefox */
 html {

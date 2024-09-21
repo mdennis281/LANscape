@@ -1,6 +1,8 @@
 import ipaddress
 import re
 
+MAX_IPS_ALLOWED = 10000 
+
 def parse_ip_input(ip_input):
     # Split input on commas for multiple entries
     entries = [entry.strip() for entry in ip_input.split(',')]
@@ -9,7 +11,10 @@ def parse_ip_input(ip_input):
     for entry in entries:
         # Handle CIDR notation or IP/32
         if '/' in entry:
-            for ip in ipaddress.IPv4Network(entry).hosts():
+            net = ipaddress.IPv4Network(entry,strict=False)
+            if net.num_addresses > MAX_IPS_ALLOWED:
+                raise SubnetTooLargeError(ip_input)
+            for ip in net.hosts():
                 ip_ranges.append(ip) 
         
         # Handle IP range (e.g., 10.0.0.15-10.0.0.25)
@@ -22,8 +27,9 @@ def parse_ip_input(ip_input):
 
         # If no CIDR or range, assume a single IP
         else:
-            ip_ranges.append(ipaddress.IPv4Address(entry))
-
+            ip_ranges.append(ipaddress.IPv4Address(entry,strict=False))
+        if len(ip_ranges) > MAX_IPS_ALLOWED:
+            raise SubnetTooLargeError(ip_input)
     return ip_ranges
 
 def parse_ip_range(entry):
@@ -48,3 +54,11 @@ def ip_range_to_list(start_ip, end_ip):
     # Yield the range of IPs
     for ip_int in range(int(start_ip), int(end_ip) + 1):
         yield ipaddress.IPv4Address(ip_int)
+
+
+class SubnetTooLargeError(Exception):
+    """Custom exception raised when the subnet size exceeds the allowed limit."""
+    def __init__(self, subnet, max_ips=MAX_IPS_ALLOWED):
+        self.subnet = subnet
+        self.max_ips = max_ips
+        super().__init__(f"Subnet {subnet} exceeds the limit of {max_ips} IP addresses.")

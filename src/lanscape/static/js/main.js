@@ -132,9 +132,6 @@ function rightSizeScanContainer() {
         const headerHeight = $('#header').outerHeight();
         const viewportHeight = $(window).height();
 
-        console.log('headerHeight', headerHeight, 'viewportHeight', viewportHeight);
-
-
         const newHeight = viewportHeight - headerHeight;
         scanContainer.height(newHeight);
     },20);

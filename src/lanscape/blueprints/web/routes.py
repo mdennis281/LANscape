@@ -9,7 +9,7 @@ from ...libraries.net_tools import get_primary_network_subnet
 def index():
     subnet = get_primary_network_subnet()
     port_list = 'medium'
-    parallelism = 1.0
+    parallelism = 0.7
     if request.args.get('scan_id'):
         scan = SubnetScanner.get_scan(request.args.get('scan_id'))
         subnet = scan['subnet']
@@ -29,3 +29,7 @@ def render_scan(scan_id, section='all'):
     filter = request.args.get('filter')
     return render_template('scan.html', data=data, section=section, filter=filter)
 
+@web_bp.route('/errors/<scan_id>')
+def view_errors(scan_id):
+    data = SubnetScanner.get_scan(scan_id)
+    return render_template('error.html',data=data)

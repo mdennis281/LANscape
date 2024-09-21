@@ -247,7 +247,7 @@ class ScannerResults:
     
     def save(self):
         Path(JOB_DIR).mkdir(parents=True, exist_ok=True)
-        self.log.debug(f'Saving Results. Threads: ${self.scan.job_stats.get('running')}')
+        self.log.debug(f"Saving Results. Threads: {self.scan.job_stats.get('running')}")
 
         self.running = self.scan.running
         self.run_time = int(round(time() - self.start_time,0))

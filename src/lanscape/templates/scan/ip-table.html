@@ -1,3 +1,9 @@
+{% if data.errors %}
+    <p class="text-danger">
+        Uncaught error(s) executing scan
+        <a href="/errors/{{data.uid}}" target="_blank">View details</a>
+    </p>
+{% endif %}
 <div class="table-container">
     <table class="table table-bordered table-striped">
         <thead>

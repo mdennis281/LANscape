@@ -33,6 +33,14 @@ can sometimes require admin-level permissions to retrieve accurate results.
 ### Unable to see results after initiating a scan
 In order to keep this program lightweight and compatible, it leverages the filesystem to temporarily save the results of an active scan. Ensure that you have write permissions in the current working directory of your shell.
 
+### Unable to start webview client. Try --nogui (Linux)
+Linux and QT (GUI package) dont seem to play well with each other very well. If you really want the gui (`python -m lanscape --nogui` is almost as good) I had success on ubuntu desktop by running these:
+```sh
+sudo apt install libcairo2-dev libxt-dev libgirepository1.0-dev
+pip install pycairo PyGObject qtpy PyQt5 PyQtWebEngine
+```
+
+
 ### Something else
 Feel free to submit a github issue detailing your experience.
 

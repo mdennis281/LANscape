@@ -1,3 +1,5 @@
+// Reload the page gracefully every second
+// Used in 'live' iframes
 
 function quietReload() {
     function run() {

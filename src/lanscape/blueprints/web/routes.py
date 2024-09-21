@@ -29,3 +29,7 @@ def render_scan(scan_id, section='all'):
     filter = request.args.get('filter')
     return render_template('scan.html', data=data, section=section, filter=filter)
 
+@web_bp.route('/errors/<scan_id>')
+def view_errors(scan_id):
+    data = SubnetScanner.get_scan(scan_id)
+    return render_template('error.html',data=data)

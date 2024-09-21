@@ -8,10 +8,13 @@
         <!-- Form -->
         <form id="scan-form" class="d-flex align-items-end">
             <div class="form-group me-2">
-                <label for="subnet">Subnet:</label>
+                <div class="label-container">
+                    <label for="subnet">Subnet:</label>
+                    <div id="subnet-info"></div>
+                </div>
                 <input type="text" id="subnet" name="subnet" class="form-control" value="{{subnet}}" placeholder="Enter subnet">
             </div>
-            <button type="submit" class="btn btn-primary mb-3">Scan</button>
+            <button type="submit" id="scan-submit" class="btn btn-primary mb-3">Scan</button>
         </form>
     </div>
 
@@ -53,7 +56,7 @@
 
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
+<script src="{{ url_for('static', filename='js/subnet-info.js') }}"></script>
 {% endblock %}
 
 

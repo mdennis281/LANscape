@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="scroll-container">
+    <div class="container-fluid my-4">
+        <h3>Scan Errors:</h3>
+        <p>Feel free to submit a Github issue</p>
+        <p><a href="https://github.com/mdennis281/LANscape/issues">https://github.com/mdennis281/LANscape/issues</a></p>
+        {% for error in data['errors'] %}
+            <div class="error-container">
+                <pre>{{error}}</pre>
+            </div>
+        {% endfor %}
+    </div>   
+</div>
+
+{% endblock %}
+

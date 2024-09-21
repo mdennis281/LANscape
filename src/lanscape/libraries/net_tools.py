@@ -72,9 +72,10 @@ class Device(IPAlive):
     def get_metadata(self):
         if self.alive:
             self.hostname = self._get_hostname()
-            self.manufacturer = self._get_manufacturer()
             if not self.mac_addr:
                 self.mac_addr = self._get_mac_address()
+            self.manufacturer = self._get_manufacturer()
+            
     
     def test_port(self,port:int) -> bool:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

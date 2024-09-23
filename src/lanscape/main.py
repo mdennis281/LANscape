@@ -6,6 +6,7 @@ import argparse
 import time
 import logging
 import traceback
+import os
 from .libraries.logger import configure_logging
 
 log = logging.getLogger('core')
@@ -15,7 +16,10 @@ def main():
     args = parse_args()
     configure_logging(args.loglevel, args.logfile)
     def no_gui():
-        open_browser(f'http://127.0.0.1:{args.port}')
+        # determine if it was reloaded by flask debug reloader
+        # if it was, dont open the browser again
+        if os.environ.get("WERKZEUG_RUN_MAIN") is None:
+            open_browser(f'http://127.0.0.1:{args.port}')
         start_webserver(
             debug=args.debug,
             port=args.port

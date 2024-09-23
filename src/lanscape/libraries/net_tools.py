@@ -227,13 +227,17 @@ def get_network_subnet(interface = get_primary_interface()):
     Get the network interface and subnet.
     Default is primary interface
     """ 
-    ip_address = get_ip_address(interface)
-    netmask = get_netmask(interface)
-    cidr = get_cidr_from_netmask(netmask)
+    try:
+        ip_address = get_ip_address(interface)
+        netmask = get_netmask(interface)
+        cidr = get_cidr_from_netmask(netmask)
 
-    ip_mask = f'{ip_address}/{cidr}'
+        ip_mask = f'{ip_address}/{cidr}'
 
-    return get_host_ip_mask(ip_mask)
+        return get_host_ip_mask(ip_mask)
+    except:
+        log.info(f'Unable to parse subnet for interface: {interface}')
+        log.debug(traceback.format_exc())
 
 def get_all_network_subnets():
     """
@@ -246,11 +250,9 @@ def get_all_network_subnets():
     for interface, snicaddrs in addrs.items():
         for snicaddr in snicaddrs:
             if snicaddr.family == socket.AF_INET and gateways[interface].isup:
-                try:
-                    subnets.append( get_network_subnet(interface) )
-                except AttributeError:
-                    log.info(f"Failed to parse mask for interface: {interface}")
-                    log.debug(traceback.format_exc())
+                subnet = get_network_subnet(interface)
+                if subnet: subnets.append( subnet )
+
     return subnets
 
 

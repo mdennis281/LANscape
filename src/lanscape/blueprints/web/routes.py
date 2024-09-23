@@ -1,13 +1,14 @@
 from flask import render_template, request
 from . import web_bp
 from ...libraries.subnet_scan import SubnetScanner
-from ...libraries.net_tools import get_primary_network_subnet
+from ...libraries.net_tools import get_network_subnet, get_all_network_subnets
 
 # Template Renderer
 ############################################
 @web_bp.route('/', methods=['GET'])
 def index():
-    subnet = get_primary_network_subnet()
+    subnet = get_network_subnet()
+    subnets = get_all_network_subnets()
     port_list = 'medium'
     parallelism = 0.7
     if request.args.get('scan_id'):
@@ -19,7 +20,8 @@ def index():
         'main.html',
         subnet=subnet, 
         port_list=port_list, 
-        parallelism=parallelism
+        parallelism=parallelism,
+        alternate_subnets=subnets
     )
 
 @web_bp.route('/scan/<scan_id>', methods=['GET'])

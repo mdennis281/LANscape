@@ -413,3 +413,33 @@ html {
     scrollbar-width: thin;
     scrollbar-color: #444 #232323;
 }
+
+.dropdown-menu {
+    background-color: #232323;
+    border: 1px solid #444;
+    
+}
+.dropdown-menu.show{
+    width: 100%;
+    transform: translate(0px, 42px);
+}
+
+.dropdown-item {
+    color: #e0e0e0;
+}
+
+.dropdown-item:hover {
+    background-color: #444;
+    color: white;
+}
+
+#subnet {
+    background-color: #232323;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+
+.btn-secondary {
+    background-color: #444;
+    border: 1px solid #444;
+}

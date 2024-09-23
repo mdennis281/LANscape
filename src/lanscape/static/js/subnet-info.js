@@ -6,7 +6,7 @@ $(document).ready(function() {
 });
 
 function subnetUpdated(input) {
-    $.getJSON(`/api/scan/subnet/test?subnet=${input}`,(data) => {
+    $.getJSON(`/api/tools/subnet/test?subnet=${input}`,(data) => {
         setSubnetValidity(data.valid);
         $('#subnet-info').html(data.msg);
     })

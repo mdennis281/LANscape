@@ -8,6 +8,7 @@ import ipaddress
 import traceback
 import logging
 from .mac_lookup import lookup_mac
+from .ip_parser import get_address_count
 from scapy.all import ARP, Ether, srp
 from time import sleep
 from typing import List
@@ -251,7 +252,9 @@ def get_all_network_subnets():
         for snicaddr in snicaddrs:
             if snicaddr.family == socket.AF_INET and gateways[interface].isup:
                 subnet = get_network_subnet(interface)
-                if subnet: subnets.append( subnet )
+                if subnet: subnets.append( 
+                    { 'subnet': subnet, 'address_cnt': get_address_count(subnet) } 
+                )
 
     return subnets
 

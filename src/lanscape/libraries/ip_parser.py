@@ -32,6 +32,13 @@ def parse_ip_input(ip_input):
             raise SubnetTooLargeError(ip_input)
     return ip_ranges
 
+def get_address_count(subnet: str):
+    try:
+        net = ipaddress.IPv4Network(subnet,strict=False)
+        return net.num_addresses
+    except:
+        return 0
+
 def parse_ip_range(entry):
     start_ip, end_ip = entry.split('-')
     start_ip = ipaddress.IPv4Address(start_ip.strip())

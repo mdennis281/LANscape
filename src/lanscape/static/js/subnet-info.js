@@ -1,12 +1,12 @@
 // Validation for subnet input
 
 $(document).ready(function() {
-    $('#subnet').keyup(() => subnetUpdated($('#subnet').val()));
+    $('#subnet').on('input', () => subnetUpdated($('#subnet').val()));
     subnetUpdated($('#subnet').val());
 });
 
 function subnetUpdated(input) {
-    $.getJSON(`/api/scan/subnet/test?subnet=${input}`,(data) => {
+    $.getJSON(`/api/tools/subnet/test?subnet=${input}`,(data) => {
         setSubnetValidity(data.valid);
         $('#subnet-info').html(data.msg);
     })

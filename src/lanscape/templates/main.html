@@ -12,7 +12,15 @@
                     <label for="subnet">Subnet:</label>
                     <div id="subnet-info"></div>
                 </div>
-                <input type="text" id="subnet" name="subnet" class="form-control" value="{{subnet}}" placeholder="Enter subnet">
+                <div class="input-group">
+                    <input type="text" id="subnet" name="subnet" class="form-control" value="{{ subnet }}" placeholder="Enter subnet">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="subnet-dropdown" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                    <ul class="dropdown-menu" aria-labelledby="subnet-dropdown" id="dropdown-list">
+                        {% for subnet_option in alternate_subnets %}
+                        <li><a class="dropdown-item" href="#">{{ subnet_option['subnet'] }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
             <button type="submit" id="scan-submit" class="btn btn-primary mb-3">Scan</button>
         </form>
@@ -57,6 +65,7 @@
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/subnet-info.js') }}"></script>
+<script src="{{ url_for('static', filename='js/subnet-selector.js') }}"></script>
 {% endblock %}
 
 

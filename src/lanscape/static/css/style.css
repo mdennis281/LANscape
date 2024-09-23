@@ -90,7 +90,24 @@ details {
 #scan-form input {
     z-index: 2;
     transition: all .2s ease-in-out;
+    border-radius: 5px !important; /* override bootstrap stuff */
+    padding-right: 34px;
+    margin-right: -34px;
 }
+
+#scan-form .input-group button {
+    background-color: #ffffff09;
+    border: 0;
+    border-left: 1px #444 solid;
+    transition: all .2s ease-in-out;
+}
+#scan-form .input-group button:hover {
+    background-color: #ffffff0f;
+}
+#scan-form .input-group button:active {
+    background-color: #007bff;
+}
+
 .label-container {
     display: flex;
     justify-content: space-between;
@@ -412,4 +429,23 @@ input, select, button, details {
 html {
     scrollbar-width: thin;
     scrollbar-color: #444 #232323;
+}
+
+.dropdown-menu {
+    background-color: #232323;
+    border: 1px solid #444;
+    
+}
+.dropdown-menu.show{
+    width: 100%;
+    transform: translate(0px, 42px);
+}
+
+.dropdown-item {
+    color: #e0e0e0;
+}
+
+.dropdown-item:hover {
+    background-color: #444;
+    color: white;
 }

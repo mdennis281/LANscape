@@ -4,5 +4,6 @@ $(document).ready(function () {
         e.preventDefault();
         let selectedSubnet = $(this).text();
         $('#subnet').val(selectedSubnet);  // Update input with selection
+        subnetUpdated(selectedSubnet); // from subnet-info.js
     });
 });

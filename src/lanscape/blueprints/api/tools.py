@@ -21,7 +21,7 @@ def test_subnet():
 @api_bp.route('/api/tools/subnet/list')
 def list_subnet():
     """
-    list all interface sunets
+    list all interface subets
     """
     try: 
         return jsonify(get_all_network_subnets())

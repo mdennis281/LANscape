@@ -2,7 +2,7 @@ import _to_parent
 import unittest
 import json
 from app import app
-from libraries.net_tools import get_primary_network_subnet
+from libraries.net_tools import get_network_subnet
 from libraries.subnet_scan import cleanup_old_jobs
 
 
@@ -66,7 +66,7 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Create a new scan
-        new_scan = {'subnet': get_primary_network_subnet(), 'port_list': 'test_port_list_scan'}
+        new_scan = {'subnet': get_network_subnet(), 'port_list': 'test_port_list_scan'}
         response = self.app.post('/api/scan/async', json=new_scan)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(json.loads(response.data)['status'], 'complete')

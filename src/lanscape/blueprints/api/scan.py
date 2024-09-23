@@ -64,7 +64,7 @@ def test_subnet():
     try:
         ips = parse_ip_input(subnet)
         length = len(ips)
-        return jsonify({'valid': True, 'msg': f'{length} IP{'s' if length > 1 else ''}'})
+        return jsonify({'valid': True, 'msg': f"{length} IP{'s' if length > 1 else ''}"})
     except SubnetTooLargeError:
         return jsonify({'valid': False, 'msg': 'subnet too large', 'error': traceback.format_exc()})
     except:

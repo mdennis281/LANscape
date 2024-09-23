@@ -1,7 +1,7 @@
 // Validation for subnet input
 
 $(document).ready(function() {
-    $('#subnet').keyup(() => subnetUpdated($('#subnet').val()));
+    $('#subnet').on('input', () => subnetUpdated($('#subnet').val()));
     subnetUpdated($('#subnet').val());
 });
 

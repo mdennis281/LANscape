@@ -231,14 +231,17 @@ def get_network_subnet(interface = get_primary_interface()):
     try:
         ip_address = get_ip_address(interface)
         netmask = get_netmask(interface)
-        cidr = get_cidr_from_netmask(netmask)
+        # is valid interface?
+        if ip_address and netmask:
+            cidr = get_cidr_from_netmask(netmask)
 
-        ip_mask = f'{ip_address}/{cidr}'
+            ip_mask = f'{ip_address}/{cidr}'
 
-        return get_host_ip_mask(ip_mask)
+            return get_host_ip_mask(ip_mask)
     except:
         log.info(f'Unable to parse subnet for interface: {interface}')
         log.debug(traceback.format_exc())
+    return
 
 def get_all_network_subnets():
     """
@@ -252,9 +255,11 @@ def get_all_network_subnets():
         for snicaddr in snicaddrs:
             if snicaddr.family == socket.AF_INET and gateways[interface].isup:
                 subnet = get_network_subnet(interface)
-                if subnet: subnets.append( 
-                    { 'subnet': subnet, 'address_cnt': get_address_count(subnet) } 
-                )
+                if subnet: 
+                    subnets.append({ 
+                        'subnet': subnet, 
+                        'address_cnt': get_address_count(subnet) 
+                    })
 
     return subnets
 

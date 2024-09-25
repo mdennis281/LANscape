@@ -1,16 +1,33 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div id="header">
+      <!-- Header and Scan Submission Inline -->
+    <div class="d-flex justify-content-start align-items-center">
+        <h1 class="title" onclick="location.reload()">
+            <span>LAN</span>scape 
+        </h1>
+    </div>
+</div>
 <div class="scroll-container">
     <div class="container-fluid my-4">
-        <h3>Scan Errors:</h3>
-        <p>Feel free to submit a Github issue</p>
-        <p><a href="https://github.com/mdennis281/LANscape/issues">https://github.com/mdennis281/LANscape/issues</a></p>
-        {% for error in data['errors'] %}
+        <h3 class="text-danger">500 - Internal Server Error</h3>
+        <h5>{{ error or 'That was unexpected.' }}</h5>
+        
+        {% if traceback %}
+        <details>
+            <summary>Traceback:</summary>
             <div class="error-container">
-                <pre>{{error}}</pre>
+                <pre>{{traceback}}</pre>
             </div>
-        {% endfor %}
+        </details>
+        {% endif %}
+
+        <button onclick="location.href='/'" class="btn btn-primary m-2">Home</button>
+
+        <a  href="https://github.com/mdennis281/LANscape/issues" target="_blank">
+            <button class="btn btn-info m-2">Github issues</button>
+        </a>
     </div>   
 </div>
 

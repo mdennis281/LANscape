@@ -4,13 +4,12 @@
         <a href="/errors/{{data.uid}}" target="_blank">View details</a>
     </p>
 {% endif %}
-<div class="table-container">
+<div class="table-container" id="ip-table-container">
     <table class="table table-bordered table-striped">
         <thead>
             <tr>
-                <th scope="col">IP Address</th>
-                <th scope="col">MAC Address</th>
-                <th scope="col">Manufacturer</th>
+                <th scope="col">IP / <span class="alt">Host</span></th>
+                <th scope="col">MAC / <span class="alt">Manufacturer</span></th>
                 <th scope="col">Open Ports</th>
                 <th scope="col">Stage</th>
                 <th scope="col">Actions</th>

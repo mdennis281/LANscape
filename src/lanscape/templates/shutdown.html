@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="header">
+      <!-- Header and Scan Submission Inline -->
+    <div class="d-flex justify-content-start align-items-center">
+        <h1 class="title" onclick="location.reload()">
+            <span>LAN</span>scape 
+        </h1>
+    </div>
+</div>
+<div class="container-fluid my-4 d-flex justify-content-center align-items-center h-60">
+    <div class="text-center">
+        <h5 id="shutdown-message">Shutting down server...</h5>
+        <p id="shutdown-sub"></p>
+    </div>
+    
+    
+</div>   
+<script src="{{ url_for('static', filename='js/shutdown-server.js') }}"></script>
+{% endblock %}

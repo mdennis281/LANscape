@@ -1,4 +1,5 @@
 import ipaddress
+from .errors import SubnetTooLargeError
 import re
 
 MAX_IPS_ALLOWED = 10000 
@@ -62,10 +63,3 @@ def ip_range_to_list(start_ip, end_ip):
     for ip_int in range(int(start_ip), int(end_ip) + 1):
         yield ipaddress.IPv4Address(ip_int)
 
-
-class SubnetTooLargeError(Exception):
-    """Custom exception raised when the subnet size exceeds the allowed limit."""
-    def __init__(self, subnet, max_ips=MAX_IPS_ALLOWED):
-        self.subnet = subnet
-        self.max_ips = max_ips
-        super().__init__(f"Subnet {subnet} exceeds the limit of {max_ips} IP addresses.")

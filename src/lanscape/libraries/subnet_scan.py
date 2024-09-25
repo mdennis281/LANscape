@@ -19,6 +19,7 @@ from .ip_parser import parse_ip_input
 from .port_manager import PortManager
 
 JOB_DIR = './lanscape-jobs/'
+SAVE_FREQUENCY = 1 # seconds
 
 
 
@@ -28,7 +29,7 @@ class SubnetScanner:
             subnet: str, 
             port_list: str,
             parallelism: float = 1.0,
-            uid: str = str(uuid.uuid4())
+            uid: str = None
         ):
         self.subnet = parse_ip_input(subnet)
         self.port_list = port_list
@@ -37,7 +38,7 @@ class SubnetScanner:
         self.parallelism: float = float(parallelism)
         self.subnet_str = subnet
         self.job_stats = {'running': {}, 'finished': {}, 'timing': {}}
-        self.uid = uid
+        self.uid = uid if uid else str(uuid.uuid4())
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
         self.log.debug(f'Instantiated with uid: {self.uid}')
@@ -122,6 +123,7 @@ class SubnetScanner:
 
         self._set_stage('complete')
         self.running = False
+        self.results.save() # manual save to ensure latest is live
         return self.results
         
 
@@ -267,16 +269,17 @@ class ScannerResults:
     def _save_thread(self):
         while self.scan.running:
             self.save()
-            sleep(1)
+            sleep(SAVE_FREQUENCY)
         self.save()
 
             
-def cleanup_old_jobs(all=False):
+def cleanup_old_jobs(older_than=0):
     """
-    Delete all job files older than 24 hours.
+    Removes removes jobs (scans) from the execution directory.
+    Optional param to filter jobs older than (seconds).
     """
     for file in os.listdir(JOB_DIR):
         if file.endswith('.json'):
             file_path = f'{JOB_DIR}{file}'
-            if time() - os.path.getmtime(file_path) > 86400 or all:
+            if time() - os.path.getmtime(file_path) > older_than:
                 os.remove(file_path)

@@ -1,7 +1,16 @@
 <tr>
-    <td>{{ device.ip }}</td>
-    <td>{{ device.mac_addr }}</td>
-    <td>{{ device.manufacturer or 'Unknown' }}</td>
+    <td>
+        <div>{{ device.ip }}</div>
+        {% if device.hostname %} 
+            <div><span class=alt>{{device.hostname}}</span></div>
+        {% endif %}
+    </td>
+    <td>
+        <div>{{ device.mac_addr or 'Unknown' }}</div>
+        {% if device.manufacturer %} 
+            <div><span class="alt">{{device.manufacturer}}</span></div>
+        {% endif %}
+    </td>
     <td>{{ device.ports | join(", ") }}</td>
     <td>
         {% if device.stage == 'complete' %}

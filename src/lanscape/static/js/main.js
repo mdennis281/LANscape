@@ -45,6 +45,8 @@ $(document).ready(function() {
         const newSrc = currentSrc.split('?')[0] + '?filter=' + filter;
         $('#ip-table-frame').attr('src', newSrc);
     });
+
+    initTooltips();
 });
 
 function showScan(scanId) {
@@ -136,3 +138,10 @@ function rightSizeScanContainer() {
         scanContainer.height(newHeight);
     },20);
 }
+function initTooltips() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+}
+

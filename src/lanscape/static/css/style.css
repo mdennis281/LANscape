@@ -542,6 +542,12 @@ html {
 #overview-container .card-header {
     padding: 5px;
     font-size: 1rem;
+    text-wrap: nowrap;
+    height: 35px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
 }
 
 #overview-container .card-body {
@@ -549,6 +555,7 @@ html {
     display: flex;
     justify-content: center;
     align-items: center;
+    text-wrap: nowrap;
 }
 
 #overview-container .col-4 {

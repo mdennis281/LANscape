@@ -80,7 +80,9 @@ hr {
     border-color: var(--border-color);
     margin: 20px 0;
 }
-
+h1.title{
+    cursor: pointer;
+}
 .title span {
     color: var(--text-accent-color);
 }

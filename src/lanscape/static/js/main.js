@@ -145,8 +145,3 @@ function initTooltips() {
     })
 }
 
-function shutdownApp() {
-    // will term server before response
-    $.get('/shutdown').fail(() => window.close());
-    
-}

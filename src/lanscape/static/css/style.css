@@ -4,27 +4,22 @@
     --primary-accent-hover: #0056b3;
     --secondary-accent: #6c757d;
     --info-accent: #17a2b8;
-    --success-accent: #28a745;
-    --success-accent-hover: #1f7d35;
+    --success-accent: #006334;
+    --success-accent-hover: #004926;
     --danger-accent: #dc3545;
     --danger-accent-hover: #c82333;
-    --warning-accent: #bf9a06;
-    --warning-accent-hover: #a47f05;
+    --warning-accent: #974d04;
+    --warning-accent-hover: #793e04;
     --text-color: #e0e0e0;
     --text-placeholder: #bbb;
     --text-danger-color: #fa7a7a;
-
-
     --body-bg: #1e1e1e;
     --primary-bg: #2a2a2a;
     --primary-bg-accent: #2b2b2b;
     --primary-bg-accent-hover: #4b4b4b;
-
-
     --secondary-bg: #232323;
-
     --border-color: #444;
-    --danger-border-color: 
+    --danger-border-color: #722; 
 
 }
 
@@ -166,7 +161,7 @@ details {
 #scan-form.error input
  {
     color: var(--text-danger-color);
-    border-color: #722;
+    border-color: var(--danger-border-color);
     outline: 0 none;
 }
 #scan-form.error input:focus {

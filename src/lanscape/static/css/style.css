@@ -1,7 +1,7 @@
 /* General Styles */
 :root {
-    --primary-accent: #1e85f2;
-    --primary-accent-hover: #0056b3;
+    --primary-accent: #0856a9;
+    --primary-accent-hover: #014389;
     --secondary-accent: #6c757d;
     --info-accent: #17a2b8;
     --success-accent: #006334;
@@ -10,9 +10,12 @@
     --danger-accent-hover: #c82333;
     --warning-accent: #974d04;
     --warning-accent-hover: #793e04;
+
     --text-color: #e0e0e0;
+    --text-accent-color: #2280e3; 
     --text-placeholder: #bbb;
     --text-danger-color: #fa7a7a;
+
     --body-bg: #1e1e1e;
     --primary-bg: #2a2a2a;
     --primary-bg-accent: #2b2b2b;
@@ -78,7 +81,7 @@ hr {
 }
 
 .title span {
-    color: var(--primary-accent);
+    color: var(--text-accent-color);
 }
 
 .overview-container {
@@ -420,7 +423,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Protocol Open Button Styles */
 span.alt {
-    color: var(--primary-accent);
+    color: var(--text-accent-color);
 }
 .colorful-buttons a{
     margin:2px;

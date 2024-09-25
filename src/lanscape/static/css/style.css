@@ -270,7 +270,7 @@ button {
     display: none !important;
 }
 
-#scan-form .btn {
+#scan-form #scan-submit {
     border: none;
     padding: 10px 20px;
 }
@@ -292,7 +292,6 @@ button {
 .btn-secondary, button.btn-secondary {
     background-color: var(--secondary-accent);
     border: none;
-    padding: 10px 20px;
     color: var(--text-color);
     font-size: 1rem;
     cursor: pointer;
@@ -305,7 +304,6 @@ button {
 .btn-info, button.btn-info {
     background-color: var(--info-accent);
     border: none;
-    padding: 10px 20px;
     color: var(--text-color);
     font-size: 1rem;
     cursor: pointer;

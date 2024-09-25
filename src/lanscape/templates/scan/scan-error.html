@@ -4,13 +4,17 @@
 <div class="scroll-container">
     <div class="container-fluid my-4">
         <h3>Scan Errors:</h3>
-        <p>Feel free to submit a Github issue</p>
-        <p><a href="https://github.com/mdennis281/LANscape/issues">https://github.com/mdennis281/LANscape/issues</a></p>
+        
         {% for error in data['errors'] %}
             <div class="error-container">
                 <pre>{{error}}</pre>
             </div>
         {% endfor %}
+        <button onclick="location.href='/'" class="btn btn-primary m-2">Home</button>
+
+        <a target="_blank" src="https://github.com/mdennis281/LANscape/issues">
+            <button class="btn btn-info m-2">Github issues</button>
+        </a>
     </div>   
 </div>
 

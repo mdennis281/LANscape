@@ -37,3 +37,7 @@ def render_scan(scan_id, section='all'):
 def view_errors(scan_id):
     data = SubnetScanner.get_scan(scan_id)
     return render_template('scan/scan-error.html',data=data)
+
+@web_bp.route('/shutdown-ui')
+def shutdown_ui():
+    return render_template('shutdown.html')

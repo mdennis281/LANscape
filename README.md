@@ -13,8 +13,10 @@ python -m lanscape
  - `--port <port number>` port of the flask app (default: 5001)
  - `--nogui` run in web mode (default: false)
  - `--debug` verbose logging (default: false)
+ - `--noclean` dont cleanup the scan files on exit (default: false)
  - `--logfile` save log output to lanscape.log
  - `--loglevel <level>` set the logger's log level (Default: INFO)
+ 
 
 Examples:
 ```shell

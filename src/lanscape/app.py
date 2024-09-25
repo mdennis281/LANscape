@@ -1,5 +1,6 @@
-from flask import Flask
+from flask import Flask, render_template
 import logging
+import traceback
 import multiprocessing
 import threading
 import os
@@ -22,7 +23,8 @@ def is_substring_in_values(results: dict, substring: str) -> bool:
 
 app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 
-# External hook to kill flask server
+## External hook to kill flask server
+################################
 exiting = False
 @app.route("/shutdown")
 def exit_app():
@@ -36,6 +38,17 @@ def teardown(exception):
     if exiting:
         os._exit(0)
 
+## Generalized error handling
+################################
+@app.errorhandler(500)
+def internal_error(e):
+    """
+    handle internal errors nicely
+    """
+    tb = traceback.format_exc()
+    return render_template('error.html',
+                           error=None,
+                           traceback=tb), 500
 
 ## Webserver creation functions
 ################################

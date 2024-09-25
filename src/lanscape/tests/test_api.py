@@ -71,13 +71,25 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         scan_info = json.loads(response.data)
         self.assertEqual(scan_info['status'], 'complete')
+        scanid = scan_info['scan_id']
+        self.assertIsNotNone(scanid)
 
         # Validate the scan worked without error
-        response = self.app.get(f"/api/scan/{scan_info['scan_id']}")
+        response = self.app.get(f"/api/scan/{scanid}")
         self.assertEqual(response.status_code, 200)
         scan_data = json.loads(response.data)
         self.assertEqual(scan_data['errors'], [])
         self.assertEqual(scan_data['stage'],'complete')
+
+        # Render UI
+        uris = [
+            f'/?scan_id={scanid}',
+            f'/scan/{scanid}/overview',
+            f'/scan/{scanid}/table'
+        ]
+        for uri in uris:
+            response = self.app.get(uri)
+            self.assertEqual(response.status_code,200)
 
 
         # Delete the new port list

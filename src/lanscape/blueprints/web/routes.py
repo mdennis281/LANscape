@@ -2,6 +2,7 @@ from flask import render_template, request
 from . import web_bp
 from ...libraries.subnet_scan import SubnetScanner
 from ...libraries.net_tools import get_network_subnet, get_all_network_subnets
+import os
 
 # Template Renderer
 ############################################
@@ -21,7 +22,8 @@ def index():
         subnet=subnet, 
         port_list=port_list, 
         parallelism=parallelism,
-        alternate_subnets=subnets
+        alternate_subnets=subnets,
+        show_power = os.getenv('NOGUI')
     )
 
 @web_bp.route('/scan/<scan_id>', methods=['GET'])

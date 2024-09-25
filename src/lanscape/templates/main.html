@@ -2,9 +2,23 @@
 
 {% block content %}
 <div id="header">
+    <!-- show a power button if no gui -->
+    {% if show_power %}
+        <span 
+            id="power-button" 
+            class="material-symbols-outlined"
+            data-bs-toggle="tooltip" 
+            data-bs-placement="right" 
+            title="Shutdown App"
+            onclick="shutdownApp()">
+            power_settings_new
+        </span>
+    {% endif %}
       <!-- Header and Scan Submission Inline -->
     <div class="d-flex justify-content-between align-items-center flex-wrap">
-        <h1 class="title"><span>LAN</span>scape</h1>
+        <h1 class="title">
+            <span>LAN</span>scape 
+        </h1>
         <!-- Form -->
         <form id="scan-form" class="d-flex align-items-end">
             <div class="form-group me-2">

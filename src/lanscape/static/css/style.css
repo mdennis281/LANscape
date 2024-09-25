@@ -3,6 +3,7 @@
     --primary-accent: #0856a9;
     --primary-accent-hover: #014389;
     --secondary-accent: #6c757d;
+    --secondary-accent-hover: #495055;
     --info-accent: #17a2b8;
     --success-accent: #006334;
     --success-accent-hover: #004926;
@@ -189,6 +190,8 @@ details {
     color: var(--text-danger-color);
 }
 
+
+
 @media screen and (max-width: 681px) {
     #power-button {
         left: auto;
@@ -265,9 +268,27 @@ button {
     display: none !important;
 }
 
+#scan-form .btn {
+    border: none;
+    padding: 10px 20px;
+}
+
 /* Button Styling */
 .btn-primary, button.btn-primary {
     background-color: var(--primary-accent);
+    color: var(--text-color);
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+}
+
+
+.btn-primary:hover {
+    background-color: var(--primary-accent-hover);
+}
+.btn-secondary, button.btn-secondary {
+    background-color: var(--secondary-accent);
     border: none;
     padding: 10px 20px;
     color: var(--text-color);
@@ -276,9 +297,22 @@ button {
     border-radius: 5px;
     transition: background-color 0.2s ease;
 }
-
-.btn-primary:hover {
-    background-color: var(--primary-accent-hover);
+.btn-secondary:hover {
+    background-color: var(--secondary-accent);
+}
+.btn-info, button.btn-info {
+    background-color: var(--info-accent);
+    border: none;
+    padding: 10px 20px;
+    color: var(--text-color);
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+}
+.btn-info:hover {
+    background-color: var(--info-accent);
+    color: var(--text-color);
 }
 input[type="range"] {
     -webkit-appearance: none;

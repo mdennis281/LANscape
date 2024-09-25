@@ -1,25 +1,25 @@
-<div class="row overview-container">
-    <div class="col-md-4">
-        <div class="card text-white mb-3" style="background-color: #0d6efd;">
-            <div class="card-header">Found / Scanned / Total</div>
-            <div class="card-body">
-                <h5 class="card-title">{{ data.devices_alive }} / {{ data.devices_scanned }} / {{ data.devices_total }}</h5>
+<div class="row d-flex justify-content-between align-items-center" id="overview-container">
+    <div class="col-4">
+        <div class="card text-white" id="progress-card">
+            <div class="card-header text-center">Found / Scanned / Total</div>
+            <div class="card-body text-center">
+                {{ data.devices_alive }} / {{ data.devices_scanned }} / {{ data.devices_total }}
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-white mb-3" style="background-color: #198754;">
-            <div class="card-header">Runtime</div>
-            <div class="card-body">
-                <h5 class="card-title">{{ data.run_time }}</h5>
+    <div class="col-4">
+        <div class="card text-white overview-card" id="runtime-card">
+            <div class="card-header text-center">Runtime</div>
+            <div class="card-body text-center">
+                {{ data.run_time }}s
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card text-white mb-3" style="background-color: #dc3545;">
-            <div class="card-header">Stage</div>
-            <div class="card-body">
-                <h5 class="card-title">{{ data.stage }}</h5>
+    <div class="col-4">
+        <div class="card text-white overview-card" id="stage-card">
+            <div class="card-header text-center">Stage</div>
+            <div class="card-body text-center">
+                {{ data.stage }}
             </div>
         </div>
     </div>

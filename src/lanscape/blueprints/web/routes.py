@@ -36,4 +36,4 @@ def render_scan(scan_id, section='all'):
 @web_bp.route('/errors/<scan_id>')
 def view_errors(scan_id):
     data = SubnetScanner.get_scan(scan_id)
-    return render_template('error.html',data=data)
+    return render_template('scan/scan-error.html',data=data)

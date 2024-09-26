@@ -4,6 +4,7 @@ import traceback
 import multiprocessing
 import threading
 import os
+from .libraries.runtime_args import RuntimeArgs
 app = Flask(__name__)
 log = logging.getLogger('core')
 
@@ -53,18 +54,18 @@ def internal_error(e):
 ## Webserver creation functions
 ################################
 
-def start_webserver_dameon(debug: bool=True, port: int=5001) -> multiprocessing.Process:
-    proc = threading.Thread(target=start_webserver, args=(debug,port))
+def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
+    proc = threading.Thread(target=start_webserver, args=(args,))
     proc.daemon = True # Kill thread when main thread exits
     proc.start()
 
         
 
 
-def start_webserver(debug: bool=True, port: int=5001) -> int:
-    if not debug:
+def start_webserver(args: RuntimeArgs) -> int:
+    if not args.debug:
         disable_flask_logging()
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=args.port, debug=args.debug)
 
 
 def disable_flask_logging() -> None:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lanscape"
-version = "0.5.2"
+version = "0.5.4"
 authors = [
   { name="Michael Dennis", email="michael@dipduo.com" },
 ]
@@ -17,10 +17,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "Flask==3.0.3",
-    "psutil==6.0.0",
-    "pywebview>=4.2",
-    "scapy>=2.3.2",
+    "Flask>=3.0,<5.0",
+    "psutil>=6.0,<7.0",
+    "requests>=2.32,<3.0", 
+    "setuptools",
+    "pywebview>=4.2,<6.0",
+    "scapy>=2.3.2,<3.0",
+    "psutil>=6.0.0"
+
 ]
 [project.urls]
 Homepage = "https://github.com/mdennis281/py-lanscape"

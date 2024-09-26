@@ -8,6 +8,7 @@ import logging
 import traceback
 from .libraries.logger import configure_logging
 from .libraries.runtime_args import parse_args, RuntimeArgs
+from .libraries.version_manager import get_installed_version, is_update_available
 import os
 
 log = logging.getLogger('core')
@@ -16,6 +17,9 @@ log = logging.getLogger('core')
 def main():
     args = parse_args()
     configure_logging(args.loglevel, args.logfile)
+
+    log.info(f'LANscape v{get_installed_version()}')
+    try_check_update()
     
         
     try:
@@ -33,6 +37,17 @@ def main():
         log.debug(traceback.format_exc())
         if not args.nogui:
             log.error('Unable to start webview client. Try running with flag --nogui')
+
+
+def try_check_update():
+    try: 
+        if is_update_available():
+            log.info('An update is available!')
+            log.info('Run "pip install --upgrade lanscape --no-cache" to supress this message.')
+    except:
+        log.debug(traceback.format_exc())
+        log.warning('Unable to check for updates.')
+    
 
 def open_browser(url: str,wait=2):
     """

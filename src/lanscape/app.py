@@ -5,6 +5,8 @@ import multiprocessing
 import threading
 import os
 from .libraries.runtime_args import RuntimeArgs
+from .libraries.version_manager import is_update_available, get_installed_version
+import click
 app = Flask(__name__)
 log = logging.getLogger('core')
 
@@ -23,6 +25,12 @@ def is_substring_in_values(results: dict, substring: str) -> bool:
     return any(substring.lower() in str(v).lower() for v in results.values()) if substring else True
 
 app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
+try:
+    app.jinja_env.globals['app_version'] = get_installed_version()
+    app.jinja_env.globals['update_available'] = is_update_available()
+except:
+    app.jinja_env.globals['app_version'] = app.jinja_env.globals.get('app_version')
+    app.jinja_env.globals['update_available'] = None
 
 ## External hook to kill flask server
 ################################
@@ -65,13 +73,33 @@ def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
 def start_webserver(args: RuntimeArgs) -> int:
     if not args.debug:
         disable_flask_logging()
-    app.run(host='0.0.0.0', port=args.port, debug=args.debug)
+    app.run(host='0.0.0.0', port=args.port, debug=args.debug, use_reloader=args.debug)
 
 
 def disable_flask_logging() -> None:
-    flask_log = logging.getLogger('werkzeug')
-    flask_log.setLevel(logging.ERROR)
-    #app.logger.disabled = True
+    def override_click_logging():
+        def secho(text, file=None, nl=None, err=None, color=None, **styles):
+            pass
+
+        def echo(text, file=None, nl=None, err=None, color=None, **styles):
+            pass
+
+        click.echo = echo
+        click.secho = secho
+    # Disable werkzeug logging
+    werkzeug_log = logging.getLogger('werkzeug')
+    werkzeug_log.setLevel(logging.ERROR)
+
+    # Disable Flask's own logger
+    app.logger.disabled = True
+    log = logging.getLogger('werkzeug')
+    log.disabled = True
+
+    override_click_logging()
+
+    
+
+
 
 
 if __name__ == "__main__":

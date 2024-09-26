@@ -7,6 +7,14 @@
 <body>
     
     {% block content %}{% endblock %}
-
+    <footer>
+        <div class="version">
+            v{{app_version}}
+            {% if update_available %} 
+                <span>(Update Available)</span> 
+            {% endif %}
+        </div>
+        
+    </footer>
 </body>
 </html>

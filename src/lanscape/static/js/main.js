@@ -132,9 +132,10 @@ function rightSizeScanContainer() {
     setTimeout(() => {
         const scanContainer = $('#scan-container');
         const headerHeight = $('#header').outerHeight();
+        const footerHeight = $('footer').outerHeight();
         const viewportHeight = $(window).height();
 
-        const newHeight = viewportHeight - headerHeight;
+        const newHeight = viewportHeight - headerHeight - footerHeight;
         scanContainer.height(newHeight);
     },20);
 }

@@ -35,9 +35,11 @@ body {
     height: fit-content;
 }
 
-body:has(#overview-container),
-body:has(#ip-table-container) {
+body:has(.submodule) {
     background-color: #0000;
+}
+body:has(.submodule) footer {
+    display: none;
 }
 
 .container-fluid {
@@ -56,6 +58,23 @@ body:has(#ip-table-container) {
     display: block;
     box-shadow: 0 0 10px rgba(0,0,0,0.8);
     width: 100vw;
+}
+
+footer {
+    position: sticky;
+    background-color: var(--primary-bg);
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    height: 25px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+    align-items: center;
+    bottom: 0;
+    color: var(--text-color);
+    font-size: .8em;
+}
+footer .version span {
+    color: var(--text-placeholder);
 }
 
 #scan-container {

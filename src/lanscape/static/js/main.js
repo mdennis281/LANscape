@@ -1,7 +1,7 @@
 $(document).ready(function() {
     // Load port lists into the dropdown
     getPortLists();
-    rightSizeScanContainer();
+    
     $('#parallelism').on('input', function() {
         const val = $('#parallelism').val();
         let ans = val;
@@ -46,7 +46,6 @@ $(document).ready(function() {
         $('#ip-table-frame').attr('src', newSrc);
     });
 
-    initTooltips();
 });
 
 function showScan(scanId) {
@@ -123,26 +122,10 @@ $('#ip-table-frame').on('load', function() {
 });
 
 $(window).on('resize', function() {
-    rightSizeScanContainer();
     resizeIframe($('#ip-table-frame')[0]);
 });
 
 
-function rightSizeScanContainer() {
-    setTimeout(() => {
-        const scanContainer = $('#scan-container');
-        const headerHeight = $('#header').outerHeight();
-        const footerHeight = $('footer').outerHeight();
-        const viewportHeight = $(window).height();
 
-        const newHeight = viewportHeight - headerHeight - footerHeight;
-        scanContainer.height(newHeight);
-    },20);
-}
-function initTooltips() {
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
-}
+
 

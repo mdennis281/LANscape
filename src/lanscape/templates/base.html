@@ -7,11 +7,36 @@
 <body>
     
     {% block content %}{% endblock %}
-    <footer>
+    <footer class="div-hide">
         <div class="version">
             v{{app_version}}
             {% if update_available %} 
                 <span>(Update Available)</span> 
+            {% endif %}
+        </div>
+
+        <div id="app-actions">
+            <a href="/info">
+                <span 
+                    class="material-symbols-outlined"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="App info">
+                    info
+                </span>
+            </a>
+
+            {% if runtime_args.get('nogui') %}
+            <a href="/shutdown-ui">
+                <span 
+                    id="power-button" 
+                    class="material-symbols-outlined"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="Shutdown App">
+                    power_settings_new
+                </span>
+            </a>
             {% endif %}
         </div>
         

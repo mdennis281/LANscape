@@ -4,12 +4,12 @@
 <div id="header">
       <!-- Header and Scan Submission Inline -->
     <div class="d-flex justify-content-start align-items-center">
-        <h1 class="title" onclick="location.reload()">
+        <h1 class="title" onclick="location.href = '/'">
             <span>LAN</span>scape 
         </h1>
     </div>
 </div>
-<div class="scroll-container">
+<div class="scroll-container" id="content">
     <div class="container-fluid my-4">
         <h3 class="text-danger">500 - Internal Server Error</h3>
         <h5>{{ error or 'That was unexpected.' }}</h5>

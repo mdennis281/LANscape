@@ -34,7 +34,7 @@ def main():
         
         
     try:
-        if args.nogui:
+        if args.nogui or args.headless:
             no_gui(args)
         else:
             start_webview(
@@ -79,8 +79,10 @@ def open_browser(url: str,wait=2):
 def no_gui(args: RuntimeArgs):
     # determine if it was reloaded by flask debug reloader
     # if it was, dont open the browser again
-    if not IS_FLASK_RELOAD:
+    if not IS_FLASK_RELOAD and not args.headless:
         open_browser(f'http://127.0.0.1:{args.port}')
+    if args.headless:
+        log.info(f'Started in headless mode on: http://127.0.0.1:{args.port}')
     start_webserver(
         args
     )

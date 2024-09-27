@@ -11,6 +11,7 @@ class RuntimeArgs:
     noclean: bool = False
     logfile: bool = False
     loglevel: str = 'INFO'
+    headless: bool = False
 
 def parse_args() -> RuntimeArgs:
     parser = argparse.ArgumentParser(description='LANscape')
@@ -21,6 +22,7 @@ def parse_args() -> RuntimeArgs:
     parser.add_argument('--noclean', action='store_true', help='Don\'t clean up jobs folder')
     parser.add_argument('--logfile', action='store_true', help='Log output to lanscape.log')
     parser.add_argument('--loglevel', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Set the log level')
+    parser.add_argument('--headless', action="store_true",help="Similar to nogui, but doesnt try to open a browser. Good for running in a container.")
 
     # Parse the arguments
     args = parser.parse_args()

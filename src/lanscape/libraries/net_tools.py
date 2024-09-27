@@ -14,15 +14,21 @@ from time import sleep
 from typing import List
 
 log = logging.getLogger('NetTools')
+arp_failure = False
 
 
 class IPAlive:
+    global arp_failure
     def is_alive(self,ip:str) -> bool:
+        
         try:
             self.alive = self._arp_lookup(ip)
         except:
-            self.log.debug('failed ARP, falling back to ping')
+            # dont print this 10000 times
+            if not arp_failure:
+                self.log.debug('failed ARP, falling back to ping')
             self.alive = self._ping_lookup(ip)
+            arp_failure = True
 
         return self.alive
 

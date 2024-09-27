@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 @dataclass
 class RuntimeArgs:
-    debug: bool = False
+    reloader: bool = False
     port: int = 5001
     nogui: bool = False
     noclean: bool = False
@@ -15,7 +15,7 @@ class RuntimeArgs:
 def parse_args() -> RuntimeArgs:
     parser = argparse.ArgumentParser(description='LANscape')
 
-    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+    parser.add_argument('--reloader', action='store_true', help='Use flask\'s reloader (helpful for local development)')
     parser.add_argument('--port', type=int, default=5001, help='Port to run the webserver on')
     parser.add_argument('--nogui', action='store_true', help='Run in standalone mode')
     parser.add_argument('--noclean', action='store_true', help='Don\'t clean up jobs folder')

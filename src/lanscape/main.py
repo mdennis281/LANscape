@@ -18,15 +18,20 @@ from .libraries.subnet_scan import cleanup_old_jobs
 
 
 log = logging.getLogger('core')
+# determine if the execution is an instance of a flask reload
+# happens on file change with reloader enabled
+IS_FLASK_RELOAD = os.environ.get("WERKZEUG_RUN_MAIN")
 
 
 
 
 def main():
-
-    log.info(f'LANscape v{get_installed_version()}')
-    try_check_update()
-    
+    if not IS_FLASK_RELOAD:
+        log.info(f'LANscape v{get_installed_version()}')
+        try_check_update()
+    else: 
+        log.debug('Flask reloaded app.')
+        
         
     try:
         if args.nogui:
@@ -74,7 +79,7 @@ def open_browser(url: str,wait=2):
 def no_gui(args: RuntimeArgs):
     # determine if it was reloaded by flask debug reloader
     # if it was, dont open the browser again
-    if os.environ.get("WERKZEUG_RUN_MAIN") is None:
+    if not IS_FLASK_RELOAD:
         open_browser(f'http://127.0.0.1:{args.port}')
     start_webserver(
         args

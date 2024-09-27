@@ -1,12 +1,13 @@
 from flask import Flask, render_template
-import logging
-import traceback
 import multiprocessing
+import traceback
 import threading
+import logging
 import os
+
 from .libraries.runtime_args import RuntimeArgs, parse_args
 from .libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
-import click
+
 app = Flask(__name__)
 log = logging.getLogger('core')
 
@@ -54,6 +55,7 @@ set_global_safe('runtime_args', vars(parse_args()))
 
 ## External hook to kill flask server
 ################################
+
 exiting = False
 @app.route("/shutdown")
 def exit_app():
@@ -87,39 +89,8 @@ def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
     proc.daemon = True # Kill thread when main thread exits
     proc.start()
 
-        
-
-
 def start_webserver(args: RuntimeArgs) -> int:
-    if not args.debug:
-        disable_flask_logging()
-    app.run(host='0.0.0.0', port=args.port, debug=args.debug, use_reloader=args.debug)
-
-
-def disable_flask_logging() -> None:
-    def override_click_logging():
-        def secho(text, file=None, nl=None, err=None, color=None, **styles):
-            pass
-
-        def echo(text, file=None, nl=None, err=None, color=None, **styles):
-            pass
-
-        click.echo = echo
-        click.secho = secho
-    # Disable werkzeug logging
-    werkzeug_log = logging.getLogger('werkzeug')
-    werkzeug_log.setLevel(logging.ERROR)
-
-    # Disable Flask's own logger
-    app.logger.disabled = True
-    log = logging.getLogger('werkzeug')
-    log.disabled = True
-
-    override_click_logging()
-
-    
-
-
+    app.run(host='0.0.0.0', port=args.port, use_reloader=args.reloader)
 
 
 if __name__ == "__main__":

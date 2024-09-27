@@ -1,5 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
+import click
 
 
 def configure_logging(loglevel:str, logfile:bool):
@@ -9,6 +10,10 @@ def configure_logging(loglevel:str, logfile:bool):
     
     
     logging.basicConfig(level=numeric_level, format='[%(name)s] %(levelname)s - %(message)s')
+
+    # flask spams too much on info
+    if numeric_level > logging.DEBUG:
+        disable_flask_logging()
     
     if logfile:
         handler = RotatingFileHandler('lanscape.log', maxBytes=100000, backupCount=3)
@@ -20,3 +25,18 @@ def configure_logging(loglevel:str, logfile:bool):
         # For console, it defaults to basicConfig
         pass
     
+def disable_flask_logging() -> None:
+
+    def override_click_logging():
+        def secho(text, file=None, nl=None, err=None, color=None, **styles):
+            pass
+
+        def echo(text, file=None, nl=None, err=None, color=None, **styles):
+            pass
+
+        click.echo = echo
+        click.secho = secho
+    werkzeug_log = logging.getLogger('werkzeug')
+    werkzeug_log.setLevel(logging.ERROR)
+
+    override_click_logging()

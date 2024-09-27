@@ -90,7 +90,12 @@ def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
     proc.start()
 
 def start_webserver(args: RuntimeArgs) -> int:
-    app.run(host='0.0.0.0', port=args.port, use_reloader=args.reloader)
+    app.run(
+        host='0.0.0.0', 
+        port=args.port, 
+        debug=args.reloader,
+        use_reloader=args.reloader
+    )
 
 
 if __name__ == "__main__":

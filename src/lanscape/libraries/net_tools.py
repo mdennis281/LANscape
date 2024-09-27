@@ -17,6 +17,7 @@ log = logging.getLogger('NetTools')
 
 
 class IPAlive:
+    
     def is_alive(self,ip:str) -> bool:
         try:
             self.alive = self._arp_lookup(ip)

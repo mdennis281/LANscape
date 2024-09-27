@@ -24,7 +24,8 @@
     --secondary-bg: #232323;
     --border-color: #444;
     --danger-border-color: #722; 
-
+    
+    --footer-height: 25px;
 }
 
 body {
@@ -35,9 +36,11 @@ body {
     height: fit-content;
 }
 
-body:has(#overview-container),
-body:has(#ip-table-container) {
+body:has(.submodule) {
     background-color: #0000;
+}
+body:has(.submodule) footer {
+    display: none;
 }
 
 .container-fluid {
@@ -58,7 +61,29 @@ body:has(#ip-table-container) {
     width: 100vw;
 }
 
-#scan-container {
+footer {
+    position: sticky;
+    background-color: var(--primary-bg);
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    height: var(--footer-height);
+    transform:translateY(25px); /* removed in core.js */
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+    align-items: center;
+    bottom: 0;
+    color: var(--text-color);
+    font-size: .8em;
+    transition: all .2s ease-in-out;
+}
+footer .version span {
+    color: var(--text-placeholder);
+}
+.div-hide {
+    display: none !important;
+}
+
+#content {
     width: 100vw;
     height: 100%;
     overflow-y: auto;
@@ -174,19 +199,28 @@ details {
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset, 0 0 8px rgba(200, 85, 85, 0.6);
 }
 
+#app-actions a .material-symbols-outlined {
+    font-size: inherit
+}
+#app-actions {
+    padding-top: 5px;
+}
+
+#app-actions,
+#app-actions a {
+    font-size: 1.1em;
+    color: var(--text-color);
+    text-decoration: none;
+    cursor: pointer;
+}
+#app-actions a:hover {
+    color: var(--text-placeholder)
+}
+
 #power-button {
-    color: green;
+    color: var(--success-accent);
     transition: all .2s ease-in-out;
     cursor: pointer;
-    position: absolute;
-    top: 0;
-    left: 0;
-    padding: 5px;
-    font-size: 1em;
-    border: 1px solid var(--border-color);
-    border-width: 0 1px 1px 0;
-    border-radius: 0 0 5px 0;
-    background-color: var(--secondary-bg);
 }
 #power-button:hover {
     color: var(--text-danger-color);
@@ -299,7 +333,7 @@ button {
     transition: background-color 0.2s ease;
 }
 .btn-secondary:hover {
-    background-color: var(--secondary-accent);
+    background-color: var(--secondary-accent-hover);
 }
 .btn-info, button.btn-info {
     background-color: var(--info-accent);

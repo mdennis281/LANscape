@@ -6,7 +6,7 @@
 
 tasks:
   - init: pip install -r requirements.txt
-    command: python localrun.py --port 8080 --nogui --debug
+    command: python localrun.py --port 8080 --nogui --reloader --loglevel DEBUG
 
 
 ports:

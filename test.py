@@ -1,4 +1,4 @@
-from src.lanscape.tests.test_api import ApiTestCase
+from src.lanscape.tests import ApiTestCase, EnvTestCase
 import unittest
 
 if __name__ == '__main__':

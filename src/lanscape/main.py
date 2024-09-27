@@ -1,29 +1,44 @@
-from .webviewer import start_webview
-from .app import start_webserver
-from .libraries.subnet_scan import cleanup_old_jobs
+
 import threading
 import webbrowser
-import argparse
 import time
 import logging
 import traceback
-from .libraries.logger import configure_logging
 import os
+from .libraries.logger import configure_logging
+from .libraries.runtime_args import parse_args, RuntimeArgs
+# do this so any logs generated on import are displayed
+args = parse_args()
+configure_logging(args.loglevel, args.logfile)
+
+from .libraries.version_manager import get_installed_version, is_update_available
+from .webviewer import start_webview
+from .app import start_webserver
+from .libraries.subnet_scan import cleanup_old_jobs
+
 
 log = logging.getLogger('core')
+# determine if the execution is an instance of a flask reload
+# happens on file change with reloader enabled
+IS_FLASK_RELOAD = os.environ.get("WERKZEUG_RUN_MAIN")
+
+
 
 
 def main():
-    args = parse_args()
-    configure_logging(args.loglevel, args.logfile)
-    
+    if not IS_FLASK_RELOAD:
+        log.info(f'LANscape v{get_installed_version()}')
+        try_check_update()
+    else: 
+        log.debug('Flask reloaded app.')
+        
         
     try:
-        if args.nogui:
+        if args.nogui or args.headless:
             no_gui(args)
         else:
             start_webview(
-                port=args.port
+                args
             )
         if not args.noclean:
             cleanup_old_jobs()
@@ -33,18 +48,17 @@ def main():
         log.debug(traceback.format_exc())
         if not args.nogui:
             log.error('Unable to start webview client. Try running with flag --nogui')
-        
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='LANscape')
-    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
-    parser.add_argument('--port', type=int, default=5001, help='Port to run the webserver on')
-    parser.add_argument('--nogui', action='store_true', help='Run in standalone mode')
-    parser.add_argument('--noclean', action='store_true', help='Don\'t clean up jobs folder')
-    parser.add_argument('--logfile', action='store_true', help='Log output to lanscape.log')
-    parser.add_argument('--loglevel', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Set the log level')
 
-    return parser.parse_args()
+def try_check_update():
+    try: 
+        if is_update_available():
+            log.info('An update is available!')
+            log.info('Run "pip install --upgrade lanscape --no-cache" to supress this message.')
+    except:
+        log.debug(traceback.format_exc())
+        log.warning('Unable to check for updates.')
+    
 
 def open_browser(url: str,wait=2):
     """
@@ -62,15 +76,15 @@ def open_browser(url: str,wait=2):
 
     threading.Thread(target=do_open).start()
 
-def no_gui(args):
+def no_gui(args: RuntimeArgs):
     # determine if it was reloaded by flask debug reloader
     # if it was, dont open the browser again
-    os.environ.setdefault('NOGUI','True')
-    if os.environ.get("WERKZEUG_RUN_MAIN") is None:
+    if not IS_FLASK_RELOAD and not args.headless:
         open_browser(f'http://127.0.0.1:{args.port}')
+    if args.headless:
+        log.info(f'Started in headless mode on: http://127.0.0.1:{args.port}')
     start_webserver(
-        debug=args.debug,
-        port=args.port
+        args
     )
 
 

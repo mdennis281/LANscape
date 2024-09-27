@@ -22,8 +22,7 @@ def index():
         subnet=subnet, 
         port_list=port_list, 
         parallelism=parallelism,
-        alternate_subnets=subnets,
-        show_power = os.getenv('NOGUI')
+        alternate_subnets=subnets
     )
 
 @web_bp.route('/scan/<scan_id>', methods=['GET'])
@@ -41,3 +40,7 @@ def view_errors(scan_id):
 @web_bp.route('/shutdown-ui')
 def shutdown_ui():
     return render_template('shutdown.html')
+
+@web_bp.route('/info')
+def app_info():
+    return render_template('info.html')

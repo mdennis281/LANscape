@@ -1,22 +1,28 @@
-from .webviewer import start_webview
-from .app import start_webserver
-from .libraries.subnet_scan import cleanup_old_jobs
+
 import threading
 import webbrowser
 import time
 import logging
 import traceback
+import os
 from .libraries.logger import configure_logging
 from .libraries.runtime_args import parse_args, RuntimeArgs
+# do this so any logs generated on import are displayed
+args = parse_args()
+configure_logging(args.loglevel, args.logfile)
+
 from .libraries.version_manager import get_installed_version, is_update_available
-import os
+from .webviewer import start_webview
+from .app import start_webserver
+from .libraries.subnet_scan import cleanup_old_jobs
+
 
 log = logging.getLogger('core')
 
 
+
+
 def main():
-    args = parse_args()
-    configure_logging(args.loglevel, args.logfile)
 
     log.info(f'LANscape v{get_installed_version()}')
     try_check_update()
@@ -68,7 +74,6 @@ def open_browser(url: str,wait=2):
 def no_gui(args: RuntimeArgs):
     # determine if it was reloaded by flask debug reloader
     # if it was, dont open the browser again
-    os.environ.setdefault('NOGUI','True')
     if os.environ.get("WERKZEUG_RUN_MAIN") is None:
         open_browser(f'http://127.0.0.1:{args.port}')
     start_webserver(

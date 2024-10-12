@@ -1,7 +1,8 @@
-from flask import request, jsonify
 from . import api_bp
-from ...libraries.subnet_scan import SubnetScanner
-from ...libraries.ip_parser import parse_ip_input, SubnetTooLargeError
+from ...libraries.subnet_scan import ScanConfig
+from .. import scan_manager
+
+from flask import request, jsonify
 import traceback
 
 # Subnet Scanner API
@@ -10,49 +11,34 @@ import traceback
 @api_bp.route('/api/scan/threaded', methods=['POST'])
 def scan_subnet_threaded():
     try:
-        data = request.get_json()
+        config = get_scan_config()
+        scan = scan_manager.new_scan(config)
 
-        scanner = SubnetScanner(
-            data['subnet'], 
-            data['port_list'], 
-            data.get('parallelism', 1.0)
-        )
-        scanner.scan_subnet_threaded()
-
-        return jsonify({'status': 'running', 'scan_id': scanner.uid})
-    except:
-        return jsonify({'status': 'error', 'traceback': traceback.format_exc()}), 500
-
-
-@api_bp.route('/api/scan/standalone', methods=['POST'])
-def scan_subnet_standalone():
-    data = request.get_json()
-
-    try:
-        uid = SubnetScanner.scan_subnet_standalone(
-            data['subnet'], 
-            data['port_list'],
-            float(data.get('parallelism', 1.0))
-        )
-
-        return jsonify({'status': 'running', 'scan_id': uid})
+        return jsonify({'status': 'running', 'scan_id': scan.uid})
     except:
         return jsonify({'status': 'error', 'traceback': traceback.format_exc()}), 500
     
 
 @api_bp.route('/api/scan/async', methods=['POST'])
 def scan_subnet_async():
-    data = request.get_json()
+    config = get_scan_config()
+    scan = scan_manager.new_scan(config)
+    scan_manager.wait_until_complete(scan.uid)
 
-    scanner = SubnetScanner(
-        data['subnet'], 
-        data['port_list'], 
-        data.get('parallelism', 1.0)
-    )
-    scanner.scan_subnet()
-    return jsonify({'status': 'complete', 'scan_id': scanner.uid})
+    return jsonify({'status': 'complete', 'scan_id': scan.uid})
 
 @api_bp.route('/api/scan/<scan_id>', methods=['GET'])
 def get_scan(scan_id):
-    scan = SubnetScanner.get_scan(scan_id)
-    return jsonify(scan)
+    scan = scan_manager.get_scan(scan_id)
+    return jsonify(scan.results.export())
+
+def get_scan_config():
+    """
+    pulls config from the request body
+    """
+    data = request.get_json()
+    return ScanConfig(
+        subnet = data['subnet'],
+        port_list= data['port_list'],
+        parallelism=data.get('parallelism',1.0)
+    )

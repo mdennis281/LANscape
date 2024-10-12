@@ -1,16 +1,14 @@
 import os
-import sys
 import json
 import uuid
 import logging
 import ipaddress
 import traceback
 import threading
-import subprocess
 from time import time
 from time import sleep
 from typing import List
-from pathlib import Path
+from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
 from .net_tools import Device
@@ -18,92 +16,41 @@ from .decorators import job_tracker
 from .ip_parser import parse_ip_input
 from .port_manager import PortManager
 
-JOB_DIR = './lanscape-jobs/'
-SAVE_FREQUENCY = 1 # seconds
+@dataclass
+class ScanConfig:
+    subnet: str
+    port_list: str
+    parallelism: float = 1.0
 
 
 
 class SubnetScanner:
     def __init__(
             self, 
-            subnet: str, 
-            port_list: str,
-            parallelism: float = 1.0,
-            uid: str = None
+            config: ScanConfig
         ):
-        self.subnet = parse_ip_input(subnet)
-        self.port_list = port_list
-        self.ports: list = PortManager().get_port_list(port_list).keys()
+        self.subnet = parse_ip_input(config.subnet)
+        self.port_list = config.port_list
+        self.ports: list = PortManager().get_port_list(config.port_list).keys()
         self.running = False
-        self.parallelism: float = float(parallelism)
-        self.subnet_str = subnet
+        self.parallelism: float = float(config.parallelism)
+        self.subnet_str = config.subnet
         self.job_stats = {'running': {}, 'finished': {}, 'timing': {}}
-        self.uid = uid if uid else str(uuid.uuid4())
+        self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
 
-    def scan_subnet_threaded(self) -> threading.Thread:
-        """
-        Start a new thread to scan the subnet.
-        """
-        t = threading.Thread(target=self.scan_subnet)
-        t.start()
-        return t
-    
-    @staticmethod
-    def scan_subnet_standalone(subnet: str, port_list: str, parallelism: float = 1.0):
-        """
-        Use shell to start a new process for subnet scan.
-        """
-        scan = SubnetScanner(subnet, port_list, parallelism)
-        scan.results.save()
 
-        try:
-            scanner_path = Path(__file__).parent.parent / 'scanner.py'
-        except:
-            scanner_path = 'scanner.py'
-
-        try:
-            subprocess.Popen(
-                [sys.executable, scanner_path, scan.uid],
-                stdout=None, stderr=None, stdin=None, close_fds=True
-            )
-            sleep(1)
-            if not ScannerResults.get_scan(scan.uid)['running']:
-                raise Exception('Could not start scanner in new process')
-
-            
-        except Exception:
-            scan.log.debug(traceback.format_exc())
-            scan.log.warning('unable to start standalone scanner')
-            scan.scan_subnet_threaded()
-        return scan.uid
     
-    @staticmethod
-    def instantiate_scan(scan_id: str) -> 'SubnetScanner':
-        """
-        Load a scan by its unique ID.
-        """
-        scan = SubnetScanner.get_scan(scan_id)
-        return SubnetScanner(scan['subnet'], scan['port_list'], scan['parallelism'], scan['uid'])
     
-
-    @staticmethod
-    def get_scan(scan_id) -> dict:
-        """
-        Load a scan by its unique ID.
-        """
-        return ScannerResults.get_scan(scan_id)
-    
-    def scan_subnet(self):
+    def start(self):
         """
         Scan the subnet for devices and open ports.
         """
         self._set_stage('scanning devices')
         self.running = True
-        self.results.auto_save()
         with ThreadPoolExecutor(max_workers=self._t_cnt(256)) as executor:
             futures = {executor.submit(self._get_host_details, str(ip)): str(ip) for ip in self.subnet}
             for future in futures:
@@ -123,7 +70,6 @@ class SubnetScanner:
 
         self._set_stage('complete')
         self.running = False
-        self.results.save() # manual save to ensure latest is live
         return self.results
         
 
@@ -226,30 +172,16 @@ class ScannerResults:
         self.log = logging.getLogger('ScannerResults')
         self.log.debug(f'Instantiated Logger For Scan: {self.scan.uid}')
 
-    @staticmethod
-    def get_scan(scan_id: str):
-        """
-        load scan by scan id
-        """
-
-        for i in range(5):
-            try:
-                with open(f'{JOB_DIR}{scan_id}.json', 'r') as f:
-                    return json.load(f)
-            except json.JSONDecodeError:
-                sleep(1)
-
-        raise json.JSONDecodeError('Could not load scan data')
 
     def scanned(self):
         self.devices_scanned += 1
         
-    def auto_save(self):
-        threading.Thread(target=self._save_thread).start()
+
     
-    def save(self):
-        Path(JOB_DIR).mkdir(parents=True, exist_ok=True)
-        self.log.debug(f"Saving Results. Threads: {self.scan.job_stats.get('running')}")
+    def export(self,out_type=dict) -> str | dict:
+        """
+            Returns json representation of the scan
+        """
 
         self.running = self.scan.running
         self.run_time = int(round(time() - self.start_time,0))
@@ -264,22 +196,45 @@ class ScannerResults:
         out['devices'] = [vars(device).copy() for device in sortedDevices]
         for device in out['devices']: device.pop('log') 
 
-        with open(f'{JOB_DIR}{self.uid}.json', 'w') as f:
-            json.dump(out, f,indent=2)
-    def _save_thread(self):
-        while self.scan.running:
-            self.save()
-            sleep(SAVE_FREQUENCY)
-        self.save()
+        if out_type == str:
+            return json.dumps(out, indent=2)
+        # otherwise return dict
+        return out
 
-            
-def cleanup_old_jobs(older_than=0):
+
+class ScanManager:
     """
-    Removes removes jobs (scans) from the execution directory.
-    Optional param to filter jobs older than (seconds).
+    Maintain active and completed scans in memory for 
+    future reference
     """
-    for file in os.listdir(JOB_DIR):
-        if file.endswith('.json'):
-            file_path = f'{JOB_DIR}{file}'
-            if time() - os.path.getmtime(file_path) > older_than:
-                os.remove(file_path)
+    def __init__(self):
+        self.scans: List[SubnetScanner] = []
+
+    def new_scan(self, config: ScanConfig) -> SubnetScanner:
+        scan = SubnetScanner(config)
+        self._start(scan)
+        self.scans.append(scan)
+        return scan
+
+    def get_scan(self,scan_id:str) -> SubnetScanner:
+        """
+        Get scan by scan.uid
+        """
+        for scan in self.scans:
+            if scan.uid == scan_id:
+                return scan
+
+    def wait_until_complete(self,scan_id:str) -> SubnetScanner:
+        scan = self.get_scan(scan_id)
+        while scan.running:
+            sleep(.5)
+        return scan
+
+    def _start(self,scan:SubnetScanner):
+        t = threading.Thread(target=scan.start)
+        t.start()
+        return t
+    
+
+
+    

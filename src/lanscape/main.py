@@ -14,7 +14,6 @@ configure_logging(args.loglevel, args.logfile)
 from .libraries.version_manager import get_installed_version, is_update_available
 from .webviewer import start_webview
 from .app import start_webserver
-from .libraries.subnet_scan import cleanup_old_jobs
 
 
 log = logging.getLogger('core')
@@ -40,8 +39,6 @@ def main():
             start_webview(
                 args
             )
-        if not args.noclean:
-            cleanup_old_jobs()
     except Exception:
         # showing error in debug only because this is handled gracefully
         log.debug('Failed to start webview client. Traceback below')

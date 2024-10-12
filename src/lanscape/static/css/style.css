@@ -437,7 +437,14 @@ input[type="range"]::-moz-range-thumb {
 .text-secondary {
     color: var(--secondary-accent)
 }
-
+.secondary-icon-btn {
+    color: var(--secondary-accent);
+    transition: .2s all ease-in-out;
+}
+.secondary-icon-btn:hover {
+    color: var(--text-color);
+    cursor: pointer;
+}
 /* Table Styles */
 .table-container {
     width: 100vw;

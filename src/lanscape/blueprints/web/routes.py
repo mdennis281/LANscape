@@ -13,12 +13,12 @@ def index():
     subnets = get_all_network_subnets()
     port_list = 'medium'
     parallelism = 0.7
-    if scan_id := request.args.get('scan_id'):
-        scanner = scan_manager.get_scan(scan_id)
-        scan = scanner.results.export()
-        subnet = scan['subnet']
-        port_list = scan['port_list']
-        parallelism = scan['parallelism']
+    if scan_id := request.args.get('scan_id'): 
+        if scanner := scan_manager.get_scan(scan_id):
+            scan = scanner.results.export()
+            subnet = scan['subnet']
+            port_list = scan['port_list']
+            parallelism = scan['parallelism']
     return render_template(
         'main.html',
         subnet=subnet, 
@@ -40,6 +40,16 @@ def view_errors(scan_id):
     scanner = scan_manager.get_scan(scan_id)
     data = scanner.results.export()
     return render_template('scan/scan-error.html',data=data)
+
+@web_bp.route('/export/<scan_id>')
+def export_scan(scan_id):
+    scanner = scan_manager.get_scan(scan_id)
+    export_json = scanner.results.export(str)
+    return render_template(
+        'scan/export.html',
+        scan=scanner,
+        export_json=export_json
+    )
 
 @web_bp.route('/shutdown-ui')
 def shutdown_ui():

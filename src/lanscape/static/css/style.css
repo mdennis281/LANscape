@@ -16,6 +16,7 @@
     --text-accent-color: #2280e3; 
     --text-placeholder: #bbb;
     --text-danger-color: #fa7a7a;
+    --text-almost-hidden: #4a4a4a;
 
     --body-bg: #1e1e1e;
     --primary-bg: #2a2a2a;
@@ -154,6 +155,7 @@ details {
     padding-right: 34px;
     margin-right: -34px;
 }
+
 
 #scan-form .input-group button {
     background-color: var(--primary-bg-accent);
@@ -592,6 +594,10 @@ html {
   'wght' 400,
   'GRAD' 0,
   'opsz' 24
+}
+
+#shutdown-sub-sub {
+    color: var(--text-almost-hidden);
 }
 
 

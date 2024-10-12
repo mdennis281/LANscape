@@ -35,8 +35,6 @@ can sometimes require admin-level permissions to retrieve accurate results.
 ### Message "WARNING: No libpcap provider available ! pcap won't be used"
 This is a missing dependency related to the ARP lookup. This is handled in the code, but you would get marginally faster/better results with this installed: [npcap download](https://npcap.com/#download)
 
-### Unable to see results after initiating a scan
-In order to keep this program lightweight and compatible, it leverages the filesystem to temporarily save the results of an active scan. Ensure that you have write permissions in the current working directory of your shell.
 
 ### Unable to start webview client. Try --nogui (Linux)
 Linux and QT (GUI package) dont seem to play well with each other very well. If you really want the gui (`python -m lanscape --nogui` is almost as good) I had success on ubuntu desktop by running these:

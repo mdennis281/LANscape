@@ -434,6 +434,9 @@ input[type="range"]::-moz-range-thumb {
     color: var(--text-color);
 }
 
+.text-secondary {
+    color: var(--secondary-accent)
+}
 
 /* Table Styles */
 .table-container {

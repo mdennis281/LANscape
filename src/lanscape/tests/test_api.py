@@ -2,7 +2,6 @@ import unittest
 import json
 from ..app import app
 from ..libraries.net_tools import get_network_subnet
-from ..libraries.subnet_scan import cleanup_old_jobs
 from ._helpers import right_size_subnet
 
 
@@ -95,7 +94,6 @@ class ApiTestCase(unittest.TestCase):
         response = self.app.delete('/api/port/list/test_port_list_scan')
         self.assertEqual(response.status_code, 200)
 
-        cleanup_old_jobs()
     
     def test_subnet_ports(self):
         """

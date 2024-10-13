@@ -7,7 +7,7 @@ import psutil
 import ipaddress
 import traceback
 import logging
-from .mac_lookup import lookup_mac
+from .mac_lookup import lookup_mac, get_mac
 from .ip_parser import get_address_count
 from scapy.all import ARP, Ether, srp
 from time import sleep
@@ -37,12 +37,10 @@ class IPAlive:
 
         for sent, received in answered:
             if received.psrc == ip:
-                if received.hwsrc:
-                    self.mac_addr = received.hwsrc
                 return True
         return False
 
-    def _ping_lookup(self,host, retries=1, retry_delay=1, ping_count=2, timeout=1):
+    def _ping_lookup(self,host, retries=1, retry_delay=1, ping_count=2, timeout=2):
             """
             Ping the given host and return True if it's reachable, False otherwise.
             """
@@ -77,8 +75,7 @@ class Device(IPAlive):
     def get_metadata(self):
         if self.alive:
             self.hostname = self._get_hostname()
-            if not self.mac_addr:
-                self.mac_addr = self._get_mac_address()
+            self.mac_addr = self._get_mac_address()
             self.manufacturer = self._get_manufacturer()
             
     
@@ -96,18 +93,7 @@ class Device(IPAlive):
         """
         Get the MAC address of a network device given its IP address.
         """
-        os = platform.system().lower()
-        if os == "windows":
-            arp_command = ['arp', '-a', self.ip]
-        else:
-            arp_command = ['arp', self.ip]
-        try:
-            output = subprocess.check_output(arp_command, stderr=subprocess.STDOUT, universal_newlines=True)
-            output = output.replace('-', ':')
-            mac = re.search(r'..:..:..:..:..:..', output)
-            return mac.group() if mac else None
-        except:
-            return None
+        return get_mac(self.ip)
         
     def _get_hostname(self):
         """

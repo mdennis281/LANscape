@@ -2,19 +2,6 @@
 
 {% block content %}
 <div id="header">
-    <!-- show a power button if no gui -->
-    {% if show_power %}
-    <a href="/shutdown-ui">
-        <span 
-            id="power-button" 
-            class="material-symbols-outlined"
-            data-bs-toggle="tooltip" 
-            data-bs-placement="right" 
-            title="Shutdown App">
-            power_settings_new
-        </span>
-    </a>
-    {% endif %}
       <!-- Header and Scan Submission Inline -->
     <div class="d-flex justify-content-between align-items-center flex-wrap">
         <h1 class="title" onclick="location.reload()">
@@ -63,7 +50,19 @@
     <div class="container-fluid my-4">
         <!-- Scan Results -->
         <div id="scan-results" class="div-hide">
-            <h2>Scan Results</h2>
+            <div class="d-flex justify-content-between">
+                <h2>Scan Results</h2>
+                <a href="" id="export-link">
+                    <span 
+                        class="material-symbols-outlined secondary-icon-btn"
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Export scan to json">
+                        ios_share
+                    </span>
+                </a>
+            </div>
+            
             <iframe id="overview-frame" src=""></iframe>
             <input type="text" id="filter" placeholder="Filter results" class="form-control mb-3 mt-3">
             <div class="table-frame-container">

@@ -8,7 +8,6 @@ class RuntimeArgs:
     reloader: bool = False
     port: int = 5001
     nogui: bool = False
-    noclean: bool = False
     logfile: bool = False
     loglevel: str = 'INFO'
     headless: bool = False
@@ -19,7 +18,6 @@ def parse_args() -> RuntimeArgs:
     parser.add_argument('--reloader', action='store_true', help='Use flask\'s reloader (helpful for local development)')
     parser.add_argument('--port', type=int, default=5001, help='Port to run the webserver on')
     parser.add_argument('--nogui', action='store_true', help='Run in standalone mode')
-    parser.add_argument('--noclean', action='store_true', help='Don\'t clean up jobs folder')
     parser.add_argument('--logfile', action='store_true', help='Log output to lanscape.log')
     parser.add_argument('--loglevel', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Set the log level')
     parser.add_argument('--headless', action="store_true",help="Similar to nogui, but doesnt try to open a browser. Good for running in a container.")

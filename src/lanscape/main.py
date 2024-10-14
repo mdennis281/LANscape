@@ -29,7 +29,7 @@ def main():
         log.info(f'LANscape v{get_installed_version()}')
         try_check_update()
     else: 
-        log.debug('Flask reloaded app.')
+        log.info('Flask reloaded app.')
         
         
     try:

@@ -1,17 +1,19 @@
-import socket
-import struct
-import platform
-import subprocess
 import re
 import psutil
+import socket
+import struct
+import logging
+import platform
 import ipaddress
 import traceback
-import logging
-from .mac_lookup import lookup_mac, get_mac
-from .ip_parser import get_address_count, MAX_IPS_ALLOWED
-from scapy.all import ARP, Ether, srp
+import subprocess
 from time import sleep
 from typing import List
+from scapy.all import ARP, Ether, srp
+
+from .mac_lookup import lookup_mac, get_mac
+from .ip_parser import get_address_count, MAX_IPS_ALLOWED
+from .hostname_lookup import get_hostname
 
 log = logging.getLogger('NetTools')
 
@@ -68,13 +70,14 @@ class Device(IPAlive):
         self.hostname: str = None
         self.mac_addr: str = None
         self.manufacturer: str = None
+        self.host_lookup_type:str = None
         self.ports: List[int] = []
         self.stage: str = 'found'
         self.log = logging.getLogger('Device')
 
     def get_metadata(self):
         if self.alive:
-            self.hostname = self._get_hostname()
+            self.hostname,self.host_lookup_type = self._get_hostname()
             self.mac_addr = self._get_mac_address()
             self.manufacturer = self._get_manufacturer()
             
@@ -99,12 +102,8 @@ class Device(IPAlive):
         """
         Get the hostname of a network device given its IP address.
         """
-        try:
-            hostname = socket.gethostbyaddr(self.ip)[0]
-            return hostname
-        except socket.herror:
-            return None
-        
+        return get_hostname(self.ip)
+    
     def _get_manufacturer(self):
         """
         Get the manufacturer of a network device given its MAC address.

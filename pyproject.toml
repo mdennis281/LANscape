@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lanscape"
-version = "1.2.0"
+version = "1.2.1"
 authors = [
   { name="Michael Dennis", email="michael@dipduo.com" },
 ]
@@ -23,6 +23,8 @@ dependencies = [
     "setuptools",
     "pywebview>=4.2,<6.0",
     "scapy>=2.3.2,<3.0",
+    "dnspython>=2.5.0",
+    "zeroconf>=0.130.0"
 ]
 [project.urls]
 Homepage = "https://github.com/mdennis281/py-lanscape"

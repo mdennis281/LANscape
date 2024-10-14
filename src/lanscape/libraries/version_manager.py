@@ -2,6 +2,7 @@ import requests
 import pkg_resources
 import logging 
 import traceback
+from random import randint
 
 log = logging.getLogger('VersionManager')
 PACKAGE='lanscape'
@@ -19,7 +20,8 @@ def lookup_latest_version(package=PACKAGE):
     # Fetch the latest version from PyPI
     global latest
     if not latest:
-        url = f"https://pypi.org/pypi/{package}/json"
+        no_cache = f'?cachebust={randint(0,6969)}'
+        url = f"https://pypi.org/pypi/{package}/json{no_cache}"
         try:
             response = requests.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors

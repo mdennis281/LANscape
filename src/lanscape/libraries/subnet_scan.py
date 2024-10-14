@@ -159,7 +159,6 @@ class ScannerResults:
         self.uid = scan.uid
 
         self.devices_total: int = len(list(scan.subnet))
-        self.devices_alive: int = 0
         self.devices_scanned: int = 0
         self.devices: List[Device] = []
 

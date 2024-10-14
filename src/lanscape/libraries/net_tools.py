@@ -1,17 +1,18 @@
-import socket
-import struct
-import platform
-import subprocess
 import re
 import psutil
+import socket
+import struct
+import logging
+import platform
 import ipaddress
 import traceback
-import logging
-from .mac_lookup import lookup_mac, get_mac
-from .ip_parser import get_address_count, MAX_IPS_ALLOWED
-from scapy.all import ARP, Ether, srp
+import subprocess
 from time import sleep
 from typing import List
+from scapy.all import ARP, Ether, srp
+
+from .mac_lookup import lookup_mac, get_mac
+from .ip_parser import get_address_count, MAX_IPS_ALLOWED
 
 log = logging.getLogger('NetTools')
 

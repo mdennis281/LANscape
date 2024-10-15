@@ -1,6 +1,6 @@
 import unittest
 import json
-from ..app import app
+from ..libraries.core.app import app
 from ..libraries.net_tools import get_network_subnet
 from ._helpers import right_size_subnet
 

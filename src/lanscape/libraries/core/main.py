@@ -5,13 +5,13 @@ import time
 import logging
 import traceback
 import os
-from .libraries.logger import configure_logging
-from .libraries.runtime_args import parse_args, RuntimeArgs
+from ..logger import configure_logging
+from ..runtime_args import parse_args, RuntimeArgs
 # do this so any logs generated on import are displayed
 args = parse_args()
 configure_logging(args.loglevel, args.logfile)
 
-from .libraries.version_manager import get_installed_version, is_update_available
+from ..version_manager import get_installed_version, is_update_available
 from .webviewer import start_webview
 from .app import start_webserver
 

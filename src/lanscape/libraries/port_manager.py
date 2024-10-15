@@ -1,8 +1,7 @@
 import json
-import os
 from typing import List
 from pathlib import Path
-from .resource_manager import ResourceManager
+from .app_scope import ResourceManager
 
 PORT_DIR = 'ports'
 

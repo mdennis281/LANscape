@@ -1,9 +1,11 @@
 from pathlib import Path
+import importlib.util
+import sys
 
 class ResourceManager:
     """
     A class to manage assets in the resources folder.
-    Works locally and if installed.
+    Works locally and if installed based on relative path from this file
     """
     def __init__(self, asset_folder: str):
         self.asset_dir = self._get_resource_path() / asset_folder
@@ -32,3 +34,26 @@ class ResourceManager:
         base_dir = Path(__file__).parent.parent
         resource_dir = base_dir / "resources"
         return resource_dir
+
+
+
+
+def is_local_run(module_name: str = 'lanscape') -> bool:
+    """
+    Determine if the code is running locally or as an installed PyPI package.
+    """
+    module_path = Path(__file__).parent
+
+    # Check if the path is in site-packages/dist-packages
+    if module_path and any(part in module_path.parts for part in ['site-packages', 'dist-packages']):
+        return False  # Installed package
+
+    # Check for a .git directory in the path or its parents
+    if module_path and any((parent / ".git").exists() for parent in module_path.parents):
+        return True  # Local development
+
+    # Check sys.path for non-standard local paths
+    if any(not str(Path(p)).startswith(('/usr', '/lib', '/site-packages')) for p in sys.path):
+        return True  # Local run
+
+    return False  # Default to installed package

@@ -4,7 +4,7 @@ import platform
 import subprocess
 from typing import Optional
 
-from .resource_manager import ResourceManager
+from .app_scope import ResourceManager
 
 DB = json.loads(ResourceManager('mac_addresses').get('mac_db.json'))
 

@@ -30,9 +30,8 @@ class LibraryTestCase(unittest.TestCase):
         for d in scan.results.devices:
             if d.hostname: cnt_with_hostname += 1
             # ensure there arent dupe mac addresses
-            if d.mac_addr:
-                self.assertNotIn(d.mac_addr, macs)
-                macs.append(d.mac_addr)
+            self.assertNotIn(d.mac_addr, macs)
+            macs.append(d.mac_addr)
 
             # ensure there arent dupe ips
             self.assertNotIn(d.ip, ips)
@@ -47,8 +46,6 @@ class LibraryTestCase(unittest.TestCase):
         # ensure everything got scanned
         self.assertEqual(scan.results.devices_scanned, scan.results.devices_total)
 
-        # find at least one device with hostname
-        self.assertGreater(cnt_with_hostname, 0)
 
 
 

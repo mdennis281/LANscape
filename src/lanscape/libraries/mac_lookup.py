@@ -59,4 +59,3 @@ def get_mac_by_scapy(ip: str) -> Optional[str]:
         return result[0][1].hwsrc if result else None
     except:
         return None
-

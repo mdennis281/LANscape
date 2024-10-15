@@ -1,7 +1,7 @@
 import unittest
 
 from ..libraries.version_manager import lookup_latest_version 
-from ..libraries.resource_manager import ResourceManager
+from ..libraries.app_scope import ResourceManager, is_local_run
 
 
 
@@ -16,6 +16,9 @@ class EnvTestCase(unittest.TestCase):
         mac = ResourceManager('mac_addresses')
         mac_list = mac.get('mac_db.json')
         self.assertIsNotNone(mac_list)
+    
+    def test_local_version(self):
+        self.assertTrue(is_local_run())
         
         
 

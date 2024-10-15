@@ -7,6 +7,7 @@ import os
 
 from .libraries.runtime_args import RuntimeArgs, parse_args
 from .libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
+from .libraries.app_scope import is_local_run
 
 app = Flask(__name__)
 log = logging.getLogger('core')
@@ -52,6 +53,7 @@ set_global_safe('app_version',get_installed_version)
 set_global_safe('update_available', is_update_available)
 set_global_safe('latest_version',lookup_latest_version)
 set_global_safe('runtime_args', vars(parse_args()))
+set_global_safe('is_local',is_local_run)
 
 ## External hook to kill flask server
 ################################

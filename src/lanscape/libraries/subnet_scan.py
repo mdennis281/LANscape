@@ -8,11 +8,12 @@ import threading
 from time import time
 from time import sleep
 from typing import List
+from tabulate import tabulate
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
 from .net_tools import Device
-from .decorators import job_tracker
+from .decorators import job_tracker, JobStats
 from .ip_parser import parse_ip_input
 from .port_manager import PortManager
 
@@ -35,7 +36,7 @@ class SubnetScanner:
         self.running = False
         self.parallelism: float = float(config.parallelism)
         self.subnet_str = config.subnet
-        self.job_stats = {'running': {}, 'finished': {}, 'timing': {}}
+        self.job_stats = JobStats()
         self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
@@ -82,14 +83,10 @@ class SubnetScanner:
             os.system('cls' if os.name == 'nt' else 'clear')
             print(f'{self.uid} - {self.subnet_str}')
             print(f"Scanned: {self.results.devices_scanned}/{self.results.devices_total}")
-            print(f"Alive: {len(self.results.devices)}")
-            print(f"Running jobs:  {self.job_stats['running']}")
-            print(f"Finished jobs: {self.job_stats['finished']}")
-            print(f"Job timing:    {self.job_stats['timing']}")
+            print(self.job_stats)
             sleep(1)
 
 
-    
     def _get_host_details(self, host: str):
         """
         Get the MAC address and open ports of the given host.
@@ -199,6 +196,25 @@ class ScannerResults:
             return json.dumps(out, indent=2)
         # otherwise return dict
         return out
+    
+    def __str__(self):
+        # Prepare data for tabulate
+        data = [
+            [device.ip, device.hostname, device.mac_addr, ", ".join(map(str, device.ports))]
+            for device in self.devices
+        ]
+
+        # Create headers for the table
+        headers = ["IP", "Host", "MAC", "Ports"]
+
+        # Generate the table using tabulate
+        table = tabulate(data, headers=headers, tablefmt="grid")
+
+        # Format and return the complete buffer with table output
+        buffer = f"Scan Results - {self.scan.subnet_str} - {self.uid}\n"
+        buffer += "---------------------------------------------\n\n"
+        buffer += table
+        return buffer
 
 
 class ScanManager:

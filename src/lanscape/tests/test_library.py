@@ -21,7 +21,7 @@ class LibraryTestCase(unittest.TestCase):
         self.assertFalse(scan.running)
 
         # ensure there are not any remaining running threads
-        self.assertDictEqual(scan.job_stats['running'],{})
+        self.assertDictEqual(scan.job_stats.running,{})
 
 
         cnt_with_hostname = 0

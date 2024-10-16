@@ -56,3 +56,20 @@ def job_tracker(func):
         return class_instance.job_stats
 
     return wrapper
+
+
+def terminator(func):
+    """
+    decorator designed specifically for the SubnetScanner class,
+    helps facilitate termination of a job
+    """
+    def wrapper(*args, **kwargs):
+        scan = args[0] # aka self
+        if not scan.running:
+            return
+        return func(*args, **kwargs)
+
+
+
+    return wrapper
+    

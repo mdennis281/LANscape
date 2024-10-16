@@ -32,6 +32,12 @@ def get_scan(scan_id):
     scan = scan_manager.get_scan(scan_id)
     return jsonify(scan.results.export())
 
+@api_bp.route('/api/scan/<scan_id>/terminate', methods=['GET'])
+def terminate_scan(scan_id):
+    scan = scan_manager.get_scan(scan_id)
+    scan.terminate()
+    return jsonify({'success': True})
+
 def get_scan_config():
     """
     pulls config from the request body

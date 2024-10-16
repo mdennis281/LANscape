@@ -8,8 +8,13 @@ cfg = ScanConfig(
     parallelism=.5
 )
 
-scan = sm.new_scan(cfg)
+try:
+    scan = sm.new_scan(cfg)
 
-scan.debug_active_scan()
+    scan.debug_active_scan()
+except KeyboardInterrupt:
+    scan.terminate()
+
+print(scan.results)
 
 print(scan.results)

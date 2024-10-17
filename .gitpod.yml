@@ -5,8 +5,16 @@
 # Learn more from ready-to-use templates: https://www.gitpod.io/docs/introduction/getting-started/quickstart
 
 tasks:
+  - init: |
+      sudo apt-get update && sudo apt-get install -y python3 python3-venv
+      sudo python3 -m venv .venv
+      sudo .venv/bin/pip install --upgrade pip
+      sudo .venv/bin/pip install -r requirements.txt
+    command: |
+      sudo .venv/bin/python test.py
   - init: pip install -r requirements.txt
     command: python localrun.py --port 8080 --nogui --reloader --loglevel DEBUG
+
 
 
 ports:

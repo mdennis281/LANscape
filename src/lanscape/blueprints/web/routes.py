@@ -1,16 +1,20 @@
-from flask import render_template, request
+from flask import render_template, request, redirect
 from . import web_bp
 from ...libraries.subnet_scan import SubnetScanner
-from ...libraries.net_tools import get_network_subnet, get_all_network_subnets
-from .. import scan_manager
+from ...libraries.net_tools import (
+    get_all_network_subnets, 
+    smart_select_primary_subnet
+)
+from .. import scan_manager, log
 import os
 
 # Template Renderer
 ############################################
 @web_bp.route('/', methods=['GET'])
 def index():
-    subnet = get_network_subnet()
     subnets = get_all_network_subnets()
+    subnet = smart_select_primary_subnet(subnets)
+    
     port_list = 'medium'
     parallelism = 0.7
     if scan_id := request.args.get('scan_id'): 
@@ -19,6 +23,9 @@ def index():
             subnet = scan['subnet']
             port_list = scan['port_list']
             parallelism = scan['parallelism']
+        else:
+            log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
+            return redirect('/')
     return render_template(
         'main.html',
         subnet=subnet, 

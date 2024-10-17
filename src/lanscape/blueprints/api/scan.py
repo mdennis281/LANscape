@@ -32,6 +32,27 @@ def get_scan(scan_id):
     scan = scan_manager.get_scan(scan_id)
     return jsonify(scan.results.export())
 
+@api_bp.route('/api/scan/<scan_id>/summary',methods=['GET'])
+def get_scan_summary(scan_id):
+    scan = scan_manager.get_scan(scan_id)
+    return jsonify({
+        'running': scan.running,
+        'percent_complete': scan.calc_percent_complete(),
+        'stage': scan.results.stage,
+        'runtime': scan.results.get_runtime(),
+        'devices': {
+            'scanned': scan.results.devices_scanned,
+            'alive': len(scan.results.devices),
+            'total': scan.results.devices_total
+        }
+    })
+
+@api_bp.route('/api/scan/<scan_id>/terminate', methods=['GET'])
+def terminate_scan(scan_id):
+    scan = scan_manager.get_scan(scan_id)
+    scan.terminate()
+    return jsonify({'success': True})
+
 def get_scan_config():
     """
     pulls config from the request body

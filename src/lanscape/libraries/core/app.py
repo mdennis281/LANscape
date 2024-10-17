@@ -5,17 +5,22 @@ import threading
 import logging
 import os
 
-from .libraries.runtime_args import RuntimeArgs, parse_args
-from .libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
+from ..runtime_args import RuntimeArgs, parse_args
+from ..version_manager import is_update_available, get_installed_version, lookup_latest_version
+from ..app_scope import is_local_run
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder='../../static', 
+    template_folder='../../templates'
+)
 log = logging.getLogger('core')
 
 ## Import and register BPs
 ################################
 
-from .blueprints.api import api_bp
-from .blueprints.web import web_bp
+from ...blueprints.api import api_bp
+from ...blueprints.web import web_bp
 
 app.register_blueprint(api_bp)
 app.register_blueprint(web_bp)
@@ -52,6 +57,7 @@ set_global_safe('app_version',get_installed_version)
 set_global_safe('update_available', is_update_available)
 set_global_safe('latest_version',lookup_latest_version)
 set_global_safe('runtime_args', vars(parse_args()))
+set_global_safe('is_local',is_local_run)
 
 ## External hook to kill flask server
 ################################

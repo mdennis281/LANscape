@@ -1,17 +1,18 @@
-import socket
-import struct
-import platform
-import subprocess
 import re
 import psutil
+import socket
+import struct
+import logging
+import platform
 import ipaddress
 import traceback
-import logging
-from .mac_lookup import lookup_mac, get_mac
-from .ip_parser import get_address_count
-from scapy.all import ARP, Ether, srp
+import subprocess
 from time import sleep
 from typing import List
+from scapy.all import ARP, Ether, srp
+
+from .mac_lookup import lookup_mac, get_mac
+from .ip_parser import get_address_count, MAX_IPS_ALLOWED
 
 log = logging.getLogger('NetTools')
 
@@ -250,4 +251,15 @@ def get_all_network_subnets():
 
     return subnets
 
-
+def smart_select_primary_subnet(subnets: List[dict]=get_all_network_subnets()) -> str:
+    """
+     Finds the largest subnet within max ip range
+     not perfect, but works better than subnets[0]
+    """
+    selected = {}
+    for subnet in subnets:
+        if selected.get('address_cnt',0) < subnet['address_cnt'] < MAX_IPS_ALLOWED:
+            selected = subnet
+    if not selected and len(subnets):
+        selected = subnets[0]
+    return selected['subnet']

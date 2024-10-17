@@ -10,9 +10,11 @@
     <footer class="div-hide">
         <div class="version">
             v{{app_version}}
-            {% if update_available %} 
+            {% if is_local %}
+                <span>(Local Run)</span> 
+            {% elif update_available %} 
                 <span>(Update Available)</span> 
-            {% endif %}
+            {% endif %}    
         </div>
 
         <div id="app-actions">

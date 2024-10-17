@@ -58,6 +58,7 @@ body:has(.submodule) footer {
     padding: 8px 20px;
     margin: 0;
     display: block;
+    position: relative;
     box-shadow: 0 0 10px rgba(0,0,0,0.8);
     width: 100vw;
 }
@@ -199,6 +200,16 @@ details {
 }
 #scan-form.error input:focus {
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset, 0 0 8px rgba(200, 85, 85, 0.6);
+}
+
+#scan-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    background-color:  var(--primary-accent);
+    height:0px;
+    transition: all .2s ease-in-out
 }
 
 #app-actions a .material-symbols-outlined {

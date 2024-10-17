@@ -4,7 +4,7 @@ import platform
 import subprocess
 from typing import Optional
 
-from .resource_manager import ResourceManager
+from .app_scope import ResourceManager
 
 DB = json.loads(ResourceManager('mac_addresses').get('mac_db.json'))
 
@@ -59,4 +59,3 @@ def get_mac_by_scapy(ip: str) -> Optional[str]:
         return result[0][1].hwsrc if result else None
     except:
         return None
-

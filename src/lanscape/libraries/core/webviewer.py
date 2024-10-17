@@ -1,6 +1,6 @@
 import webview
 from .app import start_webserver_dameon
-from .libraries.runtime_args import RuntimeArgs
+from ..runtime_args import RuntimeArgs
 
 
 

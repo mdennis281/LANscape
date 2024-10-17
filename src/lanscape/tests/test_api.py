@@ -81,9 +81,11 @@ class ApiTestCase(unittest.TestCase):
 
         # Render UI
         uris = [
+            '/info',
             f'/?scan_id={scanid}',
             f'/scan/{scanid}/overview',
-            f'/scan/{scanid}/table'
+            f'/scan/{scanid}/table',
+            f'/export/{scanid}'
         ]
         for uri in uris:
             response = self.app.get(uri)

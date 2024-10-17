@@ -12,8 +12,9 @@ $(document).ready(function() {
         $('#parallelism-value').html(ans);
     });
     const url = new URL(window.location.href);
-    if (url.searchParams.get('scan_id')) {
-        showScan(url.searchParams.get('scan_id'));
+    const scanId = url.searchParams.get('scan_id');
+    if (scanId) {
+        showScan(scanId);
     }
     
 
@@ -49,6 +50,7 @@ $(document).ready(function() {
 });
 
 function showScan(scanId) {
+    pollScanSummary(scanId);
     $('#no-scan').addClass('div-hide');
     $('#scan-results').removeClass('div-hide');
     $('#export-link').attr('href','/export/' + scanId);
@@ -115,12 +117,35 @@ function observeIframeContent(iframe) {
         attributes: true,  // In case styles/attributes change height
     });
 }
+function pollScanSummary(id) {
+    $.get(`/api/scan/${id}/summary`, function(summary) {
+        let progress = $('#scan-progress-bar');
+        if (summary.running) {
+            progress.css('height','2px');
+            progress.css('width',`${summary.percent_complete}vw`);
+            // TODO: move overview here??
+            setTimeout(() => {pollScanSummary(id)},500);
+        } else {
+            progress.css('width','100vw');
+            progress.css('background-color','var(--success-accent)')
+            setTimeout(() => {progress.css('height','0px');},500);
+            
+            // wait to make the width smaller for animation to be clean
+            setTimeout(() => {
+                progress.css('width','0vw');
+                progress.css('background-color','var(--primary-accent)')
+            },1000);
+        }
+    });
+}
 
 // Bind the iframe's load event to initialize the observer
 $('#ip-table-frame').on('load', function() {
     resizeIframe(this); // Initial resizing after iframe loads
     observeIframeContent(this); // Start observing for dynamic changes
 });
+
+
 
 $(window).on('resize', function() {
     resizeIframe($('#ip-table-frame')[0]);

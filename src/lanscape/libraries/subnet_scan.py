@@ -74,17 +74,17 @@ class SubnetScanner:
         
         self._set_stage('testing ports')
         self._scan_network_ports()
-
-        self._set_stage('complete')
         self.running = False
+        self._set_stage('complete')
+        
         return self.results
     
     def terminate(self):
         self.running = False
-        self._set_stage('Terminating')
+        self._set_stage('terminating')
         for i in range(10):
             if not len(self.job_stats.running.keys()):
-                self._set_stage('Terminated')
+                self._set_stage('terminated')
                 return True
             sleep(.5)
         raise SubnetScanTerminationFailure(self.job_stats.running)
@@ -202,6 +202,8 @@ class SubnetScanner:
     def _set_stage(self,stage):
         self.log.debug(f'[{self.uid}] Moving to Stage: {stage}')
         self.results.stage = stage
+        if not self.running:
+            self.results.end_time = time()
     
 class ScannerResults:
     def __init__(self,scan: SubnetScanner):
@@ -218,7 +220,7 @@ class ScannerResults:
         self.errors: List[str] = []        
         self.running: bool = False
         self.start_time: float = time()
-        self.run_time: int = 0
+        self.end_time: int = None
         self.stage = 'instantiated'
 
         self.log = logging.getLogger('ScannerResults')
@@ -227,6 +229,11 @@ class ScannerResults:
 
     def scanned(self):
         self.devices_scanned += 1
+
+    def get_runtime(self):
+        if self.scan.running:
+            return int(time()-self.start_time)
+        return int(self.end_time-self.start_time)
         
 
     

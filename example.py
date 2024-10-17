@@ -5,7 +5,7 @@ sm = ScanManager()
 cfg = ScanConfig(
     subnet= net_tools.smart_select_primary_subnet(),
     port_list='small',
-    parallelism=.5
+    parallelism=1
 )
 
 try:
@@ -14,7 +14,5 @@ try:
     scan.debug_active_scan()
 except KeyboardInterrupt:
     scan.terminate()
-
-print(scan.results)
 
 print(scan.results)

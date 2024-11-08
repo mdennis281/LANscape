@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include 'core/head.html' %}
+    {% include 'core/scripts.html' %}
+</head>
+<body>
+    
+    {% block content %}{% endblock %}
+    <footer class="div-hide">
+        <div class="version">
+            v{{app_version}}
+            {% if is_local %}
+                <span>(Local Run)</span> 
+            {% elif update_available %} 
+                <span>(Update Available)</span> 
+            {% endif %}    
+        </div>
+
+        <div id="app-actions">
+            <a href="/info">
+                <span 
+                    class="material-symbols-outlined"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="App info">
+                    info
+                </span>
+            </a>
+
+            {% if runtime_args.get('nogui') or runtime_args.get('headless') %}
+            <a href="/shutdown-ui">
+                <span 
+                    id="power-button" 
+                    class="material-symbols-outlined"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="top" 
+                    title="Shutdown App">
+                    power_settings_new
+                </span>
+            </a>
+            {% endif %}
+        </div>
+        
+    </footer>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="header">
+    <!-- Header and Scan Submission Inline -->
+  <div class="d-flex justify-content-start align-items-center">
+      <h1 class="title" onclick="location.href = '/'">
+          <span>LAN</span>scape 
+      </h1>
+  </div>
+</div>
+<div class="scroll-container" id="#content">
+    <div class="container-fluid my-4">
+        <h3>Json Export:</h3>
+        
+        <details>
+            <summary>{{ scan.uid }}</summary>
+            <div class="error-container">
+                <pre>{{ export_json }}</pre>
+            </div>
+        </details>
+        <button onclick="location.href='/?scan_id={{scan.uid}}'" class="btn btn-primary m-2">Back</button>
+    </div>   
+</div>
+
+{% endblock %}
+

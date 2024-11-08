@@ -1,4 +1,4 @@
-from .libraries.core.main import main
+from .ui.main import main
 
 # leveraged when calling as module ie "python -m lanscape"
 

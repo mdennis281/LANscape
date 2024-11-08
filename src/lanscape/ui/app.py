@@ -17,8 +17,8 @@ log = logging.getLogger('core')
 ## Import and register BPs
 ################################
 
-from ..blueprints.api import api_bp
-from ..blueprints.web import web_bp
+from .blueprints.api import api_bp
+from .blueprints.web import web_bp
 
 app.register_blueprint(api_bp)
 app.register_blueprint(web_bp)

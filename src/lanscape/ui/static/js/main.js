@@ -1,3 +1,5 @@
+
+
 $(document).ready(function() {
     // Load port lists into the dropdown
     getPortLists();
@@ -11,8 +13,7 @@ $(document).ready(function() {
         }
         $('#parallelism-value').html(ans);
     });
-    const url = new URL(window.location.href);
-    const scanId = url.searchParams.get('scan_id');
+    const scanId = getActiveScanId();
     if (scanId) {
         showScan(scanId);
     }
@@ -21,21 +22,12 @@ $(document).ready(function() {
     // Handle form submission
     $('#scan-form').on('submit', function(event) {
         event.preventDefault();
-        const formData = {
-            subnet: $('#subnet').val(),
-            port_list: $('#port-list').text(),
-            parallelism: $('#parallelism').val()
-        };
-        $.ajax('/api/scan', {
-            data : JSON.stringify(formData),
-            contentType : 'application/json',
-            type : 'POST',
-            success: function(response) {
-                if (response.status === 'running') {
-                    showScan(response.scan_id);
-                }
-            }
-        });
+        if ($('#scan-submit').text() == 'Scan') {
+            submitNewScan()
+        } else {
+            terminateScan();
+        }
+        
 
     });
 
@@ -49,13 +41,40 @@ $(document).ready(function() {
 
 });
 
+function submitNewScan() {
+    const formData = {
+        subnet: $('#subnet').val(),
+        port_list: $('#port-list').text(),
+        parallelism: $('#parallelism').val()
+    };
+    $.ajax('/api/scan', {
+        data : JSON.stringify(formData),
+        contentType : 'application/json',
+        type : 'POST',
+        success: function(response) {
+            if (response.status === 'running') {
+                showScan(response.scan_id);
+            }
+        }
+    });
+}
+
+function getActiveScanId() {
+    const url = new URL(window.location.href);
+    return url.searchParams.get('scan_id');
+}
+
 function showScan(scanId) {
     pollScanSummary(scanId);
+    setScanState(false);
+
     $('#no-scan').addClass('div-hide');
     $('#scan-results').removeClass('div-hide');
+    
     $('#export-link').attr('href','/export/' + scanId);
     $('#overview-frame').attr('src', '/scan/' + scanId + '/overview');
     $('#ip-table-frame').attr('src', '/scan/' + scanId + '/table');
+    
     // set url query string 'scan_id' to the scan_id
     const url = new URL(window.location.href);
     url.searchParams.set('scan_id', scanId);
@@ -94,6 +113,19 @@ $(document).on('click', function(event) {
     }
 });
 
+function setScanState(scanEnabled) {
+    const button = $('#scan-submit');
+    console.log('set scan state- scanning',scanEnabled)
+
+    if (scanEnabled) {
+        button.text("Scan");
+        button.removeClass('btn-danger').addClass('btn-primary');
+    } else {
+        button.text("Stop");
+        button.removeClass('btn-primary').addClass('btn-danger');
+    }
+}
+
 
 function resizeIframe(iframe) {
     // Adjust the height of the iframe to match the content
@@ -117,10 +149,19 @@ function observeIframeContent(iframe) {
         attributes: true,  // In case styles/attributes change height
     });
 }
+function terminateScan() {
+    const button = $('#scan-submit');
+    button.prop('disabled', true); 
+    const scanId = getActiveScanId();
+    $.get(`/api/scan/${scanId}/terminate`, function(ans) {
+        setScanState(true);
+        button.prop('disabled', false); 
+    });
+}
 function pollScanSummary(id) {
     $.get(`/api/scan/${id}/summary`, function(summary) {
         let progress = $('#scan-progress-bar');
-        if (summary.running) {
+        if (summary.running || summary.stage == 'terminating') {
             progress.css('height','2px');
             progress.css('width',`${summary.percent_complete}vw`);
             // TODO: move overview here??
@@ -129,6 +170,7 @@ function pollScanSummary(id) {
             progress.css('width','100vw');
             progress.css('background-color','var(--success-accent)')
             setTimeout(() => {progress.css('height','0px');},500);
+            setScanState(true);
             
             // wait to make the width smaller for animation to be clean
             setTimeout(() => {

@@ -82,7 +82,7 @@ class SubnetScanner:
     def terminate(self):
         self.running = False
         self._set_stage('terminating')
-        for i in range(10):
+        for i in range(20):
             if not len(self.job_stats.running.keys()):
                 self._set_stage('terminated')
                 return True

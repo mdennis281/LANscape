@@ -7,7 +7,7 @@ import traceback
 import threading
 from time import time
 from time import sleep
-from typing import List
+from typing import List, Union
 from tabulate import tabulate
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
@@ -237,7 +237,7 @@ class ScannerResults:
         
 
     
-    def export(self,out_type=dict) -> str | dict:
+    def export(self,out_type=dict) -> Union[str, dict]:
         """
             Returns json representation of the scan
         """

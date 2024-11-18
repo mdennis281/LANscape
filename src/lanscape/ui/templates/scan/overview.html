@@ -1,9 +1,11 @@
-<div class="row d-flex justify-content-between align-items-center submodule" id="overview-container">
+<div class="row d-flex justify-content-between align-items-center">
     <div class="col-4">
         <div class="card text-white" id="progress-card">
             <div class="card-header text-center">Found / Scanned / Total</div>
             <div class="card-body text-center">
-                {{ data.devices_alive }} / {{ data.devices_scanned }} / {{ data.devices_total }}
+                <span id="scan-devices-alive"></span> / 
+                <span id="scan-devices-scanned"></span> /
+                <span id="scan-devices-total"></span>
             </div>
         </div>
     </div>
@@ -11,7 +13,7 @@
         <div class="card text-white overview-card" id="runtime-card">
             <div class="card-header text-center">Runtime</div>
             <div class="card-body text-center">
-                {{ data.run_time }}s
+                <span id="scan-run-time"></span>s
             </div>
         </div>
     </div>
@@ -19,7 +21,7 @@
         <div class="card text-white overview-card" id="stage-card">
             <div class="card-header text-center">Stage</div>
             <div class="card-body text-center">
-                {{ data.stage }}
+                <span id="scan-stage"></span>
             </div>
         </div>
     </div>

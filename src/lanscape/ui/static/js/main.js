@@ -72,7 +72,7 @@ function showScan(scanId) {
     $('#scan-results').removeClass('div-hide');
     
     $('#export-link').attr('href','/export/' + scanId);
-    $('#overview-frame').attr('src', '/scan/' + scanId + '/overview');
+    //$('#overview-frame').attr('src', '/scan/' + scanId + '/overview');
     $('#ip-table-frame').attr('src', '/scan/' + scanId + '/table');
     
     // set url query string 'scan_id' to the scan_id
@@ -178,7 +178,16 @@ function pollScanSummary(id) {
                 progress.css('background-color','var(--primary-accent)')
             },1000);
         }
+        updateOverviewUI(summary);
     });
+}
+
+function updateOverviewUI(summary) {
+    $('#scan-devices-alive').text(summary.devices.alive);
+    $('#scan-devices-scanned').text(summary.devices.scanned);
+    $('#scan-devices-total').text(summary.devices.total);
+    $('#scan-run-time').text(summary.runtime);
+    $('#scan-stage').text(summary.stage);
 }
 
 // Bind the iframe's load event to initialize the observer

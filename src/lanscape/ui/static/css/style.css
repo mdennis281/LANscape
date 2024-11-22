@@ -637,10 +637,6 @@ html {
 
 
 /* START overview container */
-#overview-container {
-    padding: 10px 0;
-    width: 100vw;
-}
 
 #overview-container .card {
     height: 85px;
@@ -665,6 +661,12 @@ html {
     text-wrap: nowrap;
 }
 
+#scan-devices-alive, 
+#scan-devices-scanned,
+#scan-devices-total {
+    margin: 3px;
+}
+
 #overview-container .col-4 {
     min-width: 100px;
 }
@@ -680,19 +682,16 @@ html {
 #stage-card {
     background-color: var(--warning-accent);
 }
-body:has(#overview-container) {
-    display: flex;
-    justify-content: center;
-}
+
 /* width of iFrame, not page */
 
-@media screen and (max-width: 714px) {
+@media screen and (max-width: 885px) {
     #overview-container .col-4 {
         padding: 0 5px;
     }
     
 }
-@media screen and (max-width: 672px) {
+@media screen and (max-width: 760px) {
     #overview-container .card-header {
         font-size: .8rem;
     }

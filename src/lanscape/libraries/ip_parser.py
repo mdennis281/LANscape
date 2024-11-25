@@ -2,7 +2,7 @@ import ipaddress
 from .errors import SubnetTooLargeError
 import re
 
-MAX_IPS_ALLOWED = 10000 
+MAX_IPS_ALLOWED = 100000 
 
 def parse_ip_input(ip_input):
     # Split input on commas for multiple entries

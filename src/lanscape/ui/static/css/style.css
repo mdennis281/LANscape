@@ -1,30 +1,35 @@
 /* General Styles */
 :root {
-    --primary-accent: #0856a9;
-    --primary-accent-hover: #014389;
-    --secondary-accent: #6c757d;
-    --secondary-accent-hover: #495055;
-    --info-accent: #17a2b8;
-    --success-accent: #006334;
-    --success-accent-hover: #004926;
-    --danger-accent: #dc3545;
-    --danger-accent-hover: #c82333;
-    --warning-accent: #974d04;
-    --warning-accent-hover: #793e04;
+    --primary-accent: #0a84ff; /* A brighter blue to add contrast */
+    --primary-accent-hover: #0077e6; /* Slightly darker for hover */
+    --secondary-accent: #5a5a5a; /* Mid-gray for neutral elements */
+    --secondary-accent-hover: #484848; /* Darker gray for hover */
 
-    --text-color: #e0e0e0;
-    --text-accent-color: #2280e3; 
-    --text-placeholder: #bbb;
-    --text-danger-color: #fa7a7a;
-    --text-almost-hidden: #4a4a4a;
+    --info-accent: #1cc3dc; /* Vivid cyan for information elements */
+    --success-accent: #019561; /* Bright green for positive actions */
+    --success-accent-hover: #008456; /* Darker shade for hover */
+    --danger-accent: #ff5252; /* Bright red for warnings */
+    --danger-accent-hover: #e64545;
 
-    --body-bg: #1e1e1e;
-    --primary-bg: #2a2a2a;
-    --primary-bg-accent: #2b2b2b;
-    --primary-bg-accent-hover: #4b4b4b;
-    --secondary-bg: #232323;
-    --border-color: #444;
-    --danger-border-color: #722; 
+    --warning-accent: #cc8801; /* Vibrant amber for warnings */
+    --warning-accent-hover: #d08802;
+
+    --box-shadow: rgba(0, 0, 0, 0.6); /* Softer shadow */
+    --box-shadow-error: rgba(255, 82, 82, 0.4); /* Red shadow for error indication */
+
+    --text-color: #e4e4e4; /* Slightly lighter for readability */
+    --text-accent-color: #1ca3ec; /* A sharper blue accent */
+    --text-placeholder: #888; /* Lighter gray for input placeholders */
+    --text-danger-color: #ff6666; /* Softer red */
+    --text-almost-hidden: #3d3d3d; /* Subtle, dark gray */
+
+    --body-bg: #1b1b1b; /* Deeper dark for body background */
+    --primary-bg: #262626; /* Primary background with more contrast */
+    --primary-bg-accent: #2d2d2d; /* Accent for card areas */
+    --primary-bg-accent-hover: #3a3a3a; /* Slightly lighter for hover */
+    --secondary-bg: #202020; /* Secondary dark background */
+    --border-color: #555; /* Slightly lighter gray for borders */
+    --danger-border-color: #922; /* Bold red for danger borders */
     
     --footer-height: 25px;
 }
@@ -48,7 +53,7 @@ body:has(.submodule) footer {
     padding: 20px;
     background-color: var(--primary-bg);
     border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    box-shadow: 0 0 10px var(--box-shadow);
     width: 90%;
     margin-top: 10px;
 }
@@ -59,14 +64,14 @@ body:has(.submodule) footer {
     margin: 0;
     display: block;
     position: relative;
-    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    box-shadow: 0 0 10px var(--box-shadow);
     width: 100vw;
 }
 
 footer {
     position: sticky;
     background-color: var(--primary-bg);
-    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    box-shadow: 0 0 10px var(--box-shadow);
     height: var(--footer-height);
     transform:translateY(25px); /* removed in core.js */
     display: flex;
@@ -199,7 +204,7 @@ details {
     outline: 0 none;
 }
 #scan-form.error input:focus {
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset, 0 0 8px rgba(200, 85, 85, 0.6);
+    box-shadow: 0 1px 1px var(--box-shadow) inset, 0 0 8px var(--box-shadow-error);
 }
 
 #scan-progress-bar {
@@ -209,7 +214,7 @@ details {
     width: 0;
     background-color:  var(--primary-accent);
     height:0px;
-    transition: all .2s ease-in-out
+    transition: all .5s ease-in-out
 }
 
 #app-actions a .material-symbols-outlined {
@@ -237,6 +242,15 @@ details {
 }
 #power-button:hover {
     color: var(--text-danger-color);
+}
+#scan-actions {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    a {
+        text-decoration: none;
+        margin: 0 3px;
+    }
 }
 
 
@@ -468,7 +482,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .table th, .table td {
-    background-color: #282828;
+    background-color: var(--secondary-bg);
     border-color: var(--border-color);
     color: var(--text-color);
 }
@@ -623,10 +637,6 @@ html {
 
 
 /* START overview container */
-#overview-container {
-    padding: 10px 0;
-    width: 100vw;
-}
 
 #overview-container .card {
     height: 85px;
@@ -651,6 +661,12 @@ html {
     text-wrap: nowrap;
 }
 
+#scan-devices-alive, 
+#scan-devices-scanned,
+#scan-devices-total {
+    margin: 3px;
+}
+
 #overview-container .col-4 {
     min-width: 100px;
 }
@@ -666,19 +682,16 @@ html {
 #stage-card {
     background-color: var(--warning-accent);
 }
-body:has(#overview-container) {
-    display: flex;
-    justify-content: center;
-}
+
 /* width of iFrame, not page */
 
-@media screen and (max-width: 714px) {
+@media screen and (max-width: 885px) {
     #overview-container .col-4 {
         padding: 0 5px;
     }
     
 }
-@media screen and (max-width: 672px) {
+@media screen and (max-width: 760px) {
     #overview-container .card-header {
         font-size: .8rem;
     }

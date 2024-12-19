@@ -5,22 +5,20 @@ import threading
 import logging
 import os
 
-from ..runtime_args import RuntimeArgs, parse_args
-from ..version_manager import is_update_available, get_installed_version, lookup_latest_version
-from ..app_scope import is_local_run
+from ..libraries.runtime_args import RuntimeArgs, parse_args
+from ..libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
+from ..libraries.app_scope import is_local_run
 
 app = Flask(
-    __name__,
-    static_folder='../../static', 
-    template_folder='../../templates'
+    __name__
 )
 log = logging.getLogger('core')
 
 ## Import and register BPs
 ################################
 
-from ...blueprints.api import api_bp
-from ...blueprints.web import web_bp
+from .blueprints.api import api_bp
+from .blueprints.web import web_bp
 
 app.register_blueprint(api_bp)
 app.register_blueprint(web_bp)

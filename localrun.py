@@ -1,4 +1,4 @@
-from src.lanscape.libraries.core.main import main
+from src.lanscape.ui.main import main
 
 if __name__ == "__main__":
     main()

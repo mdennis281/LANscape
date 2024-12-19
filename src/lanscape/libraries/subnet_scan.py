@@ -7,7 +7,7 @@ import traceback
 import threading
 from time import time
 from time import sleep
-from typing import List
+from typing import List, Union
 from tabulate import tabulate
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
@@ -82,7 +82,7 @@ class SubnetScanner:
     def terminate(self):
         self.running = False
         self._set_stage('terminating')
-        for i in range(10):
+        for i in range(20):
             if not len(self.job_stats.running.keys()):
                 self._set_stage('terminated')
                 return True
@@ -237,7 +237,7 @@ class ScannerResults:
         
 
     
-    def export(self,out_type=dict) -> str | dict:
+    def export(self,out_type=dict) -> Union[str, dict]:
         """
             Returns json representation of the scan
         """

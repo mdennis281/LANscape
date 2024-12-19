@@ -1,5 +1,5 @@
 from . import api_bp
-from ...libraries.subnet_scan import ScanConfig
+from ....libraries.subnet_scan import ScanConfig
 from .. import scan_manager
 
 from flask import request, jsonify

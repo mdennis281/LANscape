@@ -2,6 +2,8 @@
 from ..libraries.ip_parser import get_address_count
 import webview, time
 
+import warnings
+
 from concurrent.futures import ThreadPoolExecutor, Future
 def right_size_subnet(subnet: str):
     """
@@ -20,7 +22,6 @@ def webview_client(title, url):
         def wrapper(*args, **kwargs):
             baseclass = args[0]
 
-            # Create the WebView window
             window = webview.create_window(title, url)
 
             # Create a Future object to communicate results/exceptions
@@ -28,6 +29,9 @@ def webview_client(title, url):
 
             # Define the function to run in the secondary thread
             def test_function():
+                # disable resource warning occuring in py >=3.13
+                warnings.filterwarnings("ignore", category=ResourceWarning)
+
                 try:
                     # Call the decorated function
                     func(baseclass, window, **kwargs)

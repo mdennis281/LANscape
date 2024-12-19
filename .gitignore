@@ -154,3 +154,11 @@ cython_debug/
 
 # Runtime generated
 lanscape-jobs/*.json
+
+# pyenv tests
+.venv*
+
+
+# tauri stuff
+node_modules
+setup_tauri

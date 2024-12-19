@@ -1,11 +1,9 @@
 import webview
 from ._helpers import webview_client
 import unittest
-import warnings
 from time import sleep
 
-# Suppress ResourceWarning
-warnings.simplefilter("ignore", ResourceWarning)
+
 
 class WebViewTestCase(unittest.TestCase):
     

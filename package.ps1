@@ -1,20 +1,32 @@
-# Run Python unit tests
-$unittestResult = python -m unittest
+param (
+    [switch]$SkipTests,
+    [switch]$SkipUpload
+)
 
-# Check if the tests succeeded
-if ($LASTEXITCODE -eq 0) {
-    # Remove files in dist directory
-    Remove-Item -Path .\dist\* -Recurse -Force
+if (-not $SkipTests) {
+    # Run Python unit tests
+    python -m unittest
 
-    # Upgrade pip and build the package
-    py -m pip install --upgrade pip
-    py -m pip install --upgrade build
-    py -m build
+    # Check if the tests succeeded
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Unit tests failed. Exiting script." -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
 
+# Remove files in dist directory
+Remove-Item -Path dist -Recurse -Force
+Remove-Item -Path ./**/*.egg-info -Recurse -Force
+
+# Upgrade pip and build the package
+py -m pip install --upgrade pip
+py -m pip install --upgrade build
+py -m build
+
+if (-not $SkipUpload) {
     # Upgrade twine and upload the package
     py -m pip install --upgrade twine
+
+    py -m twine check dist/*
     py -m twine upload --repository pypi dist/*
-} else {
-    Write-Host "Unit tests failed. Exiting script." -ForegroundColor Red
-    exit $LASTEXITCODE
 }

@@ -1,4 +1,5 @@
 from flask import Flask, render_template
+from time import sleep
 import multiprocessing
 import traceback
 import threading
@@ -92,6 +93,8 @@ def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
     proc = threading.Thread(target=start_webserver, args=(args,))
     proc.daemon = True # Kill thread when main thread exits
     proc.start()
+    log.info('Flask server initializing as dameon')
+    sleep(2)
 
 def start_webserver(args: RuntimeArgs) -> int:
     app.run(

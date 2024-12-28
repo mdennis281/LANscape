@@ -1,7 +1,7 @@
 # LANscape
 A python based local network scanner.
 
-![screenshot](https://github.com/mdennis281/py-lanscape/raw/main/src/lanscape/ui/static/img/readme1.png)
+![screenshot](https://github.com/user-attachments/assets/ba09c656-9fd9-4d74-8426-506d9a5c316c)
 
 ## Local Run
 ```sh

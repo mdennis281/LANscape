@@ -39,6 +39,7 @@ def main():
             start_webview(
                 args
             )
+        log.info('Exiting...')
     except Exception:
         # showing error in debug only because this is handled gracefully
         log.debug('Failed to start webview client. Traceback below')

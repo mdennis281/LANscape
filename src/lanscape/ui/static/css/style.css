@@ -460,8 +460,15 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .text-secondary {
-    color: var(--secondary-accent)
+    color: var(--secondary-accent) !important;
 }
+.text-danger {
+    color: var(--text-danger-color) !important;
+}
+.text-info {
+    color: var(--text-accent-color) !important;
+}
+
 .secondary-icon-btn {
     color: var(--secondary-accent);
     transition: .2s all ease-in-out;

@@ -106,8 +106,6 @@ def start_webserver(args: RuntimeArgs) -> int:
 
     app.run(**run_args)
 
-    
-
 if __name__ == "__main__":
     start_webserver(True)
 

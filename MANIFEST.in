@@ -1,0 +1,3 @@
+recursive-include src/lanscape/resources *.json
+recursive-include src/lanscape/ui/templates *.html
+recursive-include src/lanscape/ui/static *

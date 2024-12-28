@@ -1,6 +1,6 @@
 [project]
 name = "lanscape"
-version = "1.2.5"
+version = "1.2.6"
 authors = [
   { name="Michael Dennis", email="michael@dipduo.com" },
 ]

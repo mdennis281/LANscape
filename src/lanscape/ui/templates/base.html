@@ -11,10 +11,15 @@
         <div class="version">
             v{{app_version}}
             {% if is_local %}
-                <span>(Local Run)</span> 
+                <span class="text-info">(Local)</span> 
             {% elif update_available %} 
                 <span>(Update Available)</span> 
-            {% endif %}    
+            {% endif %}   
+            {% if 'a' in app_version %}
+                <span class="text-danger">(Alpha)</span>
+            {% elif 'b' in app_version %}
+                <span class="text-info">(Beta)</span>
+            {% endif %}
         </div>
 
         <div id="app-actions">
@@ -28,7 +33,6 @@
                 </span>
             </a>
 
-            {% if runtime_args.get('nogui') or runtime_args.get('headless') %}
             <a href="/shutdown-ui">
                 <span 
                     id="power-button" 
@@ -39,7 +43,6 @@
                     power_settings_new
                 </span>
             </a>
-            {% endif %}
         </div>
         
     </footer>

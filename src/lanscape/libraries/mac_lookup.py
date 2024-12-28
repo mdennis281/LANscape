@@ -1,12 +1,15 @@
 import re
 import json
+import logging
 import platform
 import subprocess
-from typing import Optional
+from typing import List
 
 from .app_scope import ResourceManager
 
 DB = json.loads(ResourceManager('mac_addresses').get('mac_db.json'))
+
+log = logging.getLogger('MacLookup')
 
 
 def lookup_mac(mac: str) -> str:
@@ -19,13 +22,17 @@ def lookup_mac(mac: str) -> str:
                 return DB[m]
     return None
         
-def get_mac(ip: str) -> Optional[str]:
+def get_macs(ip: str) -> List[str]:
     """Try to get the MAC address using Scapy, fallback to ARP if it fails."""
     if mac := get_mac_by_scapy(ip):
+        log.debug(f"Used Scapy to resolve ip {ip} to mac {mac}")
         return mac
-    return get_mac_by_arp(ip)
+    arp = get_mac_by_arp(ip)
+    log.debug(f"Used ARP to resolve ip {ip} to mac {arp}")
+    return arp
 
-def get_mac_by_arp(ip: str) -> Optional[str]:
+
+def get_mac_by_arp(ip: str) -> List[str]:
     """Retrieve the last MAC address instance using the ARP command."""
     try:
         # Use the appropriate ARP command based on the platform
@@ -38,11 +45,11 @@ def get_mac_by_arp(ip: str) -> Optional[str]:
 
         macs = re.findall(r'..:..:..:..:..:..', output)
         # found that typically last mac is the correct one
-        return macs[-1] if macs else None
+        return macs
     except:
-        return None
+        return []
 
-def get_mac_by_scapy(ip: str) -> Optional[str]:
+def get_mac_by_scapy(ip: str) -> List[str]:
     """Retrieve the MAC address using the Scapy library."""
     try:
         from scapy.all import ARP, Ether, srp
@@ -55,7 +62,9 @@ def get_mac_by_scapy(ip: str) -> Optional[str]:
         # Send the packet and wait for a response
         result = srp(packet, timeout=1, verbose=0)[0]
 
-        # Extract the MAC address from the response
-        return result[0][1].hwsrc if result else None
+        # Extract the MAC addresses from the response
+        return [res[1].hwsrc for res in result]
+        # return result[0][1].hwsrc if result else None
     except:
         return None
+

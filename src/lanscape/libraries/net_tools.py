@@ -11,7 +11,7 @@ from time import sleep
 from typing import List
 from scapy.all import ARP, Ether, srp
 
-from .mac_lookup import lookup_mac, get_mac
+from .mac_lookup import lookup_mac, get_macs
 from .ip_parser import get_address_count, MAX_IPS_ALLOWED
 
 log = logging.getLogger('NetTools')
@@ -61,13 +61,15 @@ class IPAlive:
                     pass  # Ping failed
                 sleep(retry_delay)
             return False
+    
+
 
 class Device(IPAlive):
     def __init__(self,ip:str):
         self.ip: str = ip
         self.alive: bool = None
         self.hostname: str = None
-        self.mac_addr: str = None
+        self.macs: List[str] = []
         self.manufacturer: str = None
         self.ports: List[int] = []
         self.stage: str = 'found'
@@ -76,8 +78,16 @@ class Device(IPAlive):
     def get_metadata(self):
         if self.alive:
             self.hostname = self._get_hostname()
-            self.mac_addr = self._get_mac_address()
-            self.manufacturer = self._get_manufacturer()
+            self.macs = self._get_mac_addresses()
+
+    def dict(self) -> dict:
+        obj = vars(self).copy()
+        obj.pop('log')
+        primary_mac = self.get_mac()
+        obj['mac_addr'] = primary_mac
+        obj['manufacturer'] = self._get_manufacturer(primary_mac)
+
+        return obj
             
     
     def test_port(self,port:int) -> bool:
@@ -89,12 +99,19 @@ class Device(IPAlive):
             self.ports.append(port)
             return True
         return False
+    
+    def get_mac(self):
+        if not self.macs:
+            self.macs = self._get_mac_addresses()
+        return mac_selector.choose_mac(self.macs)
 
-    def _get_mac_address(self):
+    def _get_mac_addresses(self):
         """
         Get the MAC address of a network device given its IP address.
         """
-        return get_mac(self.ip)
+        macs = get_macs(self.ip)
+        mac_selector.import_macs(macs)
+        return macs
         
     def _get_hostname(self):
         """
@@ -106,11 +123,46 @@ class Device(IPAlive):
         except socket.herror:
             return None
         
-    def _get_manufacturer(self):
+    def _get_manufacturer(self,mac_addr=None):
         """
         Get the manufacturer of a network device given its MAC address.
         """
-        return lookup_mac(self.mac_addr) if self.mac_addr else None
+        return lookup_mac(mac_addr) if mac_addr else None
+    
+
+class MacSelector:
+    """
+    Essentially filters out bad mac addresses
+    you send in a list of macs, 
+    it will return the one that has been seen the least
+    (ideally meaning it is the most likely to be the correct one)
+    this was added because some lookups return multiple macs,
+    usually the hwid of a vpn tunnel etc
+    """
+    def __init__(self):
+        self.macs = {}
+    
+    def choose_mac(self,macs:List[str]) -> str:
+        if len(macs) == 1:
+            return macs[0]
+        lowest = 9999
+        lowest_i = -1
+
+        for mac in macs:
+            if self.macs[mac] < lowest:
+                lowest = self.macs[mac]
+                lowest_i = macs.index(mac)
+        return macs[lowest_i] if lowest_i != -1 else None
+
+    
+    def import_macs(self,macs:List[str]):
+        for mac in macs:
+            self.macs[mac] = self.macs.get(mac,0) + 1
+    
+    def clear(self):
+        self.macs = {}
+
+mac_selector = MacSelector()
     
 
 def get_ip_address(interface: str):
@@ -263,3 +315,5 @@ def smart_select_primary_subnet(subnets: List[dict]=get_all_network_subnets()) -
     if not selected and len(subnets):
         selected = subnets[0]
     return selected['subnet']
+
+

@@ -250,10 +250,9 @@ class ScannerResults:
         out.pop('scan')
         out.pop('log')
         
-        devices: Device = out.pop('devices')
+        devices: List[Device] = out.pop('devices')
         sortedDevices = sorted(devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
-        out['devices'] = [vars(device).copy() for device in sortedDevices]
-        for device in out['devices']: device.pop('log') 
+        out['devices'] = [device.dict() for device in sortedDevices]
 
         if out_type == str:
             return json.dumps(out, indent=2)

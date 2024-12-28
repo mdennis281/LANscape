@@ -1,3 +1,9 @@
+# Usage:
+# .\package.ps1 
+# .\package.ps1 -SkipTests
+# .\package.ps1  -SkipUpload
+# .\package.ps1  -SkipUpload -SkipTests
+
 param (
     [switch]$SkipTests,
     [switch]$SkipUpload

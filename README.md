@@ -11,17 +11,15 @@ python -m lanscape
 
 ## Flags
  - `--port <port number>` port of the flask app (default: 5001)
- - `--nogui` run in web mode (default: false)
  - `--reloader` essentially flask debug mode- good for local development (default: false)
  - `--logfile` save log output to lanscape.log
  - `--loglevel <level>` set the logger's log level (default: INFO)
- - `--headless` similar to nogui but doesnt try to open a browser (default: false)
  
 
 Examples:
 ```shell
 python -m lanscape --reloader
-python -m lanscape --nogui --port 5002
+python -m lanscape --port 5002
 python -m lanscape --logfile --loglevel DEBUG
 ```
 

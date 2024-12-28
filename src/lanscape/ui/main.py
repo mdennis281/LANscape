@@ -12,7 +12,6 @@ args = parse_args()
 configure_logging(args.loglevel, args.logfile)
 
 from ..libraries.version_manager import get_installed_version, is_update_available
-from .webviewer import start_webview
 from .app import start_webserver
 
 
@@ -33,19 +32,15 @@ def main():
         
         
     try:
-        if args.nogui or args.headless:
-            no_gui(args)
-        else:
-            start_webview(
-                args
-            )
+        
+        no_gui(args)
+
         log.info('Exiting...')
     except Exception:
         # showing error in debug only because this is handled gracefully
-        log.debug('Failed to start webview client. Traceback below')
+        log.debug('Failed to start. Traceback below')
         log.debug(traceback.format_exc())
-        if not args.nogui:
-            log.error('Unable to start webview client. Try running with flag --nogui')
+
 
 
 def try_check_update():
@@ -77,10 +72,11 @@ def open_browser(url: str,wait=2):
 def no_gui(args: RuntimeArgs):
     # determine if it was reloaded by flask debug reloader
     # if it was, dont open the browser again
-    if not IS_FLASK_RELOAD and not args.headless:
+    if not IS_FLASK_RELOAD:
         open_browser(f'http://127.0.0.1:{args.port}')
-    if args.headless:
-        log.info(f'Started in headless mode on: http://127.0.0.1:{args.port}')
+    
+    log.info(f'Server started: http://127.0.0.1:{args.port}')
+    
     start_webserver(
         args
     )

@@ -22,7 +22,7 @@ def index():
             scan = scanner.results.export()
             subnet = scan['subnet']
             port_list = scan['port_list']
-            parallelism = scan['parallelism']
+            parallelism = scan['cfg']['t_multiplier']
         else:
             log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
             return redirect('/')

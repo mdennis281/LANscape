@@ -27,7 +27,14 @@ TCNT_DEVICE_ISALIVE = 256
 class ScanConfig:
     subnet: str
     port_list: str
-    parallelism: float = 1.0
+    t_multiplier: float = 1.0
+    t_cnt_port_scan: int = 10
+    t_cnt_port_test: int = 128
+    t_cnt_isalive: int = 256
+
+    def t_cnt(self, id: str) -> int:
+        return int(int(getattr(self, f't_cnt_{id}')) * float(self.t_multiplier))
+
 
 
 
@@ -40,8 +47,9 @@ class SubnetScanner:
         self.port_list = config.port_list
         self.ports: list = PortManager().get_port_list(config.port_list).keys()
         self.running = False
-        self.parallelism: float = float(config.parallelism)
         self.subnet_str = config.subnet
+
+        self.cfg = config
         self.job_stats = JobStats()
         self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
@@ -58,7 +66,7 @@ class SubnetScanner:
         """
         self._set_stage('scanning devices')
         self.running = True
-        with ThreadPoolExecutor(max_workers=self._t_cnt(TCNT_DEVICE_ISALIVE)) as executor:
+        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('isalive')) as executor:
             futures = {executor.submit(self._get_host_details, str(ip)): str(ip) for ip in self.subnet}
             for future in futures:
                 ip = futures[future]
@@ -104,7 +112,7 @@ class SubnetScanner:
         remaining_isalive_sec = (self.results.devices_total - self.results.devices_scanned) * avg_host_detail_sec
         total_isalive_sec = self.results.devices_total * avg_host_detail_sec
 
-        isalive_multiplier = self._t_cnt(TCNT_DEVICE_ISALIVE)
+        isalive_multiplier = self.cfg.t_cnt('isalive')
 
         # --- Port scanning calculations ---
         device_ports_scanned = self.job_stats.finished.get('_test_port', 0)
@@ -116,7 +124,7 @@ class SubnetScanner:
         remaining_port_test_sec = device_ports_unscanned * avg_port_test_sec
         total_port_test_sec = est_subnet_devices * len(self.ports) * avg_port_test_sec
 
-        port_test_multiplier = self._t_cnt(TCNT_PORT_SCANS) * self._t_cnt(TCNT_PORT_TEST)
+        port_test_multiplier = self.cfg.t_cnt('port_scan') * self.cfg.t_cnt('port_test')
 
         # --- Overall progress ---
         est_total_time = (total_isalive_sec / isalive_multiplier) + (total_port_test_sec / port_test_multiplier)
@@ -157,7 +165,7 @@ class SubnetScanner:
         
     @terminator
     def _scan_network_ports(self):
-        with ThreadPoolExecutor(max_workers=self._t_cnt(TCNT_PORT_SCANS)) as executor:
+        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_scan')) as executor:
             futures = {executor.submit(self._scan_ports, device): device for device in self.results.devices}
             for future in futures:
                 future.result()
@@ -167,7 +175,7 @@ class SubnetScanner:
     def _scan_ports(self, device: Device):
         self.log.debug(f'[{device.ip}] Initiating port scan')
         device.stage = 'scanning'
-        with ThreadPoolExecutor(max_workers=self._t_cnt(TCNT_PORT_TEST)) as executor:
+        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_test')) as executor:
             futures = {executor.submit(self._test_port, device, int(port)): port for port in self.ports}
             for future in futures:
                 future.result()
@@ -192,13 +200,6 @@ class SubnetScanner:
         """
         return host.is_alive(host.ip)
     
-    def _t_cnt(self, base_threads: int) -> int:
-        """
-        Calculate the number of threads to use based on the base number 
-        of threads and the parallelism factor.
-        """
-        return int(base_threads * self.parallelism)
-    
     def _set_stage(self,stage):
         self.log.debug(f'[{self.uid}] Moving to Stage: {stage}')
         self.results.stage = stage
@@ -210,7 +211,6 @@ class ScannerResults:
         self.scan = scan
         self.port_list: str = scan.port_list
         self.subnet: str = scan.subnet_str
-        self.parallelism: float = scan.parallelism
         self.uid = scan.uid
 
         self.devices_total: int = len(list(scan.subnet))
@@ -249,6 +249,7 @@ class ScannerResults:
         out = vars(self).copy()
         out.pop('scan')
         out.pop('log')
+        out['cfg'] = vars(self.scan.cfg)
         
         devices: List[Device] = out.pop('devices')
         sortedDevices = sorted(devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))

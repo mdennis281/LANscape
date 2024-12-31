@@ -5,7 +5,7 @@ sm = ScanManager()
 cfg = ScanConfig(
     subnet= net_tools.smart_select_primary_subnet(),
     port_list='small',
-    parallelism=1
+    t_multiplier=1
 )
 
 try:

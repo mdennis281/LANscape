@@ -61,5 +61,5 @@ def get_scan_config():
     return ScanConfig(
         subnet = data['subnet'],
         port_list= data['port_list'],
-        parallelism=data.get('parallelism',1.0)
+        t_multiplier=data.get('parallelism',1.0)
     )

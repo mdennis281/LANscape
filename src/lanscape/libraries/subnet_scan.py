@@ -134,17 +134,23 @@ class SubnetScanner:
 
         
 
-    def debug_active_scan(self):
+    def debug_active_scan(self,sleep_sec=1):
         """
             Run this after running scan_subnet_threaded 
             to see the progress of the scan
         """
         while self.running:
+            percent = self.calc_percent_complete()
+            t_elapsed = time() - self.results.start_time
+            t_remain = int((100-percent) * (t_elapsed / percent)) if percent else '∞'
+            buffer = f'{self.uid} - {self.subnet_str}\n'
+            buffer += f'Elapsed: {int(t_elapsed)} sec - Remain: {t_remain} sec\n'
+            buffer += f'Scanned: {self.results.devices_scanned}/{self.results.devices_total}'
+            buffer += f' - {percent}%\n'
+            buffer += str(self.job_stats)
             os.system('cls' if os.name == 'nt' else 'clear')
-            print(f'{self.uid} - {self.subnet_str}')
-            print(f"Scanned: {self.results.devices_scanned}/{self.results.devices_total} - {self.calc_percent_complete()}%")
-            print(self.job_stats)
-            sleep(1)
+            print(buffer)
+            sleep(sleep_sec)
 
     @terminator
     @job_tracker
@@ -263,7 +269,7 @@ class ScannerResults:
     def __str__(self):
         # Prepare data for tabulate
         data = [
-            [device.ip, device.hostname, device.mac_addr, ", ".join(map(str, device.ports))]
+            [device.ip, device.hostname, device.get_mac(), ", ".join(map(str, device.ports))]
             for device in self.devices
         ]
 

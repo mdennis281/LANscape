@@ -1,6 +1,7 @@
 from pathlib import Path
-import importlib.util
+import json
 import sys
+import re
 
 class ResourceManager:
     """
@@ -16,6 +17,16 @@ class ResourceManager:
     def get(self, asset_name: str):
         with open(self.asset_dir / asset_name, 'r') as f:
             return f.read()
+        
+    def get_json(self, asset_name: str):
+        return json.loads(self.get(asset_name))
+    
+    def get_jsonc(self, asset_name: str):
+        " Get JSON content with comments removed "
+        content = self.get(asset_name)
+        cleaned_content = re.sub(r'//.*', '', content)
+        return json.loads(cleaned_content)
+
         
     def update(self, asset_name: str, content: str):
         with open(self.asset_dir / asset_name, 'w') as f:

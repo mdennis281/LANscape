@@ -28,7 +28,7 @@ def parse_ip_input(ip_input):
 
         # If no CIDR or range, assume a single IP
         else:
-            ip_ranges.append(ipaddress.IPv4Address(entry,strict=False))
+            ip_ranges.append(ipaddress.IPv4Address(entry))
         if len(ip_ranges) > MAX_IPS_ALLOWED:
             raise SubnetTooLargeError(ip_input)
     return ip_ranges

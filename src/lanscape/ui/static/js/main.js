@@ -164,7 +164,6 @@ function pollScanSummary(id) {
         if (summary.running || summary.stage == 'terminating') {
             progress.css('height','2px');
             progress.css('width',`${summary.percent_complete}vw`);
-            // TODO: move overview here??
             setTimeout(() => {pollScanSummary(id)},500);
         } else {
             progress.css('width','100vw');
@@ -179,6 +178,11 @@ function pollScanSummary(id) {
             },1000);
         }
         updateOverviewUI(summary);
+    }).fail(function(req) {
+        if (req === 404) {
+            console.log('Scan not found, redirecting to home');
+            window.location.href = '/';
+        }
     });
 }
 

@@ -35,6 +35,8 @@ def get_scan(scan_id):
 @api_bp.route('/api/scan/<scan_id>/summary',methods=['GET'])
 def get_scan_summary(scan_id):
     scan = scan_manager.get_scan(scan_id)
+    if not scan:
+        return jsonify({'error':'scan not found'}), 404
     return jsonify({
         'running': scan.running,
         'percent_complete': scan.calc_percent_complete(),

@@ -32,8 +32,31 @@ class ScanConfig:
     t_cnt_port_test: int = 128
     t_cnt_isalive: int = 256
 
+    task_scan_ports: bool = True
+    # below wont run if above false
+    task_scan_port_services: bool = True
+
     def t_cnt(self, id: str) -> int:
         return int(int(getattr(self, f't_cnt_{id}')) * float(self.t_multiplier))
+    
+    @staticmethod
+    def from_dict(data: dict) -> 'ScanConfig':
+        return ScanConfig(
+            subnet = data['subnet'],
+            port_list = data['port_list'],
+            t_multiplier = data.get('parallelism',1.0),
+            t_cnt_port_scan = data.get('t_cnt_port_scan',10),
+            t_cnt_port_test = data.get('t_cnt_port_test',128),
+            t_cnt_isalive = data.get('t_cnt_isalive',256),
+            task_scan_ports = data.get('task_scan_ports',True),
+            task_scan_port_services = data.get('task_scan_port_services',True)
+        )
+    
+    def get_ports(self) -> List[int]:
+        return PortManager().get_port_list(self.port_list).keys()
+    
+    def parse_subnet(self) -> List[ipaddress.IPv4Network]:
+        return parse_ip_input(self.subnet)
 
 
 
@@ -43,13 +66,13 @@ class SubnetScanner:
             self, 
             config: ScanConfig
         ):
-        self.subnet = parse_ip_input(config.subnet)
-        self.port_list = config.port_list
-        self.ports: list = PortManager().get_port_list(config.port_list).keys()
+        self.cfg = config
+        self.subnet = config.parse_subnet()
+        self.ports: List[int] = config.get_ports()
         self.running = False
         self.subnet_str = config.subnet
 
-        self.cfg = config
+        
         self.job_stats = JobStats()
         self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
@@ -81,7 +104,8 @@ class SubnetScanner:
                 
         
         self._set_stage('testing ports')
-        self._scan_network_ports()
+        if self.cfg.task_scan_ports:
+            self._scan_network_ports()
         self.running = False
         self._set_stage('complete')
         
@@ -193,9 +217,13 @@ class SubnetScanner:
     def _test_port(self,host: Device, port: int):
         """
         Test if a port is open on a given host.
+        If port open, determine service.
         Device class handles tracking open ports.
         """
-        return host.test_port(port)
+        is_alive = host.test_port(port)
+        if is_alive and self.cfg.task_scan_port_services:
+            host.scan_service(port)
+        return is_alive
     
         
     @terminator
@@ -215,7 +243,7 @@ class SubnetScanner:
 class ScannerResults:
     def __init__(self,scan: SubnetScanner):
         self.scan = scan
-        self.port_list: str = scan.port_list
+        self.port_list: str = scan.cfg.port_list
         self.subnet: str = scan.subnet_str
         self.uid = scan.uid
 

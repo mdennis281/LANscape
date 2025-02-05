@@ -34,7 +34,7 @@ class ScanConfig:
 
     task_scan_ports: bool = True
     # below wont run if above false
-    task_scan_port_services: bool = True
+    task_scan_port_services: bool = False # disabling until more stable
 
     def t_cnt(self, id: str) -> int:
         return int(int(getattr(self, f't_cnt_{id}')) * float(self.t_multiplier))

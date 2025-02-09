@@ -1,5 +1,4 @@
 import re
-import json
 import logging
 import platform
 import subprocess
@@ -7,7 +6,7 @@ from typing import List
 
 from .app_scope import ResourceManager
 
-DB = json.loads(ResourceManager('mac_addresses').get('mac_db.json'))
+DB = ResourceManager('mac_addresses').get_json('mac_db.json')
 
 log = logging.getLogger('MacLookup')
 

@@ -1,0 +1,456 @@
+{
+    // ----------------------- Web Services -----------------------
+    "HTTP": [
+        "HTTP", 
+        "Apache", 
+        "Nginx", 
+        "IIS", 
+        "lighttpd", 
+        "Caddy", 
+        "OpenResty",
+        "GWS",  // Google Web Server
+        "LiteSpeed",
+        "Gunicorn",  // Often in X-Powered-By
+        "OpenLiteSpeed",
+        "Cloudflare"
+    ],
+    "HTTPS": [
+        "HTTPS", 
+        "SSL", 
+        "TLS"
+        // Possibly you'd see "443" in a banner or SNI reference, 
+        // but typically "SSL" or "TLS" coverage is sufficient
+    ],
+
+    // ------------------ Remote Shell / Admin --------------------
+    "SSH": [
+        "SSH", 
+        "OpenSSH", 
+        "Dropbear",
+        "libssh"
+    ],
+    "Telnet": [
+        "Telnet",
+        "BusyBox on telnetd"
+    ],
+
+    // ------------------ File Transfer Protocols -----------------
+    "FTP": [
+        "FTP", 
+        "FileZilla", 
+        "ProFTPD", 
+        "vsftpd", 
+        "Pure-FTPd",
+        "WS_FTP",
+        "Microsoft ftpd"
+    ],
+    "SFTP": [
+        "SFTP"
+        // SFTP typically is an SSH subsystem, so you'd often see an SSH banner anyway
+    ],
+    "TFTP": [
+        "TFTP"
+    ],
+
+    // -------------------- Email / Messaging ----------------------
+    "SMTP": [
+        "SMTP", 
+        "Postfix", 
+        "Exim", 
+        "Sendmail", 
+        "Qmail", 
+        "Exchange"
+    ],
+    "SMTPS": [
+        "SMTPS", 
+        "465 secure", 
+        "587 secure"
+        // Some servers might mention "TLS wrapper" or similar
+    ],
+    "POP3": [
+        "POP3",
+        "Dovecot",
+        "Courier",
+        "POP3 (Internet Mail)"
+    ],
+    "POP3S": [
+        "POP3S",
+        "SSL POP3",
+        "Dovecot",
+        "Courier"
+    ],
+    "IMAP": [
+        "IMAP",
+        "Dovecot",
+        "Courier",
+        "Cyrus",
+        "IMAP4"
+    ],
+    "IMAPS": [
+        "IMAPS",
+        "SSL IMAP",
+        "Dovecot",
+        "Courier",
+        "Cyrus"
+    ],
+
+    // ---------------- Domain / Directory Services ---------------
+    "DNS": [
+        "DNS", 
+        "Bind", 
+        "DNSMasq", 
+        "PowerDNS",
+        "Unbound",
+        "Microsoft DNS",
+        "Knot DNS"
+    ],
+    "LDAP": [
+        "LDAP"
+    ],
+    "Active Directory": [
+        "Active Directory", 
+        "Kerberos", 
+        "MSAD", 
+        "LDAP for AD", 
+        "LDAP Service (AD)"
+    ],
+
+    // -------------------- Database Services ----------------------
+    "MySQL": [
+        "MySQL", 
+        "MariaDB", 
+        "Percona"
+    ],
+    "PostgreSQL": [
+        "PostgreSQL",
+        "Postgres"
+    ],
+    "Microsoft SQL Server": [
+        "MSSQL", 
+        "Microsoft SQL Server", 
+        "TDS",
+        "SQL Server",
+        "MS-SQL"
+    ],
+    "Oracle Database": [
+        "Oracle", 
+        "TNS", 
+        "Oracle Net"
+    ],
+    "MongoDB": [
+        "MongoDB"
+    ],
+    "Redis": [
+        "Redis"
+    ],
+    "Cassandra": [
+        "Cassandra"
+    ],
+    "Memcached": [
+        "Memcached"
+    ],
+
+    // ----------------- Caching / Indexing / Logging -------------
+    "Elasticsearch": [
+        "Elasticsearch"
+    ],
+    "Logstash": [
+        "Logstash"
+    ],
+
+    // --------------- Message Brokers & Streaming ----------------
+    "Kafka": [
+        "Kafka"
+    ],
+    "RabbitMQ": [
+        "RabbitMQ", 
+        "AMQP"
+    ],
+    "ActiveMQ": [
+        "ActiveMQ"
+    ],
+    "Mosquitto": [
+        "Mosquitto", 
+        "MQTT"
+    ],
+
+    // -------------------- Microsoft Services ---------------------
+    "RDP": [
+        "RDP", 
+        "Terminal Services", 
+        "Remote Desktop",
+        "MSTerminal"
+    ],
+    "SMB": [
+        "SMB", 
+        "NetBIOS", 
+        "Samba"
+    ],
+    "WMI": [
+        "WMI"
+    ],
+    "WinRM": [
+        "WinRM"
+    ],
+
+    // ---------------- Collaboration / Chat -----------------------
+    "IRC": [
+        "IRC"
+    ],
+    "XMPP": [
+        "XMPP", 
+        "Jabber"
+    ],
+    "Matrix": [
+        "Matrix"
+    ],
+
+    // ------------- Virtualization / Container Services ----------
+    "Docker API": [
+        "Docker"
+    ],
+    "Kubernetes API": [
+        "Kubernetes",
+        "K8s",
+        "kube-apiserver"
+    ],
+    "VMware ESXi": [
+        "VMware ESXi", 
+        "ESX"
+    ],
+    "Proxmox": [
+        "Proxmox"
+    ],
+
+    // ----------------- Remote Desktop / Control -----------------
+    "VNC": [
+        "VNC", 
+        "RFB"
+    ],
+    "TeamViewer": [
+        "TeamViewer"
+    ],
+    "AnyDesk": [
+        "AnyDesk"
+    ],
+
+    // --------------------- Voice over IP ------------------------
+    "SIP": [
+        "SIP", 
+        "Asterisk", 
+        "FreeSWITCH"
+    ],
+    "H.323": [
+        "H.323"
+    ],
+
+    // ----------- Time, Network Config, and Infrastructure -------
+    "NTP": [
+        "NTP"
+    ],
+    "DHCP": [
+        "DHCP"
+    ],
+
+    // ------------------ VPN / Tunneling / Security --------------
+    "OpenVPN": [
+        "OpenVPN"
+    ],
+    "IPSec": [
+        "IPSec", 
+        "IKE"
+    ],
+    "WireGuard": [
+        "WireGuard"
+    ],
+
+    // ---------------------- Other Protocols ----------------------
+    "SNMP": [
+        "SNMP"
+    ],
+    "SNMP Trap": [
+        "Trap", 
+        "SNMPTRAP"
+    ],
+    "Syslog": [
+        "Syslog"
+    ],
+
+    // -------------------- Cloud Services / APIs -----------------
+    "AWS S3": [
+        "AmazonS3", 
+        "S3"
+    ],
+    "AWS RDS": [
+        "AWS RDS", 
+        "amazon-rds"
+    ],
+    "Azure DevOps": [
+        "Azure DevOps", 
+        "VSTS"
+    ],
+    "GCP Services": [
+        "GCP", 
+        "googleapis.com"
+    ],
+
+    // -------------------- Repo / Code Hosting --------------------
+    "Git": [
+        "git-daemon"
+    ],
+    "SVN": [
+        "SVN", 
+        "Subversion"
+    ],
+
+    // -------------- HPC / Cluster Management / HPC --------------
+    "Slurm": [
+        "Slurm"
+    ],
+
+    // --------------------- Misc / Exotic ------------------------
+    "Tor": [
+        "Tor", 
+        "obfs"
+    ],
+    "ZeroTier": [
+        "ZeroTier"
+    ],
+    "Mumble": [
+        "Mumble", 
+        "Murmur"
+    ],
+    "Spice": [
+        "SPICE protocol"
+    ],
+    "FusionDirectory": [
+        "FusionDirectory"
+    ],
+    "Jenkins": [
+        "Jenkins"
+    ],
+    "GitLab": [
+        "GitLab"
+    ],
+    "GitHub": [
+        "GitHub", 
+        "github.com"
+    ],
+    "Bitbucket": [
+        "Bitbucket"
+    ],
+
+    // ------------------ Legacy or Older Protocols ---------------
+    "Gopher": [
+        "Gopher"
+    ],
+    "Finger": [
+        "Finger"
+    ],
+    "Ident": [
+        "Ident"
+    ],
+    "Rlogin": [
+        "rlogin"
+    ],
+    "Rsync": [
+        "rsync"
+    ],
+    "UUCP": [
+        "UUCP"
+    ],
+    "AFS": [
+        "AFS", 
+        "OpenAFS"
+    ],
+    "NIS": [
+        "NIS", 
+        "YPServ"
+    ],
+    "Telnet SSL": [
+        "telnet-ssl"
+    ],
+
+    // ----------------- Big Data / Hadoop Ecosystem --------------
+    "Hadoop": [
+        "Hadoop",
+        "MapReduce",
+        "YARN"
+    ],
+    "HDFS": [
+        "HDFS"
+    ],
+    "Hive": [
+        "Hive",
+        "HiveServer2"
+    ],
+    "HBase": [
+        "HBase",
+        "HMaster"
+    ],
+    "Zookeeper": [
+        "Zookeeper",
+        "ZooKeeper"
+    ],
+    "Spark": [
+        "Spark"
+    ],
+
+    // ------------ Web Frameworks / Application Servers ----------
+    "Tomcat": [
+        "Apache Tomcat",
+        "Apache-Coyote"
+    ],
+    "JBoss": [
+        "JBoss",
+        "JBoss EAP"
+    ],
+    "GlassFish": [
+        "GlassFish"
+    ],
+    "WebLogic": [
+        "WebLogic"
+    ],
+    "WebSphere": [
+        "WebSphere"
+    ],
+    "Jetty": [
+        "Jetty"
+    ],
+    // Gunicorn and uWSGI also appear under HTTP if they surface in the banner.
+
+    // ------- Additional Container / Orchestration Tools ---------
+    "Docker Swarm": [
+        "Swarm"
+    ],
+
+    // ---------- Reverse Proxies / Load Balancers / Gateways -----
+    "HAProxy": [
+        "HAProxy"
+    ],
+    "Traefik": [
+        "Traefik"
+    ],
+    "Envoy": [
+        "Envoy"
+    ],
+
+    // ------------------ CI/CD and DevOps Tools ------------------
+    "Bamboo": [
+        "Bamboo"
+    ],
+    "TeamCity": [
+        "TeamCity"
+    ],
+    "Drone CI": [
+        "Drone"
+    ],
+
+    // ------------------- Just for completeness ------------------
+    "COBOL-based service": [
+        "Mainframe", 
+        "AS/400",
+        // Banner might mention "Enterprise COBOL" or "z/OS"
+        "z/OS"
+    ]
+}

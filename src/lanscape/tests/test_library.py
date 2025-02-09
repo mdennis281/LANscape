@@ -11,7 +11,7 @@ class LibraryTestCase(unittest.TestCase):
         self.assertIsNotNone(subnet)
         cfg = ScanConfig(
             subnet = right_size_subnet(subnet),
-            parallelism=1.0,
+            t_multiplier=1.0,
             port_list='small'
         )
         scan = sm.new_scan(cfg)

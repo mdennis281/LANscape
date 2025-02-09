@@ -8,9 +8,10 @@ import ipaddress
 import traceback
 import subprocess
 from time import sleep
-from typing import List
+from typing import List, Dict
 from scapy.all import ARP, Ether, srp
 
+from .service_scan import scan_service
 from .mac_lookup import lookup_mac, get_macs
 from .ip_parser import get_address_count, MAX_IPS_ALLOWED
 
@@ -73,6 +74,7 @@ class Device(IPAlive):
         self.manufacturer: str = None
         self.ports: List[int] = []
         self.stage: str = 'found'
+        self.services: Dict[str,List[int]] = {}
         self.log = logging.getLogger('Device')
 
     def get_metadata(self):
@@ -99,6 +101,12 @@ class Device(IPAlive):
             self.ports.append(port)
             return True
         return False
+    
+    def scan_service(self,port:int):
+        service = scan_service(self.ip,port)
+        service_ports = self.services.get(service,[])
+        service_ports.append(port)
+        self.services[service] = service_ports
     
     def get_mac(self):
         if not self.macs:

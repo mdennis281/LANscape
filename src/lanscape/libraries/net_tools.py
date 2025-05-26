@@ -15,11 +15,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .service_scan import scan_service
 from .mac_lookup import lookup_mac, get_macs
 from .ip_parser import get_address_count, MAX_IPS_ALLOWED
+from .errors import DeviceError
 
 log = logging.getLogger('NetTools')
 
 
 class IPAlive:
+    caught_errors: List[DeviceError] = []
+
     def is_alive(self, ip: str) -> bool:
         """
         Run ARP and ping in parallel. As soon as one returns True, we shut
@@ -36,17 +39,18 @@ class IPAlive:
             try:
                 if future.result():
                     # one check succeeded — don’t block on the other
-                    executor.shutdown(wait=False)
+                    executor.shutdown(wait=False, cancel_futures=True)
                     return True
-            except Exception:
+            except Exception as e:
                 # treat any error as a False response
+                self.caught_errors.append(DeviceError(e))
                 pass
 
         # neither check found the host alive
-        executor.shutdown(wait=False)
+        executor.shutdown()
         return False
 
-    def _arp_lookup(self, ip: str, timeout: int = 4) -> bool:
+    def _arp_lookup(self, ip: str, timeout: int = 3) -> bool:
         arp_request = ARP(pdst=ip)
         broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
         packet      = broadcast / arp_request
@@ -57,7 +61,7 @@ class IPAlive:
     def _ping_lookup(
         self, host: str,
         retries: int = 1,
-        retry_delay: int = 1,
+        retry_delay: int = .25,
         ping_count: int = 2,
         timeout: int = 2
     ) -> bool:
@@ -70,7 +74,7 @@ class IPAlive:
             # -c count, -W timeout in s
             cmd = ['ping', '-c', str(ping_count), '-W', str(timeout)]
 
-        for _ in range(retries):
+        for r in range(retries):
             try:
                 output = subprocess.check_output(
                     cmd + [host],
@@ -80,9 +84,11 @@ class IPAlive:
                 # Windows/Linux both include “TTL” on a successful reply
                 if 'TTL' in output.upper():
                     return True
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as e:
+                self.caught_errors.append(DeviceError(e))
                 pass
-            sleep(retry_delay)
+            if r < retries - 1:
+                sleep(retry_delay)
         return False
     
 
@@ -97,6 +103,7 @@ class Device(IPAlive):
         self.ports: List[int] = []
         self.stage: str = 'found'
         self.services: Dict[str,List[int]] = {}
+        self.caught_errors: List[DeviceError] = []
         self.log = logging.getLogger('Device')
 
     def get_metadata(self):
@@ -150,7 +157,8 @@ class Device(IPAlive):
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
             return hostname
-        except socket.herror:
+        except socket.herror as e:
+            self.caught_errors.append(DeviceError(e))
             return None
         
     def _get_manufacturer(self,mac_addr=None):

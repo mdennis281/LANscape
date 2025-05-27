@@ -22,9 +22,19 @@ log = logging.getLogger('core')
 IS_FLASK_RELOAD = os.environ.get("WERKZEUG_RUN_MAIN")
 
 
-
-
 def main():
+    try:
+        _main()
+    except KeyboardInterrupt:
+        log.info('Keyboard interrupt received, terminating...')
+        terminate()
+    except Exception as e:
+        log.critical(f'Unexpected error: {e}')
+        log.debug(traceback.format_exc())
+        terminate()
+
+
+def _main():
     if not IS_FLASK_RELOAD:
         log.info(f'LANscape v{get_installed_version()}')
         try_check_update()
@@ -61,21 +71,12 @@ def open_browser(url: str, wait=2) -> bool:
     Open a browser window to the specified
     url after waiting for the server to start
     """
-    start_time = time.time()
     try:
         time.sleep(wait)
-        log.info('Starting UI')
+        log.info(f'Starting UI - http://127.0.0.1:{args.port}')
         return open_webapp(url)
         
     except:
-        elapsed = time.time() - start_time
-        if elapsed > 15:
-            # noticing that occasionally there will be a failure
-            # when user closes the browser. if it took more then 
-            # 15 seconds before the failure, assume that browser
-            # was closed by the user & everything is fine
-            log.debug(f'Exception after {elapsed:.2f} seconds, assuming browser was closed by user')
-            return True
         log.debug(traceback.format_exc())
         log.info(f'Unable to open web browser, server running on {url}')
     return False
@@ -106,7 +107,10 @@ def start_webserver_ui(args: RuntimeArgs):
         # may not be coupled with the closure of UI
         # (if in browser tab, it's uncoupled)
         if not app_closed:
-            flask_thread.join()
+            # not doing a direct join so i can still 
+            # terminate the app with ctrl+c
+            while flask_thread.is_alive():
+                time.sleep(1)
     
 
 def get_valid_port(port: int):
@@ -121,27 +125,10 @@ def get_valid_port(port: int):
 
 def terminate():
     import requests
-    from ..libraries.web_browser import BROWSER_PID
     log.info('Attempting flask shutdown')
     requests.get(f'http://127.0.0.1:{args.port}/shutdown')
 
 
-    if BROWSER_PID:
-        try:
-            os.kill(BROWSER_PID, 9)  # Force kill the browser process
-            log.info(f'Killed browser process with PID {BROWSER_PID}')
-        except OSError as e:
-            log.warning(f'Failed to kill browser process: {e}')
-
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        log.info('Keyboard interrupt received, terminating...')
-        terminate()
-    except Exception as e:
-        log.critical(f'Unexpected error: {e}')
-        log.debug(traceback.format_exc())
-        terminate()
-        
+    main()

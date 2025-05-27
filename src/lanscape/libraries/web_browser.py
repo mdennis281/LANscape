@@ -19,6 +19,7 @@ from ..ui.app import app
 
 log = logging.getLogger('WebBrowser')
 
+
 def open_webapp(url: str) -> bool:
     """
     will try to open the web page as an app
@@ -26,6 +27,7 @@ def open_webapp(url: str) -> bool:
 
     returns: 
     """
+    start = time.time()
     try:
         exe = get_default_browser_executable()
         if not exe:
@@ -33,6 +35,9 @@ def open_webapp(url: str) -> bool:
         
         #this is blocking until closed
         subprocess.run(f'{exe} --app="{url}"')
+        if time.time() - start < 2:
+            log.debug(f'Unable to hook into closure of UI, listening for flask shutdown')
+            return False
         return True
         
     except Exception as e:

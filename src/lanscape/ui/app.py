@@ -89,12 +89,12 @@ def internal_error(e):
 ## Webserver creation functions
 ################################
 
-def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
+def start_webserver_dameon(args: RuntimeArgs) -> threading.Thread:
     proc = threading.Thread(target=start_webserver, args=(args,))
     proc.daemon = True # Kill thread when main thread exits
     proc.start()
     log.info('Flask server initializing as dameon')
-    sleep(2)
+    return proc
 
 def start_webserver(args: RuntimeArgs) -> int:
     run_args = {
@@ -103,10 +103,7 @@ def start_webserver(args: RuntimeArgs) -> int:
         'debug':args.reloader,
         'use_reloader':args.reloader
     }
-
     app.run(**run_args)
 
-if __name__ == "__main__":
-    start_webserver(True)
 
 

@@ -14,7 +14,7 @@ python -m lanscape
  - `--reloader` essentially flask debug mode- good for local development (default: false)
  - `--logfile` save log output to lanscape.log
  - `--loglevel <level>` set the logger's log level (default: INFO)
- 
+ - `--flask-logging` turn on flask logging (default: false)
 
 Examples:
 ```shell

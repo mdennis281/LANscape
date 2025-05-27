@@ -187,10 +187,44 @@ function pollScanSummary(id) {
 }
 
 function updateOverviewUI(summary) {
-    $('#scan-devices-alive').text(summary.devices.alive);
-    $('#scan-devices-scanned').text(summary.devices.scanned);
-    $('#scan-devices-total').text(summary.devices.total);
-    $('#scan-run-time').text(summary.runtime);
+    // helper to turn a number of seconds into "MM:SS"
+    function formatMMSS(totalSeconds) {
+      const secs = Math.floor(totalSeconds);
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      // pad minutes and seconds to 2 digits
+      const mm = String(m).padStart(2, '0');
+      const ss = String(s).padStart(2, '0');
+      return `${mm}:${ss}`;
+    }
+  
+    const alive       = summary.devices.alive;
+    const scanned     = summary.devices.scanned;
+    const total       = summary.devices.total;
+  
+    // ensure we have a number of elapsed seconds
+    const runtimeSec  = parseFloat(summary.runtime) || 0;
+    const pctComplete = Number(summary.percent_complete) || 0;
+  
+    // compute remaining seconds correctly
+    const remainingSec = pctComplete > 0
+      ? (runtimeSec * (100 - pctComplete)) / pctComplete
+      : 0;
+  
+    // update everything…
+    $('#scan-devices-alive').text(alive);
+    $('#scan-devices-scanned').text(scanned);
+    $('#scan-devices-total').text(total);
+  
+    // …but format runtime and remaining as MM:SS
+    $('#scan-run-time').text(formatMMSS(runtimeSec));
+    if (pctComplete < 10) {
+        $('#scan-remain-time').text('??:??');
+    } else {
+        $('#scan-remain-time').text(formatMMSS(remainingSec));
+    }
+    
+  
     $('#scan-stage').text(summary.stage);
 }
 

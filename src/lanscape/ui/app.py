@@ -13,7 +13,7 @@ from ..libraries.app_scope import is_local_run
 app = Flask(
     __name__
 )
-log = logging.getLogger('core')
+log = logging.getLogger('flask')
 
 ## Import and register BPs
 ################################

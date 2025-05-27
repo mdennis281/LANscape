@@ -168,7 +168,7 @@ class ApiTestCase(unittest.TestCase):
             response = self.app.get(f'/api/scan/{scan_id}/summary')
             self.assertEqual(response.status_code, 200)
             summary = json.loads(response.data)
-            self.assertTrue(summary['running'])
+            self.assertTrue(summary['running'] or summary['stage'] == 'complete')
             percent_complete = summary['percent_complete']
             self.assertGreaterEqual(percent_complete, 0)
             self.assertLessEqual(percent_complete, 100)

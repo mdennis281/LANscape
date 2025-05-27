@@ -16,10 +16,14 @@ latest = None # used to 'remember' pypi version each runtime
 def is_update_available(package=PACKAGE) -> bool:
     installed = get_installed_version(package)
     available = lookup_latest_version(package)
-    if installed == LOCAL_VERSION: return False # local
-    if 'a' in installed: return False # alpha
-    if 'b' in installed: return False # beta
 
+    is_update_exempt = (
+        'a' in installed, 'b' in installed, # pre-release
+        installed == LOCAL_VERSION
+    )
+    if any(is_update_exempt): return False
+
+    log.debug(f'Installed: {installed} | Available: {available}')
     return installed != available
 
 def lookup_latest_version(package=PACKAGE):

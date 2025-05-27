@@ -16,7 +16,7 @@ def index():
     subnet = smart_select_primary_subnet(subnets)
     
     port_list = 'medium'
-    parallelism = 0.7
+    parallelism = 1
     if scan_id := request.args.get('scan_id'): 
         if scan := scan_manager.get_scan(scan_id):
             subnet = scan.cfg.subnet

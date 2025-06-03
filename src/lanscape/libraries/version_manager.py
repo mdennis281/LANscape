@@ -1,7 +1,7 @@
 import logging 
 import requests
 import traceback
-import pkg_resources
+from importlib.metadata import version, PackageNotFoundError
 from random import randint
 
 from .app_scope import is_local_run
@@ -45,8 +45,8 @@ def lookup_latest_version(package=PACKAGE):
 def get_installed_version(package=PACKAGE):
     if not is_local_run():
         try:
-            return pkg_resources.get_distribution(package).version
-        except:
+            return version(package)
+        except PackageNotFoundError:
             log.debug(traceback.format_exc())
             log.warning(f'Cannot find {package} installation')
     return LOCAL_VERSION

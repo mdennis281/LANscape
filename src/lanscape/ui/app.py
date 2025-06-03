@@ -71,7 +71,7 @@ def exit_app():
         if args.persistent:
             log.info('Dectected browser close, not exiting flask.')
             return "Ignored"
-        log.info('Web browser closed, terminating flask.')
+        log.info('Web browser closed, terminating flask. (disable with --peristent)')
     elif req_type == 'core':
         log.info('Core requested exit, terminating flask.')
     else:

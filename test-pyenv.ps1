@@ -10,12 +10,12 @@ $testFile = Join-Path -Path $projectDir -ChildPath "test.py"
 
 # Check if pyenv is installed
 if (-not (Get-Command "pyenv" -ErrorAction SilentlyContinue)) {
-    Write-Output "⚠️ Pyenv is not installed. Please install pyenv before running this script."
+    Write-Output "⚠️  Pyenv is not installed. Please install pyenv before running this script."
     exit
 }
 
 # Get the exact installed versions
-Write-Output "⬇️ Updating pyenv"
+Write-Output "⬇️  Updating pyenv"
 pyenv update
 $installedVersions = pyenv versions --bare | ForEach-Object { $_.Trim() }
 
@@ -30,7 +30,7 @@ foreach ($version in $pythonVersions) {
         $exactVersion = $installedVersions | Where-Object { $_ -match "^$version\.\d+$" } | Sort-Object -Descending | Select-Object -First 1
     }
 
-    Write-Output "`n--- 🧪 Testing Python $exactVersion ⌛ ---"
+    Write-Output "`n--- 🧪  Testing Python $exactVersion  ⌛ ---"
     
     # Set the exact version for pyenv
     pyenv shell $exactVersion
@@ -42,7 +42,7 @@ foreach ($version in $pythonVersions) {
     & $pythonExec -m venv $venvPath
     
     if (-not (Test-Path $venvPath)) {
-        Write-Output "⚠️ Failed to create virtual environment for Python $exactVersion."
+        Write-Output "⚠️  Failed to create virtual environment for Python $exactVersion."
         exit
     }
 
@@ -54,7 +54,7 @@ foreach ($version in $pythonVersions) {
     # Validate running correct python version
     $reportedVersion = python -V
     if ($exactVersion -in $reportedVersion) {
-        Write-Output "⚠️ Failed to activate python version. '$reportedVersion' != '$exactVersion'"
+        Write-Output "⚠️  Failed to activate python version. '$reportedVersion' != '$exactVersion'"
         break
     }
     Write-Output "Validated venv version is $reportedVersion"
@@ -64,23 +64,23 @@ foreach ($version in $pythonVersions) {
         Write-Output "Installing dependencies..."
         pip install -r $requirementsFile
         if ($LASTEXITCODE -ne 0) {
-            Write-Output "⚠️ Failed to install dependencies for Python $exactVersion."
+            Write-Output "⚠️  Failed to install dependencies for Python $exactVersion."
             deactivate
             exit
         }
     } else {
-        Write-Output "⚠️ No requirements.txt found."
+        Write-Output "⚠️  No requirements.txt found."
     }
 
     # Run test.py
     Write-Output "Running test.py with Python $exactVersion..."
     python $testFile
     if ($LASTEXITCODE -eq 0) {
-        Write-Output "✅ Python $exactVersion : Test succeeded."
+        Write-Output "✅  Python $exactVersion : Test succeeded."
         # Clean up by removing the virtual environment
         Remove-Item -Recurse -Force $venvPath
     } else {
-        Write-Output "❌ Python $exactVersion : Test failed. Stopping further tests."
+        Write-Output "❌  Python $exactVersion : Test failed. Stopping further tests."
         # Deactivate and break the loop
         deactivate
         break

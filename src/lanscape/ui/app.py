@@ -100,7 +100,7 @@ def internal_error(e):
 ## Webserver creation functions
 ################################
 
-def start_webserver_dameon(args: RuntimeArgs) -> threading.Thread:
+def start_webserver_daemon(args: RuntimeArgs) -> threading.Thread:
     proc = threading.Thread(target=start_webserver, args=(args,))
     proc.daemon = True # Kill thread when main thread exits
     proc.start()

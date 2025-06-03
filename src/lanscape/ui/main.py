@@ -12,7 +12,7 @@ args = parse_args()
 configure_logging(args.loglevel, args.logfile, args.flask_logging)
 
 from ..libraries.version_manager import get_installed_version, is_update_available
-from .app import start_webserver_dameon, start_webserver
+from .app import start_webserver_daemon, start_webserver
 import socket
 
 
@@ -100,7 +100,7 @@ def start_webserver_ui(args: RuntimeArgs):
             ).start()
         start_webserver(args)
     else: 
-        flask_thread = start_webserver_dameon(args)
+        flask_thread = start_webserver_daemon(args)
         app_closed = open_browser(uri)
 
         # depending on env, open_browser may or

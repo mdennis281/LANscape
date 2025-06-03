@@ -126,7 +126,7 @@ def get_valid_port(port: int):
 def terminate():
     import requests
     log.info('Attempting flask shutdown')
-    requests.get(f'http://127.0.0.1:{args.port}/shutdown')
+    requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core')
 
 
 

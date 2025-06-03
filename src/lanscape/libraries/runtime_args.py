@@ -10,6 +10,7 @@ class RuntimeArgs:
     logfile: bool = False
     loglevel: str = 'INFO'
     flask_logging: bool = False
+    persistent: bool = False
 
 def parse_args() -> RuntimeArgs:
     parser = argparse.ArgumentParser(description='LANscape')
@@ -19,6 +20,7 @@ def parse_args() -> RuntimeArgs:
     parser.add_argument('--logfile', action='store_true', help='Log output to lanscape.log')
     parser.add_argument('--loglevel', default='INFO', help='Set the log level')
     parser.add_argument('--flask-logging', action='store_true', help='Enable flask logging (disables click output)')
+    parser.add_argument('--persistent', action='store_true', help='Don\'t exit after browser is closed')
 
     # Parse the arguments
     args = parser.parse_args()

@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from time import sleep
 import multiprocessing
 import traceback
@@ -62,11 +62,22 @@ set_global_safe('is_local',is_local_run)
 ################################
 
 exiting = False
-@app.route("/shutdown")
+@app.route("/shutdown", methods=['GET', 'POST'])
 def exit_app():
+    
+    req_type = request.args.get('type')
+    if req_type == 'browser-close':
+        args = parse_args()
+        if args.persistent:
+            log.info('Dectected browser close, not exiting flask.')
+            return "Ignored"
+        log.info('Web browser closed, terminating flask.')
+    elif req_type == 'core':
+        log.info('Core requested exit, terminating flask.')
+    else:
+        log.info('Received external exit request. Terminating flask.')
     global exiting
     exiting = True
-    log.info('Received external exit request. Terminating flask.')
     return "Done"
 
 @app.teardown_request

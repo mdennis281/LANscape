@@ -10,7 +10,8 @@ python -m lanscape
 ```
 
 ## Flags
- - `--port <port number>` port of the flask app (default: 5001)
+ - `--port <port number>` port of the flask app (default: automagic)
+ - `--persistent` dont shutdown server when browser tab is closed (default: false)
  - `--reloader` essentially flask debug mode- good for local development (default: false)
  - `--logfile` save log output to lanscape.log
  - `--loglevel <level>` set the logger's log level (default: INFO)
@@ -32,6 +33,14 @@ can sometimes require admin-level permissions to retrieve accurate results.
 
 ### Message "WARNING: No libpcap provider available ! pcap won't be used"
 This is a missing dependency related to the ARP lookup. This is handled in the code, but you would get marginally faster/better results with this installed: [npcap download](https://npcap.com/#download)
+
+### The accuracy of the devices found is low
+I use a combination of ARP and Ping to determine if a device is online. This method drops in stability when used in many threads. 
+Recommendations:
+
+  - Drop parallelism value (advanced dropdown)
+  - Use python > 3.10 im noticing threadpool improvements after this version
+  - Create a bug - I'm curious
 
 
 ### Something else

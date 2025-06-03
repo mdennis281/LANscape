@@ -319,11 +319,19 @@ class ScannerResults:
 class ScanManager:
     """
     Maintain active and completed scans in memory for 
-    future reference
+    future reference. Singleton implementation.
     """
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(ScanManager, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self):
-        self.scans: List[SubnetScanner] = []
-        self.log = logging.getLogger('ScanManager')
+        if not hasattr(self, 'scans'):  # Prevent reinitialization
+            self.scans: List[SubnetScanner] = []
+            self.log = logging.getLogger('ScanManager')
 
     def new_scan(self, config: ScanConfig) -> SubnetScanner:
         scan = SubnetScanner(config)
@@ -332,33 +340,32 @@ class ScanManager:
         self.scans.append(scan)
         return scan
 
-    def get_scan(self,scan_id:str) -> SubnetScanner:
+    def get_scan(self, scan_id: str) -> SubnetScanner:
         """
         Get scan by scan.uid
         """
         for scan in self.scans:
             if scan.uid == scan_id:
                 return scan
-            
+
     def terminate_scans(self):
         """
-        terminate all active scans
+        Terminate all active scans
         """
         for scan in self.scans:
             if scan.running:
                 scan.terminate()
 
-    def wait_until_complete(self,scan_id:str) -> SubnetScanner:
+    def wait_until_complete(self, scan_id: str) -> SubnetScanner:
         scan = self.get_scan(scan_id)
         while scan.running:
             sleep(.5)
         return scan
 
-    def _start(self,scan:SubnetScanner):
+    def _start(self, scan: SubnetScanner):
         t = threading.Thread(target=scan.start)
         t.start()
         return t
-    
 
 
     

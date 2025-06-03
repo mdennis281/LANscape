@@ -106,7 +106,7 @@ def start_webserver_ui(args: RuntimeArgs):
         # depending on env, open_browser may or
         # may not be coupled with the closure of UI
         # (if in browser tab, it's uncoupled)
-        if not app_closed:
+        if not app_closed or args.persistent:
             # not doing a direct join so i can still 
             # terminate the app with ctrl+c
             while flask_thread.is_alive():

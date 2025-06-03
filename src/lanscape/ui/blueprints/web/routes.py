@@ -23,9 +23,9 @@ def index():
             port_list = scan.cfg.port_list
             parallelism = scan.cfg.t_multiplier
             
-
-        log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
-        return redirect('/')
+        else:
+            log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
+            return redirect('/')
     return render_template(
             'main.html',
             subnet=subnet, 

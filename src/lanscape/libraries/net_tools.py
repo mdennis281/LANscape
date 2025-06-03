@@ -38,13 +38,19 @@ class IPAlive:
         for future in as_completed(futures):
             try:
                 if future.result():
-                    # one check succeeded — don’t block on the other
-                    executor.shutdown(wait=False, cancel_futures=True)
+                    # one check succeeded — don't block on the other
+                    # Cancel remaining futures in a version-compatible way
+                    for f in futures:
+                        if not f.done():
+                            f.cancel()
+                    
+                    executor.shutdown(wait=False)  # Python 3.8 compatible
                     return True
             except Exception as e:
                 # treat any error as a False response
+                log.debug(f'Error while checking {ip}: {e}')
                 self.caught_errors.append(DeviceError(e))
-                pass
+
 
         # neither check found the host alive
         executor.shutdown()

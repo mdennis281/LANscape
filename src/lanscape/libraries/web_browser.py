@@ -14,7 +14,7 @@ import webbrowser
 import logging
 import re
 import time
-import traceback
+from typing import Optional
 from ..ui.app import app
 
 log = logging.getLogger('WebBrowser')
@@ -32,9 +32,10 @@ def open_webapp(url: str) -> bool:
         exe = get_default_browser_executable()
         if not exe:
             raise RuntimeError('Unable to find browser binary')
-        
-        #this is blocking until closed
+        log.debug(f'Opening {url} with {exe}')
+
         subprocess.run(f'{exe} --app="{url}"')
+
         if time.time() - start < 2:
             log.debug(f'Unable to hook into closure of UI, listening for flask shutdown')
             return False
@@ -42,12 +43,20 @@ def open_webapp(url: str) -> bool:
         
     except Exception as e:
         log.warning('Failed to open webpage as app, falling back to browser tab')
-        log.debug(e)
-        webbrowser.open(url, new=2)
+        log.debug(f'As app error: {e}')
+        try:
+            success = webbrowser.open(url)
+            log.debug(f'Opened {url} in browser tab: {success}')
+            if not success:
+                raise RuntimeError('Unknown error while opening browser tab')
+        except Exception as e:
+            log.warning(f'Exhausted all options to open browser, you need to open manually')
+            log.debug(f'As tab error: {e}')
+            log.info(f'LANScape UI is running on {url}')
     return False
     
 
-def get_default_browser_executable() -> str | None:
+def get_default_browser_executable() -> Optional[str]:
     if sys.platform.startswith("win"):
         try:
             import winreg

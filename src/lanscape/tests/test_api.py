@@ -3,6 +3,7 @@ import json
 from ..ui.app import app
 from ..libraries.net_tools import get_network_subnet
 from ._helpers import right_size_subnet
+import time
 
 
 
@@ -143,7 +144,47 @@ class ApiTestCase(unittest.TestCase):
             self.assertIsNotNone(data.get('msg'))
             if count == -1:
                 self.assertFalse(data.get('valid'))
-            
+    
+    def test_scan_api(self):
+        """
+        Test the scan API endpoints
+        """
+        # Create a new scan
+        new_scan = {
+            'subnet': right_size_subnet(get_network_subnet()),
+            'port_list': 'small',
+            'parallelism': 1
+        }
+        response = self.app.post('/api/scan', json=new_scan)
+        self.assertEqual(response.status_code, 200)
+        scan_info = json.loads(response.data)
+        self.assertEqual(scan_info['status'], 'running')
+        scan_id = scan_info['scan_id']
+        self.assertIsNotNone(scan_id)
+
+        percent_complete = 0
+        while percent_complete < 100:
+            # Get scan summary
+            response = self.app.get(f'/api/scan/{scan_id}/summary')
+            self.assertEqual(response.status_code, 200)
+            summary = json.loads(response.data)
+            self.assertTrue(summary['running'] or summary['stage'] == 'complete')
+            percent_complete = summary['percent_complete']
+            self.assertGreaterEqual(percent_complete, 0)
+            self.assertLessEqual(percent_complete, 100)
+            # Wait for a bit before checking again
+            time.sleep(2)
+        
+        self.assertEqual(summary['running'], False)
+        self.assertEqual(summary['stage'], 'complete')
+        self.assertGreater(summary['runtime'], 0)
+
+        devices_alive = summary['devices']['alive']
+        devices_scanned = summary['devices']['scanned']
+        devices_total = summary['devices']['total']
+
+        self.assertEqual(devices_scanned, devices_total)
+        self.assertGreater(devices_alive, 0)
 
 
 

@@ -670,7 +670,9 @@ html {
 
 #scan-devices-alive, 
 #scan-devices-scanned,
-#scan-devices-total {
+#scan-devices-total,
+#scan-run-time,
+#scan-remain-time {
     margin: 3px;
 }
 

@@ -3,7 +3,7 @@ from logging.handlers import RotatingFileHandler
 import click
 
 
-def configure_logging(loglevel:str, logfile:bool):
+def configure_logging(loglevel:str, logfile:bool, flask_logging:bool=False) -> None:
     numeric_level = getattr(logging, loglevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f'Invalid log level: {loglevel}')
@@ -12,7 +12,7 @@ def configure_logging(loglevel:str, logfile:bool):
     logging.basicConfig(level=numeric_level, format='[%(name)s] %(levelname)s - %(message)s')
 
     # flask spams too much on info
-    if numeric_level > logging.DEBUG:
+    if not flask_logging:
         disable_flask_logging()
     
     if logfile:

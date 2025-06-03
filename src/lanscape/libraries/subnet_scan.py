@@ -10,7 +10,7 @@ from time import sleep
 from typing import List, Union
 from tabulate import tabulate
 from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .net_tools import Device
 from .ip_parser import parse_ip_input
@@ -57,6 +57,9 @@ class ScanConfig:
     
     def parse_subnet(self) -> List[ipaddress.IPv4Network]:
         return parse_ip_input(self.subnet)
+    
+    def __str__(self):
+        return f'ScanCfg(subnet={self.subnet}, ports={self.port_list}, multiplier={self.t_multiplier})'
 
 
 
@@ -91,7 +94,7 @@ class SubnetScanner:
         self.running = True
         with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('isalive')) as executor:
             futures = {executor.submit(self._get_host_details, str(ip)): str(ip) for ip in self.subnet}
-            for future in futures:
+            for future in as_completed(futures):
                 ip = futures[future]
                 try:
                     future.result()
@@ -183,12 +186,11 @@ class SubnetScanner:
         Get the MAC address and open ports of the given host.
         """
         device = Device(host)
-        is_alive = self._ping(device)
+        device.alive = self._ping(device)
         self.results.scanned()
-        if not is_alive:
+        if not device.alive:
             return None
         self.log.debug(f'[{host}] is alive, getting metadata')
-        
         device.get_metadata()
         self.results.devices.append(device)
         return True
@@ -290,7 +292,7 @@ class ScannerResults:
         out['devices'] = [device.dict() for device in sortedDevices]
 
         if out_type == str:
-            return json.dumps(out, indent=2)
+            return json.dumps(out,default=str, indent=2)
         # otherwise return dict
         return out
     
@@ -317,44 +319,53 @@ class ScannerResults:
 class ScanManager:
     """
     Maintain active and completed scans in memory for 
-    future reference
+    future reference. Singleton implementation.
     """
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(ScanManager, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self):
-        self.scans: List[SubnetScanner] = []
+        if not hasattr(self, 'scans'):  # Prevent reinitialization
+            self.scans: List[SubnetScanner] = []
+            self.log = logging.getLogger('ScanManager')
 
     def new_scan(self, config: ScanConfig) -> SubnetScanner:
         scan = SubnetScanner(config)
         self._start(scan)
+        self.log.info(f'Scan started - {config}')
         self.scans.append(scan)
         return scan
 
-    def get_scan(self,scan_id:str) -> SubnetScanner:
+    def get_scan(self, scan_id: str) -> SubnetScanner:
         """
         Get scan by scan.uid
         """
         for scan in self.scans:
             if scan.uid == scan_id:
                 return scan
-            
+
     def terminate_scans(self):
         """
-        terminate all active scans
+        Terminate all active scans
         """
         for scan in self.scans:
             if scan.running:
                 scan.terminate()
 
-    def wait_until_complete(self,scan_id:str) -> SubnetScanner:
+    def wait_until_complete(self, scan_id: str) -> SubnetScanner:
         scan = self.get_scan(scan_id)
         while scan.running:
             sleep(.5)
         return scan
 
-    def _start(self,scan:SubnetScanner):
+    def _start(self, scan: SubnetScanner):
         t = threading.Thread(target=scan.start)
         t.start()
         return t
-    
 
 
     

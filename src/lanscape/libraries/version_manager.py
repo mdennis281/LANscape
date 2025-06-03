@@ -1,7 +1,7 @@
 import logging 
 import requests
 import traceback
-import pkg_resources
+from importlib.metadata import version, PackageNotFoundError
 from random import randint
 
 from .app_scope import is_local_run
@@ -16,10 +16,14 @@ latest = None # used to 'remember' pypi version each runtime
 def is_update_available(package=PACKAGE) -> bool:
     installed = get_installed_version(package)
     available = lookup_latest_version(package)
-    if installed == LOCAL_VERSION: return False # local
-    if 'a' in installed: return False # alpha
-    if 'b' in installed: return False # beta
 
+    is_update_exempt = (
+        'a' in installed, 'b' in installed, # pre-release
+        installed == LOCAL_VERSION
+    )
+    if any(is_update_exempt): return False
+
+    log.debug(f'Installed: {installed} | Available: {available}')
     return installed != available
 
 def lookup_latest_version(package=PACKAGE):
@@ -41,8 +45,8 @@ def lookup_latest_version(package=PACKAGE):
 def get_installed_version(package=PACKAGE):
     if not is_local_run():
         try:
-            return pkg_resources.get_distribution(package).version
-        except:
+            return version(package)
+        except PackageNotFoundError:
             log.debug(traceback.format_exc())
             log.warning(f'Cannot find {package} installation')
     return LOCAL_VERSION

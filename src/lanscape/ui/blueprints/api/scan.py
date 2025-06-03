@@ -3,6 +3,7 @@ from ....libraries.subnet_scan import ScanConfig
 from .. import scan_manager
 
 from flask import request, jsonify
+import json
 import traceback
 
 # Subnet Scanner API
@@ -30,7 +31,8 @@ def scan_subnet_async():
 @api_bp.route('/api/scan/<scan_id>', methods=['GET'])
 def get_scan(scan_id):
     scan = scan_manager.get_scan(scan_id)
-    return jsonify(scan.results.export())
+    # cast to str and back to handle custom JSON serialization
+    return jsonify(json.loads(scan.results.export(str)))
 
 @api_bp.route('/api/scan/<scan_id>/summary',methods=['GET'])
 def get_scan_summary(scan_id):

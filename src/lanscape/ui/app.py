@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from time import sleep
 import multiprocessing
 import traceback
@@ -13,7 +13,7 @@ from ..libraries.app_scope import is_local_run
 app = Flask(
     __name__
 )
-log = logging.getLogger('core')
+log = logging.getLogger('flask')
 
 ## Import and register BPs
 ################################
@@ -62,11 +62,22 @@ set_global_safe('is_local',is_local_run)
 ################################
 
 exiting = False
-@app.route("/shutdown")
+@app.route("/shutdown", methods=['GET', 'POST'])
 def exit_app():
+    
+    req_type = request.args.get('type')
+    if req_type == 'browser-close':
+        args = parse_args()
+        if args.persistent:
+            log.info('Dectected browser close, not exiting flask.')
+            return "Ignored"
+        log.info('Web browser closed, terminating flask. (disable with --peristent)')
+    elif req_type == 'core':
+        log.info('Core requested exit, terminating flask.')
+    else:
+        log.info('Received external exit request. Terminating flask.')
     global exiting
     exiting = True
-    log.info('Received external exit request. Terminating flask.')
     return "Done"
 
 @app.teardown_request
@@ -89,12 +100,12 @@ def internal_error(e):
 ## Webserver creation functions
 ################################
 
-def start_webserver_dameon(args: RuntimeArgs) -> multiprocessing.Process:
+def start_webserver_daemon(args: RuntimeArgs) -> threading.Thread:
     proc = threading.Thread(target=start_webserver, args=(args,))
     proc.daemon = True # Kill thread when main thread exits
     proc.start()
     log.info('Flask server initializing as dameon')
-    sleep(2)
+    return proc
 
 def start_webserver(args: RuntimeArgs) -> int:
     run_args = {
@@ -103,10 +114,7 @@ def start_webserver(args: RuntimeArgs) -> int:
         'debug':args.reloader,
         'use_reloader':args.reloader
     }
-
     app.run(**run_args)
 
-if __name__ == "__main__":
-    start_webserver(True)
 
 

@@ -10,58 +10,92 @@ import subprocess
 from time import sleep
 from typing import List, Dict
 from scapy.all import ARP, Ether, srp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .service_scan import scan_service
 from .mac_lookup import lookup_mac, get_macs
 from .ip_parser import get_address_count, MAX_IPS_ALLOWED
+from .errors import DeviceError
 
 log = logging.getLogger('NetTools')
 
 
 class IPAlive:
-    
-    def is_alive(self,ip:str) -> bool:
-        try:
-            self.alive = self._arp_lookup(ip)
-        except:
-            self.log.debug('failed ARP, falling back to ping')
-            self.alive = self._ping_lookup(ip)
+    caught_errors: List[DeviceError] = []
 
-        return self.alive
+    def is_alive(self, ip: str) -> bool:
+        """
+        Run ARP and ping in parallel. As soon as one returns True, we shut
+        down the executor (without waiting) and return True. Exceptions
+        from either lookup are caught and treated as False.
+        """
+        executor = ThreadPoolExecutor(max_workers=2)
+        futures = [
+            executor.submit(self._arp_lookup,  ip),
+            executor.submit(self._ping_lookup, ip),
+        ]
 
-    def _arp_lookup(self,ip,timeout=4):
-        arp_request = ARP(pdst=ip)
-        broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-        arp_request_broadcast = broadcast / arp_request
+        for future in as_completed(futures):
+            try:
+                if future.result():
+                    # one check succeeded — don't block on the other
+                    # Cancel remaining futures in a version-compatible way
+                    for f in futures:
+                        if not f.done():
+                            f.cancel()
+                    
+                    executor.shutdown(wait=False)  # Python 3.8 compatible
+                    return True
+            except Exception as e:
+                # treat any error as a False response
+                log.debug(f'Error while checking {ip}: {e}')
+                self.caught_errors.append(DeviceError(e))
 
-        # Send the packet and receive the response
-        answered, _ = srp(arp_request_broadcast, timeout=timeout, verbose=False)
 
-        for sent, received in answered:
-            if received.psrc == ip:
-                return True
+        # neither check found the host alive
+        executor.shutdown()
         return False
 
-    def _ping_lookup(self,host, retries=1, retry_delay=1, ping_count=2, timeout=2):
-            """
-            Ping the given host and return True if it's reachable, False otherwise.
-            """
-            os = platform.system().lower()
-            if os == "windows":
-                ping_command = ['ping', '-n', str(ping_count), '-w', str(timeout*1000)]  
-            else:
-                ping_command = ['ping', '-c', str(ping_count), '-W', str(timeout)]
-                
-            for _ in range(retries):
-                try:
-                    output = subprocess.check_output(ping_command + [host], stderr=subprocess.STDOUT, universal_newlines=True)
-                    # Check if 'TTL' or 'time' is in the output to determine success
-                    if 'TTL' in output.upper():
-                        return True
-                except subprocess.CalledProcessError:
-                    pass  # Ping failed
+    def _arp_lookup(self, ip: str, timeout: int = 3) -> bool:
+        arp_request = ARP(pdst=ip)
+        broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
+        packet      = broadcast / arp_request
+
+        answered, _ = srp(packet, timeout=timeout, verbose=False)
+        return any(resp.psrc == ip for _, resp in answered)
+
+    def _ping_lookup(
+        self, host: str,
+        retries: int = 1,
+        retry_delay: int = .25,
+        ping_count: int = 2,
+        timeout: int = 2
+    ) -> bool:
+        cmd = []
+        os_name = platform.system().lower()
+        if os_name == "windows":
+            # -n count, -w timeout in ms
+            cmd = ['ping', '-n', str(ping_count), '-w', str(timeout*1000)]
+        else:
+            # -c count, -W timeout in s
+            cmd = ['ping', '-c', str(ping_count), '-W', str(timeout)]
+
+        for r in range(retries):
+            try:
+                output = subprocess.check_output(
+                    cmd + [host],
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+                # Windows/Linux both include “TTL” on a successful reply
+                if 'TTL' in output.upper():
+                    return True
+            except subprocess.CalledProcessError as e:
+                self.caught_errors.append(DeviceError(e))
+                pass
+            if r < retries - 1:
                 sleep(retry_delay)
-            return False
+        return False
     
 
 
@@ -75,6 +109,7 @@ class Device(IPAlive):
         self.ports: List[int] = []
         self.stage: str = 'found'
         self.services: Dict[str,List[int]] = {}
+        self.caught_errors: List[DeviceError] = []
         self.log = logging.getLogger('Device')
 
     def get_metadata(self):
@@ -128,7 +163,8 @@ class Device(IPAlive):
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
             return hostname
-        except socket.herror:
+        except socket.herror as e:
+            self.caught_errors.append(DeviceError(e))
             return None
         
     def _get_manufacturer(self,mac_addr=None):

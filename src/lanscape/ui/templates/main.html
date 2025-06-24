@@ -7,7 +7,17 @@
         <h1 class="title" onclick="location.reload()">
             <span>LAN</span>scape
         </h1>
-        <!-- Form -->
+        <!-- Right side: settings + form -->
+        <div class="d-flex align-items-end justify-content-end ms-auto">
+            <span
+                id="settings-btn"
+                class="material-symbols-outlined secondary-icon-btn me-2"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                title="Advanced scan settings"
+            >
+                settings
+            </span>
         <form id="scan-form" class="d-flex align-items-end">
             <div class="form-group me-2">
                 <div class="label-container">
@@ -26,16 +36,7 @@
             </div>
             <button type="submit" id="scan-submit" class="btn btn-primary mb-3">Scan</button>
         </form>
-
-        <span
-            id="settings-btn"
-            class="material-symbols-outlined secondary-icon-btn ms-2"
-            data-bs-toggle="tooltip"
-            data-bs-placement="top"
-            title="Advanced scan settings"
-        >
-            settings
-        </span>
+        </div>
     </div>
 
     <div id="scan-progress-bar"></div>
@@ -44,10 +45,10 @@
 <!-- Advanced Settings Modal -->
 <div class="modal fade" id="advancedModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-secondary">
         <h5 class="modal-title" id="advancedModalLabel">Advanced Settings</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="form-group mt-2">
@@ -64,7 +65,7 @@
             <output id="parallelism-value">{{parallelism}}</output>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer border-secondary">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>

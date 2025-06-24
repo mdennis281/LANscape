@@ -3,9 +3,9 @@
 {% block content %}
 <div id="header">
       <!-- Header and Scan Submission Inline -->
-    <div class="d-flex justify-content-between align-items-center flex-wrap">
+    <div class="d-flex justify-content-between align-items-center flex-nowrap">
         <h1 class="title" onclick="location.reload()">
-            <span>LAN</span>scape 
+            <span>LAN</span>scape
         </h1>
         <!-- Form -->
         <form id="scan-form" class="d-flex align-items-end">
@@ -26,11 +26,30 @@
             </div>
             <button type="submit" id="scan-submit" class="btn btn-primary mb-3">Scan</button>
         </form>
+
+        <span
+            id="settings-btn"
+            class="material-symbols-outlined secondary-icon-btn ms-2"
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            title="Advanced scan settings"
+        >
+            settings
+        </span>
     </div>
 
-    <!-- Advanced Section -->
-    <details onclick="rightSizeDocLayout()">
-        <summary>Advanced</summary>
+    <div id="scan-progress-bar"></div>
+</div>
+
+<!-- Advanced Settings Modal -->
+<div class="modal fade" id="advancedModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="advancedModalLabel">Advanced Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
         <div class="form-group mt-2">
             <label for="port_list">Port List:</label>
             <div class="port-list-wrapper">
@@ -38,14 +57,18 @@
                 <div id="port-list-dropdown" class="port-list-dropdown"></div>
             </div>
         </div>
-        
+
         <div class="form-group mt-2">
             <label for="parallelism">Parallelism:</label>
             <input type="range" id="parallelism" name="parallelism" min="0.25" max="3" step="0.05" value="{{parallelism}}">
             <output id="parallelism-value">{{parallelism}}</output>
         </div>
-    </details>
-    <div id="scan-progress-bar"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
 </div>
 <div id="content">
     <div class="container-fluid my-4">

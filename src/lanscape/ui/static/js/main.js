@@ -39,6 +39,10 @@ $(document).ready(function() {
         $('#ip-table-frame').attr('src', newSrc);
     });
 
+    $('#settings-btn').on('click', function() {
+        $('#advancedModal').modal('show');
+    });
+
 });
 
 function submitNewScan() {

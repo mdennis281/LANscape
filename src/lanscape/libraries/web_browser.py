@@ -29,6 +29,13 @@ def open_webapp(url: str) -> bool:
     """
     start = time.time()
     try:
+        if sys.platform.startswith("darwin"):
+            # macOS does not support chrome-style app mode via the generic
+            # method. Fallback to the system "open" command which will use the
+            # default browser.
+            subprocess.run(["open", url], check=True)
+            return True
+
         exe = get_default_browser_executable()
         if not exe:
             raise RuntimeError('Unable to find browser binary')
@@ -117,8 +124,12 @@ def get_default_browser_executable() -> Optional[str]:
                             # strip arguments like “%u”, “--flag”, etc.
                             exec_cmd = exec_cmd.split()[0]
                             exec_cmd = exec_cmd.split("%")[0]
-                            return exec_cmd
+            return exec_cmd
         return None
+
+    elif sys.platform.startswith("darwin"):
+        # macOS will use the system 'open' command to launch the default browser
+        return "/usr/bin/open"
 
     else:
         raise NotImplementedError(f"Unsupported platform: {sys.platform!r}")

@@ -347,17 +347,24 @@ def get_all_network_subnets():
 
     return subnets
 
-def smart_select_primary_subnet(subnets: List[dict]=get_all_network_subnets()) -> str:
+def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
     """
-     Finds the largest subnet within max ip range
-     not perfect, but works better than subnets[0]
+    Finds the largest subnet within max ip range. If no subnets are
+    available, returns an empty string instead of raising ``KeyError``.
     """
+    subnets = subnets or get_all_network_subnets()
+
+    if not subnets:
+        return ""
+
     selected = {}
     for subnet in subnets:
-        if selected.get('address_cnt',0) < subnet['address_cnt'] < MAX_IPS_ALLOWED:
+        if selected.get("address_cnt", 0) < subnet["address_cnt"] < MAX_IPS_ALLOWED:
             selected = subnet
-    if not selected and len(subnets):
+
+    if not selected:
         selected = subnets[0]
-    return selected['subnet']
+
+    return selected.get("subnet", "")
 
 

@@ -76,7 +76,7 @@ class IPAlive:
         if os_name == "windows":
             # -n count, -w timeout in ms
             cmd = ['ping', '-n', str(ping_count), '-w', str(timeout*1000)]
-        else:
+        else:  # Linux, macOS, and other Unix-like systems
             # -c count, -W timeout in s
             cmd = ['ping', '-c', str(ping_count), '-W', str(timeout)]
 
@@ -211,9 +211,9 @@ mac_selector = MacSelector()
 
 def get_ip_address(interface: str):
     """
-    Get the IP address of a network interface on Windows or Linux.
+    Get the IP address of a network interface on Windows, Linux, or macOS.
     """
-    def linux():
+    def unix_like():  # Combined Linux and macOS
         try:
             import fcntl
             import struct
@@ -239,17 +239,15 @@ def get_ip_address(interface: str):
     # Call the appropriate function based on the platform
     if psutil.WINDOWS:
         return windows()
-    elif psutil.LINUX:
-        return linux()
-    else:
-        return None
+    else:  # Linux, macOS, and other Unix-like systems
+        return unix_like()
 
 def get_netmask(interface: str):
     """
     Get the netmask of a network interface.
     """
     
-    def linux():
+    def unix_like():  # Combined Linux and macOS
         try:
             import fcntl
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -273,7 +271,8 @@ def get_netmask(interface: str):
     
     if psutil.WINDOWS:
         return windows()
-    return linux()
+    else:  # Linux, macOS, and other Unix-like systems
+        return unix_like()
 
 def get_cidr_from_netmask(netmask: str):
     """

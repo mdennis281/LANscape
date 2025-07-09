@@ -33,7 +33,7 @@ def lookup_latest_version(package=PACKAGE):
         no_cache = f'?cachebust={randint(0,6969)}'
         url = f"https://pypi.org/pypi/{package}/json{no_cache}"
         try:
-            response = requests.get(url)
+            response = requests.get(url,timeout=5)
             response.raise_for_status()  # Raise an exception for HTTP errors
             latest = response.json()['info']['version']
             log.debug(f'Latest pypi version: {latest}')

@@ -9,14 +9,8 @@ import traceback
 import subprocess
 from time import sleep
 from typing import List, Dict
-
-
-# Configure Scapy before importing specific modules to handle large routing tables
-from scapy.config import conf
-conf.max_list_count = 10000  # Increase from default 4096 to handle large routing tables
-
-from scapy.layers.l2 import ARP, Ether
 from scapy.sendrecv import srp
+from scapy.layers.l2 import ARP, Ether
 from scapy.error import Scapy_Exception
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

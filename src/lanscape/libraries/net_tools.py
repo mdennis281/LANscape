@@ -9,7 +9,15 @@ import traceback
 import subprocess
 from time import sleep
 from typing import List, Dict
-from scapy.all import ARP, Ether, srp
+
+
+# Configure Scapy before importing specific modules to handle large routing tables
+from scapy.config import conf
+conf.max_list_count = 10000  # Increase from default 4096 to handle large routing tables
+
+from scapy.layers.l2 import ARP, Ether
+from scapy.sendrecv import srp
+from scapy.error import Scapy_Exception
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .service_scan import scan_service
@@ -66,7 +74,7 @@ class IPAlive:
 
     def _ping_lookup(
         self, host: str,
-        retries: int = 1,
+        retries: int = 2,
         retry_delay: int = .25,
         ping_count: int = 2,
         timeout: int = 2
@@ -80,16 +88,31 @@ class IPAlive:
             # -c count, -W timeout in s
             cmd = ['ping', '-c', str(ping_count), '-W', str(timeout)]
 
+        cmd = cmd + [host]
+
         for r in range(retries):
             try:
-                output = subprocess.check_output(
-                    cmd + [host],
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
+                proc = subprocess.run(
+                    cmd,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
                 )
-                # Windows/Linux both include “TTL” on a successful reply
-                if 'TTL' in output.upper():
-                    return True
+                
+                if proc.returncode == 0:
+                    output = proc.stdout.lower()
+
+                    # Windows/Linux both include “TTL” on a successful reply
+                    if psutil.WINDOWS or psutil.LINUX:
+                        if 'ttl' in output:
+                            return True
+                    # some distributions of Linux and macOS
+                    if psutil.MACOS or psutil.LINUX:
+                        bad = '100.0% packet loss'
+                        good = 'ping statistics'
+                        # mac doesnt include TTL, so we check good is there, and bad is not
+                        if good in output and bad not in output:
+                            return True
             except subprocess.CalledProcessError as e:
                 self.caught_errors.append(DeviceError(e))
                 pass
@@ -306,25 +329,25 @@ def get_host_ip_mask(ip_with_cidr: str):
     network = ipaddress.ip_network(ip_with_cidr, strict=False)
     return f'{network.network_address}/{cidr}'
 
-def get_network_subnet(interface = get_primary_interface()):
+def get_network_subnet(interface = None):
     """
-    Get the network interface and subnet.
-    Default is primary interface
-    """ 
+    Get the network subnet for a given interface.
+    Uses network_from_snicaddr for conversion.
+    Default is primary interface.
+    """
+    interface = interface or get_primary_interface()
     try:
-        ip_address = get_ip_address(interface)
-        netmask = get_netmask(interface)
-        # is valid interface?
-        if ip_address and netmask:
-            cidr = get_cidr_from_netmask(netmask)
-
-            ip_mask = f'{ip_address}/{cidr}'
-
-            return get_host_ip_mask(ip_mask)
-    except:
+        addrs = psutil.net_if_addrs()
+        if interface in addrs:
+            for snicaddr in addrs[interface]:
+                if snicaddr.family == socket.AF_INET and snicaddr.address and snicaddr.netmask:
+                    subnet = network_from_snicaddr(snicaddr)
+                    if subnet:
+                        return subnet
+    except Exception:
         log.info(f'Unable to parse subnet for interface: {interface}')
         log.debug(traceback.format_exc())
-    return
+    return None
 
 def get_all_network_subnets():
     """
@@ -337,7 +360,9 @@ def get_all_network_subnets():
     for interface, snicaddrs in addrs.items():
         for snicaddr in snicaddrs:
             if snicaddr.family == socket.AF_INET and gateways[interface].isup:
-                subnet = get_network_subnet(interface)
+
+                subnet = network_from_snicaddr(snicaddr)
+
                 if subnet: 
                     subnets.append({ 
                         'subnet': subnet, 
@@ -345,6 +370,20 @@ def get_all_network_subnets():
                     })
 
     return subnets
+
+def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
+    """
+    Convert a psutil snicaddr object to a human-readable string.
+    """
+    if not snicaddr.address or not snicaddr.netmask:
+        return None
+    elif snicaddr.family == socket.AF_INET:
+        addr = f"{snicaddr.address}/{get_cidr_from_netmask(snicaddr.netmask)}"
+    elif snicaddr.family == socket.AF_INET6:
+        addr = f"{snicaddr.address}/{snicaddr.netmask}"
+    else:
+        return f"{snicaddr.address}"
+    return get_host_ip_mask(addr)
 
 def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
     """
@@ -365,5 +404,19 @@ def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
         selected = subnets[0]
 
     return selected.get("subnet", "")
+
+def is_arp_supported():
+    """
+    Check if ARP requests are supported on the current platform.
+    """
+    try:
+        arp_request = ARP(pdst='0.0.0.0')
+        broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
+        packet      = broadcast / arp_request
+
+        srp(packet, timeout=0, verbose=False)
+        return True
+    except Scapy_Exception:
+        return False
 
 

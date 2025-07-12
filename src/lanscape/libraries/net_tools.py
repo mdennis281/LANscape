@@ -443,7 +443,6 @@ def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
         
     # First priority: Get subnet for the primary interface
     primary_if = get_primary_interface()
-    print(f"Primary interface: {primary_if}")
     if primary_if:
         primary_subnet = get_network_subnet(primary_if)
         if primary_subnet:

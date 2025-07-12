@@ -56,7 +56,7 @@ body:has(.submodule) footer {
     background-color: var(--primary-bg);
     border-radius: 8px;
     box-shadow: 0 0 10px var(--box-shadow);
-    width: 90%;
+    width: 95%;
     margin-top: 10px;
     overflow: hidden; 
 }

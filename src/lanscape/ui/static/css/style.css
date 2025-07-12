@@ -11,6 +11,8 @@
     --danger-accent: #ff5252; /* Bright red for warnings */
     --danger-accent-hover: #e64545;
 
+    --danger-accent-transparent: rgba(255, 82, 82, 0.3);/* Light red for subtle danger indication */
+
     --warning-accent: #cc8801; /* Vibrant amber for warnings */
     --warning-accent-hover: #d08802;
 
@@ -54,8 +56,9 @@ body:has(.submodule) footer {
     background-color: var(--primary-bg);
     border-radius: 8px;
     box-shadow: 0 0 10px var(--box-shadow);
-    width: 90%;
+    width: 95%;
     margin-top: 10px;
+    overflow: hidden; 
 }
 
 #header {
@@ -255,18 +258,7 @@ details {
 
 
 
-@media screen and (max-width: 681px) {
-    #power-button {
-        left: auto;
-        right: 0;
-        border-width: 0 0 1px 1px;
-        border-radius: 0 0 0 5px;
-    }
-    .container-fluid {
-        width:98%;
-        padding: 8px;
-    }
-}
+
 
 /* Card Styles */
 .card {
@@ -692,7 +684,36 @@ html {
     background-color: var(--warning-accent);
 }
 
-/* width of iFrame, not page */
+#arp-error {
+    width: calc(100% + 40px);
+    position: relative;
+    display: flex;
+    justify-content: center;
+    background-color: var(--danger-accent-transparent);
+    color: var(--text-color);
+    transform: translate3d(-20px, -20px, 0);
+    font-size: small;
+}
+#arp-error span {
+    text-align: center;
+}
+
+@media screen and (max-width: 681px) {
+    #power-button {
+        left: auto;
+        right: 0;
+        border-width: 0 0 1px 1px;
+        border-radius: 0 0 0 5px;
+    }
+    .container-fluid {
+        width:98%;
+        padding: 8px;
+    }
+    #arp-error {
+        width: calc(100% + 16px);
+        transform: translate3d(-8px, -8px, 0);
+    }
+}
 
 @media screen and (max-width: 885px) {
     #overview-container .col-4 {

@@ -7,6 +7,7 @@ import os
 from ..libraries.logger import configure_logging
 from ..libraries.runtime_args import parse_args, RuntimeArgs
 from ..libraries.web_browser import open_webapp
+from ..libraries.net_tools import is_arp_supported
 # do this so any logs generated on import are displayed
 args = parse_args()
 configure_logging(args.loglevel, args.logfile, args.flask_logging)
@@ -43,8 +44,10 @@ def _main():
         log.info('Flask reloaded app.')
         
     args.port = get_valid_port(args.port)
-        
-        
+
+    if not is_arp_supported():
+        log.warning('ARP is not supported, device discovery is degraded. For more information, see the help guide: https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md')
+
     try:
         start_webserver_ui(args)
         log.info('Exiting...')

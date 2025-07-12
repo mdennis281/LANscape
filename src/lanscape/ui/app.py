@@ -9,6 +9,7 @@ import os
 from ..libraries.runtime_args import RuntimeArgs, parse_args
 from ..libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
 from ..libraries.app_scope import is_local_run
+from ..libraries.net_tools import is_arp_supported
 
 app = Flask(
     __name__
@@ -57,6 +58,7 @@ set_global_safe('update_available', is_update_available)
 set_global_safe('latest_version',lookup_latest_version)
 set_global_safe('runtime_args', vars(parse_args()))
 set_global_safe('is_local',is_local_run)
+set_global_safe('is_arp_supported', is_arp_supported)
 
 ## External hook to kill flask server
 ################################

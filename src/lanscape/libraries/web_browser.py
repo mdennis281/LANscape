@@ -34,7 +34,8 @@ def open_webapp(url: str) -> bool:
             raise RuntimeError('Unable to find browser binary')
         log.debug(f'Opening {url} with {exe}')
 
-        subprocess.run(f'{exe} --app="{url}"')
+        cmd = f'"{exe}" --app="{url}"'
+        subprocess.run(cmd, check=True, shell=True)
 
         if time.time() - start < 2:
             log.debug(f'Unable to hook into closure of UI, listening for flask shutdown')
@@ -117,8 +118,24 @@ def get_default_browser_executable() -> Optional[str]:
                             # strip arguments like “%u”, “--flag”, etc.
                             exec_cmd = exec_cmd.split()[0]
                             exec_cmd = exec_cmd.split("%")[0]
-                            return exec_cmd
+            return exec_cmd
         return None
+
+    elif sys.platform.startswith("darwin"):
+        # macOS: try to find Chrome first for app mode support, fallback to default
+        try:
+            p = subprocess.run(
+                ["mdfind", "kMDItemCFBundleIdentifier == 'com.google.Chrome'"],
+                capture_output=True, text=True, check=True
+            )
+            chrome_paths = p.stdout.strip().split('\n')
+            if chrome_paths and chrome_paths[0]:
+                return f"{chrome_paths[0]}/Contents/MacOS/Google Chrome"
+        except subprocess.CalledProcessError:
+            pass
+        
+        # Fallback to system default
+        return "/usr/bin/open"
 
     else:
         raise NotImplementedError(f"Unsupported platform: {sys.platform!r}")

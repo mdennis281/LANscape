@@ -9,7 +9,9 @@ import traceback
 import subprocess
 from time import sleep
 from typing import List, Dict
-from scapy.all import ARP, Ether, srp
+from scapy.sendrecv import srp
+from scapy.layers.l2 import ARP, Ether
+from scapy.error import Scapy_Exception
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .service_scan import scan_service
@@ -66,7 +68,7 @@ class IPAlive:
 
     def _ping_lookup(
         self, host: str,
-        retries: int = 1,
+        retries: int = 2,
         retry_delay: int = .25,
         ping_count: int = 2,
         timeout: int = 2
@@ -76,20 +78,35 @@ class IPAlive:
         if os_name == "windows":
             # -n count, -w timeout in ms
             cmd = ['ping', '-n', str(ping_count), '-w', str(timeout*1000)]
-        else:
+        else:  # Linux, macOS, and other Unix-like systems
             # -c count, -W timeout in s
             cmd = ['ping', '-c', str(ping_count), '-W', str(timeout)]
 
+        cmd = cmd + [host]
+
         for r in range(retries):
             try:
-                output = subprocess.check_output(
-                    cmd + [host],
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
+                proc = subprocess.run(
+                    cmd,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
                 )
-                # Windows/Linux both include “TTL” on a successful reply
-                if 'TTL' in output.upper():
-                    return True
+                
+                if proc.returncode == 0:
+                    output = proc.stdout.lower()
+
+                    # Windows/Linux both include “TTL” on a successful reply
+                    if psutil.WINDOWS or psutil.LINUX:
+                        if 'ttl' in output:
+                            return True
+                    # some distributions of Linux and macOS
+                    if psutil.MACOS or psutil.LINUX:
+                        bad = '100.0% packet loss'
+                        good = 'ping statistics'
+                        # mac doesnt include TTL, so we check good is there, and bad is not
+                        if good in output and bad not in output:
+                            return True
             except subprocess.CalledProcessError as e:
                 self.caught_errors.append(DeviceError(e))
                 pass
@@ -211,9 +228,9 @@ mac_selector = MacSelector()
 
 def get_ip_address(interface: str):
     """
-    Get the IP address of a network interface on Windows or Linux.
+    Get the IP address of a network interface on Windows, Linux, or macOS.
     """
-    def linux():
+    def unix_like():  # Combined Linux and macOS
         try:
             import fcntl
             import struct
@@ -239,17 +256,15 @@ def get_ip_address(interface: str):
     # Call the appropriate function based on the platform
     if psutil.WINDOWS:
         return windows()
-    elif psutil.LINUX:
-        return linux()
-    else:
-        return None
+    else:  # Linux, macOS, and other Unix-like systems
+        return unix_like()
 
 def get_netmask(interface: str):
     """
     Get the netmask of a network interface.
     """
     
-    def linux():
+    def unix_like():  # Combined Linux and macOS
         try:
             import fcntl
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -273,7 +288,8 @@ def get_netmask(interface: str):
     
     if psutil.WINDOWS:
         return windows()
-    return linux()
+    else:  # Linux, macOS, and other Unix-like systems
+        return unix_like()
 
 def get_cidr_from_netmask(netmask: str):
     """
@@ -284,20 +300,65 @@ def get_cidr_from_netmask(netmask: str):
 
 def get_primary_interface():
     """
-    Get the primary network interface based on the default gateway.
+    Get the primary network interface that is likely handling internet traffic.
+    Uses heuristics to identify the most probable interface.
     """
-    # Get the default gateway information
-    gateways = psutil.net_if_addrs()
-    default_gw = psutil.net_if_stats()
-
-    # Iterate over the default gateways
-    for interface, addrs in gateways.items():
-        if default_gw[interface].isup:  # Ensure the interface is up
-            for addr in addrs:
-                if addr.family == socket.AF_INET:  # Look for IPv4 addresses
-                    return interface
-
-    return None
+    # Try to find the interface with the default gateway
+    try:
+        if psutil.WINDOWS:
+            # On Windows, parse route print output
+            output = subprocess.check_output("route print 0.0.0.0", shell=True, text=True)
+            lines = output.strip().split('\n')
+            for line in lines:
+                if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
+                    parts = [p for p in line.split() if p]
+                    if len(parts) >= 4:
+                        interface_idx = parts[3]
+                        # Find interface name in the output
+                        for iface_name, addrs in psutil.net_if_addrs().items():
+                            if str(interface_idx) in iface_name:
+                                return iface_name
+        else:
+            # Linux/Unix/Mac - use ip route or netstat
+            try:
+                output = subprocess.check_output("ip route show default 2>/dev/null || netstat -rn | grep default", 
+                                               shell=True, text=True)
+                for line in output.split('\n'):
+                    if 'default via' in line and 'dev' in line:
+                        return line.split('dev')[1].split()[0]
+                    elif 'default' in line:
+                        parts = line.split()
+                        if len(parts) > 3:
+                            return parts[-1]  # Interface is usually the last column
+            except (subprocess.SubprocessError, IndexError, FileNotFoundError):
+                pass
+    except Exception as e:
+        log.debug(f"Error determining primary interface: {e}")
+    
+    # Fallback: Identify likely candidates based on heuristics
+    candidates = []
+    
+    for interface, addrs in psutil.net_if_addrs().items():
+        stats = psutil.net_if_stats().get(interface)
+        if stats and stats.isup:
+            ipv4_addrs = [addr for addr in addrs if addr.family == socket.AF_INET]
+            if ipv4_addrs:
+                # Skip loopback and common virtual interfaces
+                is_loopback = any(addr.address.startswith('127.') for addr in ipv4_addrs)
+                is_virtual = any(name in interface.lower() for name in 
+                                ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth'])
+                
+                if not is_loopback and not is_virtual:
+                    candidates.append(interface)
+    
+    # Prioritize interfaces with names typically used for physical connections
+    for prefix in ['eth', 'en', 'wlan', 'wifi', 'wl', 'wi']:
+        for interface in candidates:
+            if interface.lower().startswith(prefix):
+                return interface
+    
+    # Otherwise return the first candidate or None
+    return candidates[0] if candidates else None
 
 def get_host_ip_mask(ip_with_cidr: str):
     """
@@ -307,25 +368,26 @@ def get_host_ip_mask(ip_with_cidr: str):
     network = ipaddress.ip_network(ip_with_cidr, strict=False)
     return f'{network.network_address}/{cidr}'
 
-def get_network_subnet(interface = get_primary_interface()):
+def get_network_subnet(interface = None):
     """
-    Get the network interface and subnet.
-    Default is primary interface
-    """ 
+    Get the network subnet for a given interface.
+    Uses network_from_snicaddr for conversion.
+    Default is primary interface.
+    """
+    interface = interface or get_primary_interface()
+    
     try:
-        ip_address = get_ip_address(interface)
-        netmask = get_netmask(interface)
-        # is valid interface?
-        if ip_address and netmask:
-            cidr = get_cidr_from_netmask(netmask)
-
-            ip_mask = f'{ip_address}/{cidr}'
-
-            return get_host_ip_mask(ip_mask)
-    except:
+        addrs = psutil.net_if_addrs()
+        if interface in addrs:
+            for snicaddr in addrs[interface]:
+                if snicaddr.family == socket.AF_INET and snicaddr.address and snicaddr.netmask:
+                    subnet = network_from_snicaddr(snicaddr)
+                    if subnet:
+                        return subnet
+    except Exception:
         log.info(f'Unable to parse subnet for interface: {interface}')
         log.debug(traceback.format_exc())
-    return
+    return None
 
 def get_all_network_subnets():
     """
@@ -338,7 +400,9 @@ def get_all_network_subnets():
     for interface, snicaddrs in addrs.items():
         for snicaddr in snicaddrs:
             if snicaddr.family == socket.AF_INET and gateways[interface].isup:
-                subnet = get_network_subnet(interface)
+
+                subnet = network_from_snicaddr(snicaddr)
+
                 if subnet: 
                     subnets.append({ 
                         'subnet': subnet, 
@@ -347,17 +411,70 @@ def get_all_network_subnets():
 
     return subnets
 
-def smart_select_primary_subnet(subnets: List[dict]=get_all_network_subnets()) -> str:
+def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
     """
-     Finds the largest subnet within max ip range
-     not perfect, but works better than subnets[0]
+    Convert a psutil snicaddr object to a human-readable string.
     """
+    if not snicaddr.address or not snicaddr.netmask:
+        return None
+    elif snicaddr.family == socket.AF_INET:
+        addr = f"{snicaddr.address}/{get_cidr_from_netmask(snicaddr.netmask)}"
+    elif snicaddr.family == socket.AF_INET6:
+        addr = f"{snicaddr.address}/{snicaddr.netmask}"
+    else:
+        return f"{snicaddr.address}"
+    return get_host_ip_mask(addr)
+
+def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
+    """
+    Intelligently select the primary subnet that is most likely handling internet traffic.
+    
+    Selection priority:
+    1. Subnet associated with the primary interface (with default gateway)
+    2. Largest subnet within maximum allowed IP range
+    3. First subnet in the list as fallback
+    
+    Returns an empty string if no subnets are available.
+    """
+    subnets = subnets or get_all_network_subnets()
+
+    if not subnets:
+        return ""
+        
+    # First priority: Get subnet for the primary interface
+    primary_if = get_primary_interface()
+    if primary_if:
+        primary_subnet = get_network_subnet(primary_if)
+        if primary_subnet:
+            # Return this subnet if it's within our list
+            for subnet in subnets:
+                if subnet["subnet"] == primary_subnet:
+                    return primary_subnet
+
+    # Second priority: Find a reasonable sized subnet (existing logic)
     selected = {}
     for subnet in subnets:
-        if selected.get('address_cnt',0) < subnet['address_cnt'] < MAX_IPS_ALLOWED:
+        if selected.get("address_cnt", 0) < subnet["address_cnt"] < MAX_IPS_ALLOWED:
             selected = subnet
-    if not selected and len(subnets):
+
+    # Third priority: Just take the first subnet if nothing else matched
+    if not selected and subnets:
         selected = subnets[0]
-    return selected['subnet']
+
+    return selected.get("subnet", "")
+
+def is_arp_supported():
+    """
+    Check if ARP requests are supported on the current platform.
+    """
+    try:
+        arp_request = ARP(pdst='0.0.0.0')
+        broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
+        packet      = broadcast / arp_request
+
+        srp(packet, timeout=0, verbose=False)
+        return True
+    except Scapy_Exception:
+        return False
 
 

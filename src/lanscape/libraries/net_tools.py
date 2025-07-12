@@ -300,20 +300,65 @@ def get_cidr_from_netmask(netmask: str):
 
 def get_primary_interface():
     """
-    Get the primary network interface based on the default gateway.
+    Get the primary network interface that is likely handling internet traffic.
+    Uses heuristics to identify the most probable interface.
     """
-    # Get the default gateway information
-    gateways = psutil.net_if_addrs()
-    default_gw = psutil.net_if_stats()
-
-    # Iterate over the default gateways
-    for interface, addrs in gateways.items():
-        if default_gw[interface].isup:  # Ensure the interface is up
-            for addr in addrs:
-                if addr.family == socket.AF_INET:  # Look for IPv4 addresses
-                    return interface
-
-    return None
+    # Try to find the interface with the default gateway
+    try:
+        if psutil.WINDOWS:
+            # On Windows, parse route print output
+            output = subprocess.check_output("route print 0.0.0.0", shell=True, text=True)
+            lines = output.strip().split('\n')
+            for line in lines:
+                if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
+                    parts = [p for p in line.split() if p]
+                    if len(parts) >= 4:
+                        interface_idx = parts[3]
+                        # Find interface name in the output
+                        for iface_name, addrs in psutil.net_if_addrs().items():
+                            if str(interface_idx) in iface_name:
+                                return iface_name
+        else:
+            # Linux/Unix/Mac - use ip route or netstat
+            try:
+                output = subprocess.check_output("ip route show default 2>/dev/null || netstat -rn | grep default", 
+                                               shell=True, text=True)
+                for line in output.split('\n'):
+                    if 'default via' in line and 'dev' in line:
+                        return line.split('dev')[1].split()[0]
+                    elif 'default' in line:
+                        parts = line.split()
+                        if len(parts) > 3:
+                            return parts[-1]  # Interface is usually the last column
+            except (subprocess.SubprocessError, IndexError, FileNotFoundError):
+                pass
+    except Exception as e:
+        log.debug(f"Error determining primary interface: {e}")
+    
+    # Fallback: Identify likely candidates based on heuristics
+    candidates = []
+    
+    for interface, addrs in psutil.net_if_addrs().items():
+        stats = psutil.net_if_stats().get(interface)
+        if stats and stats.isup:
+            ipv4_addrs = [addr for addr in addrs if addr.family == socket.AF_INET]
+            if ipv4_addrs:
+                # Skip loopback and common virtual interfaces
+                is_loopback = any(addr.address.startswith('127.') for addr in ipv4_addrs)
+                is_virtual = any(name in interface.lower() for name in 
+                                ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth'])
+                
+                if not is_loopback and not is_virtual:
+                    candidates.append(interface)
+    
+    # Prioritize interfaces with names typically used for physical connections
+    for prefix in ['eth', 'en', 'wlan', 'wifi', 'wl', 'wi']:
+        for interface in candidates:
+            if interface.lower().startswith(prefix):
+                return interface
+    
+    # Otherwise return the first candidate or None
+    return candidates[0] if candidates else None
 
 def get_host_ip_mask(ip_with_cidr: str):
     """
@@ -330,6 +375,7 @@ def get_network_subnet(interface = None):
     Default is primary interface.
     """
     interface = interface or get_primary_interface()
+    
     try:
         addrs = psutil.net_if_addrs()
         if interface in addrs:
@@ -381,20 +427,39 @@ def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
 
 def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
     """
-    Finds the largest subnet within max ip range. If no subnets are
-    available, returns an empty string instead of raising ``KeyError``.
+    Intelligently select the primary subnet that is most likely handling internet traffic.
+    
+    Selection priority:
+    1. Subnet associated with the primary interface (with default gateway)
+    2. Largest subnet within maximum allowed IP range
+    3. First subnet in the list as fallback
+    
+    Returns an empty string if no subnets are available.
     """
     subnets = subnets or get_all_network_subnets()
 
     if not subnets:
         return ""
+        
+    # First priority: Get subnet for the primary interface
+    primary_if = get_primary_interface()
+    print(f"Primary interface: {primary_if}")
+    if primary_if:
+        primary_subnet = get_network_subnet(primary_if)
+        if primary_subnet:
+            # Return this subnet if it's within our list
+            for subnet in subnets:
+                if subnet["subnet"] == primary_subnet:
+                    return primary_subnet
 
+    # Second priority: Find a reasonable sized subnet (existing logic)
     selected = {}
     for subnet in subnets:
         if selected.get("address_cnt", 0) < subnet["address_cnt"] < MAX_IPS_ALLOWED:
             selected = subnet
 
-    if not selected:
+    # Third priority: Just take the first subnet if nothing else matched
+    if not selected and subnets:
         selected = subnets[0]
 
     return selected.get("subnet", "")

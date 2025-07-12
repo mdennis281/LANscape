@@ -46,8 +46,7 @@ def _main():
     args.port = get_valid_port(args.port)
 
     if not is_arp_supported():
-        log.warning('ARP is not supported, device discovery is degraded.')
-        log.warning('Help guide: https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md')
+        log.warning('ARP is not supported, device discovery is degraded. For more information, see the help guide: https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md')
 
     try:
         start_webserver_ui(args)

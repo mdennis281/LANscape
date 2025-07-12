@@ -6,7 +6,7 @@ While tools like `ping` can be used to check if a device is reachable on the net
 
 
 ## Getting it working (Mac/Linux)
-Unfortunately the only known solution to get python Scapy (ARP lookup library) working on unix machines is to run the program as root. If you arent comfortable with this, there is a ping mechanism used as a backup in the code that will be invoked on a failed ARP lookup.
+Unfortunately the only known solution to get python Scapy (ARP lookup library) working on unix machines is to run the program as root. If you aren't comfortable with this, there is a ping mechanism used as a backup in the code that will be invoked on a failed ARP lookup.
 
 ## Getting it working (Windows)
 Windows doesn't need any special elevation, but it does need a dependency installed on your computer

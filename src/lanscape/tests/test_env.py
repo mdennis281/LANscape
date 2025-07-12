@@ -2,6 +2,7 @@ import unittest
 
 from ..libraries.version_manager import lookup_latest_version 
 from ..libraries.app_scope import ResourceManager, is_local_run
+from ..libraries.net_tools import is_arp_supported
 
 
 
@@ -20,5 +21,10 @@ class EnvTestCase(unittest.TestCase):
     def test_local_version(self):
         self.assertTrue(is_local_run())
         
+    def test_arp_support(self):
+        arp_supported = is_arp_supported()
+        self.assertIn(arp_supported, [True, False],
+            f"ARP support should be either True or False, not {arp_supported}"
+        )
         
 

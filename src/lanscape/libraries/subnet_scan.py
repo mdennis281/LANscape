@@ -12,7 +12,7 @@ from tabulate import tabulate
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from .net_tools import Device
+from .net_tools import Device, is_arp_supported
 from .ip_parser import parse_ip_input
 from .port_manager import PortManager
 from.errors import SubnetScanTerminationFailure
@@ -80,6 +80,8 @@ class SubnetScanner:
         self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
+        if not is_arp_supported():
+            self.log.warning('ARP is not supported with the active runtime context. Device discovery will be limited to ping responses.')
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
 

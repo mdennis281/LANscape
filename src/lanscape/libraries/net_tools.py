@@ -12,107 +12,117 @@ from typing import List, Dict
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
 from scapy.error import Scapy_Exception
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .service_scan import scan_service
-from .mac_lookup import lookup_mac, get_macs
+from .mac_lookup import MacLookup, get_macs
 from .ip_parser import get_address_count, MAX_IPS_ALLOWED
 from .errors import DeviceError
+from .decorators import job_tracker, JobStatsMixin, timeout_enforcer
+from .scan_config import ScanType, PingConfig, ArpConfig
+
 
 log = logging.getLogger('NetTools')
 
 
-class IPAlive:
+
+
+class IPAlive(JobStatsMixin):
     caught_errors: List[DeviceError] = []
 
-    def is_alive(self, ip: str) -> bool:
+    @job_tracker
+    def is_alive(
+        self, 
+        ip: str, 
+        scan_type: ScanType = ScanType.BOTH,
+        arp_config: ArpConfig = ArpConfig(),
+        ping_config: PingConfig = PingConfig()
+    ) -> bool:
         """
-        Run ARP and ping in parallel. As soon as one returns True, we shut
-        down the executor (without waiting) and return True. Exceptions
-        from either lookup are caught and treated as False.
+        Check if a device is alive by performing ARP and/or ping scans.
         """
-        executor = ThreadPoolExecutor(max_workers=2)
-        futures = [
-            executor.submit(self._arp_lookup,  ip),
-            executor.submit(self._ping_lookup, ip),
-        ]
+        if scan_type == ScanType.ARP:
+            return self._arp_lookup(ip, arp_config)
+        elif scan_type == ScanType.PING:
+            return self._ping_lookup(ip, ping_config)
+        else:  # ScanType.BOTH
+            return self._arp_lookup(ip, arp_config) or self._ping_lookup(ip, ping_config)
 
-        for future in as_completed(futures):
-            try:
-                if future.result():
-                    # one check succeeded — don't block on the other
-                    # Cancel remaining futures in a version-compatible way
-                    for f in futures:
-                        if not f.done():
-                            f.cancel()
-                    
-                    executor.shutdown(wait=False)  # Python 3.8 compatible
-                    return True
-            except Exception as e:
-                # treat any error as a False response
-                log.debug(f'Error while checking {ip}: {e}')
-                self.caught_errors.append(DeviceError(e))
+    
+    @job_tracker
+    def _arp_lookup(
+            self, ip: str, 
+            cfg: ArpConfig = ArpConfig()
+    ) -> bool:
+        
+        enforcer_timeout = cfg.timeout * 1.3
+        @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
+        def do_arp_lookup():
+            arp_request = ARP(pdst=ip)
+            broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
+            packet      = broadcast / arp_request
 
+            answered, _ = srp(packet, timeout=cfg.timeout, verbose=False)
+            self._arp_alive = any(resp.psrc == ip for _, resp in answered)
+            return self._arp_alive
+        
 
-        # neither check found the host alive
-        executor.shutdown()
+        try:
+            for _ in range(cfg.attempts):
+                do_arp_lookup()
+        except Exception as e:
+            self.caught_errors.append(DeviceError(e))
         return False
 
-    def _arp_lookup(self, ip: str, timeout: int = 3) -> bool:
-        arp_request = ARP(pdst=ip)
-        broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
-        packet      = broadcast / arp_request
-
-        answered, _ = srp(packet, timeout=timeout, verbose=False)
-        return any(resp.psrc == ip for _, resp in answered)
-
+    @job_tracker
     def _ping_lookup(
         self, host: str,
-        retries: int = 2,
-        retry_delay: int = .25,
-        ping_count: int = 2,
-        timeout: int = 2
+        cfg: PingConfig = PingConfig()
     ) -> bool:
+
+        enforcer_timeout = cfg.timeout * cfg.ping_count * 1.3
+        @timeout_enforcer(enforcer_timeout, raise_on_timeout=False)
+        def execute_ping(cmd: List[str]) -> subprocess.CompletedProcess:
+            return subprocess.run(
+                cmd, 
+                text=True, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                check=False
+            )
+
         cmd = []
         os_name = platform.system().lower()
         if os_name == "windows":
-            # -n count, -w timeout in ms
-            cmd = ['ping', '-n', str(ping_count), '-w', str(timeout*1000)]
-        else:  # Linux, macOS, and other Unix-like systems
-            # -c count, -W timeout in s
-            cmd = ['ping', '-c', str(ping_count), '-W', str(timeout)]
+            cmd = ['ping', '-n', str(cfg.ping_count), '-w', str(cfg.timeout*1000)]
+        else:
+            cmd = ['ping', '-c', str(cfg.ping_count), '-W', str(cfg.timeout)]
 
         cmd = cmd + [host]
 
-        for r in range(retries):
+        for r in range(cfg.attempts):
             try:
-                proc = subprocess.run(
-                    cmd,
-                    text=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+                proc = execute_ping(cmd)
                 
-                if proc.returncode == 0:
+                if proc and proc.returncode == 0:
                     output = proc.stdout.lower()
 
-                    # Windows/Linux both include “TTL” on a successful reply
                     if psutil.WINDOWS or psutil.LINUX:
                         if 'ttl' in output:
-                            return True
-                    # some distributions of Linux and macOS
+                            self._ping_alive = True
+                            return self._ping_alive
                     if psutil.MACOS or psutil.LINUX:
                         bad = '100.0% packet loss'
                         good = 'ping statistics'
-                        # mac doesnt include TTL, so we check good is there, and bad is not
                         if good in output and bad not in output:
-                            return True
-            except subprocess.CalledProcessError as e:
+                            self._ping_alive = True
+                            return self._ping_alive
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 self.caught_errors.append(DeviceError(e))
                 pass
-            if r < retries - 1:
-                sleep(retry_delay)
-        return False
+            if r < cfg.attempts - 1:
+                sleep(cfg.retry_delay)
+        self._ping_alive = False
+        return self._ping_alive
     
 
 
@@ -128,6 +138,7 @@ class Device(IPAlive):
         self.services: Dict[str,List[int]] = {}
         self.caught_errors: List[DeviceError] = []
         self.log = logging.getLogger('Device')
+        self._mac_lookup = MacLookup()
 
     def get_metadata(self):
         if self.alive:
@@ -137,6 +148,7 @@ class Device(IPAlive):
     def dict(self) -> dict:
         obj = vars(self).copy()
         obj.pop('log')
+        obj.pop('job_stats', None)  # Remove job_stats if it exists
         primary_mac = self.get_mac()
         obj['mac_addr'] = primary_mac
         obj['manufacturer'] = self._get_manufacturer(primary_mac)
@@ -154,6 +166,7 @@ class Device(IPAlive):
             return True
         return False
     
+    @job_tracker
     def scan_service(self,port:int):
         service = scan_service(self.ip,port)
         service_ports = self.services.get(service,[])
@@ -162,17 +175,19 @@ class Device(IPAlive):
     
     def get_mac(self):
         if not self.macs:
-            self.macs = self._get_mac_addresses()
+            return ''
         return mac_selector.choose_mac(self.macs)
 
+    @job_tracker
     def _get_mac_addresses(self):
         """
-        Get the MAC address of a network device given its IP address.
+        Get the possible MAC addresses of a network device given its IP address.
         """
         macs = get_macs(self.ip)
         mac_selector.import_macs(macs)
         return macs
         
+    @job_tracker
     def _get_hostname(self):
         """
         Get the hostname of a network device given its IP address.
@@ -183,12 +198,13 @@ class Device(IPAlive):
         except socket.herror as e:
             self.caught_errors.append(DeviceError(e))
             return None
-        
+    
+    @job_tracker
     def _get_manufacturer(self,mac_addr=None):
         """
         Get the manufacturer of a network device given its MAC address.
         """
-        return lookup_mac(mac_addr) if mac_addr else None
+        return self._mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
     
 
 class MacSelector:
@@ -204,11 +220,14 @@ class MacSelector:
         self.macs = {}
     
     def choose_mac(self,macs:List[str]) -> str:
+        """
+        Choose the most appropriate MAC address from a list.
+        The mac address that has been seen the least is returned.
+        """
         if len(macs) == 1:
             return macs[0]
         lowest = 9999
         lowest_i = -1
-
         for mac in macs:
             if self.macs[mac] < lowest:
                 lowest = self.macs[mac]
@@ -217,6 +236,9 @@ class MacSelector:
 
     
     def import_macs(self,macs:List[str]):
+        """
+        Import a list of MAC addresses associated with a device.
+        """
         for mac in macs:
             self.macs[mac] = self.macs.get(mac,0) + 1
     

@@ -9,62 +9,15 @@ from time import time
 from time import sleep
 from typing import List, Union
 from tabulate import tabulate
-from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .net_tools import Device, is_arp_supported
-from .ip_parser import parse_ip_input
-from .port_manager import PortManager
 from.errors import SubnetScanTerminationFailure
-from .decorators import job_tracker, JobStats, terminator
+from .decorators import job_tracker, terminator, JobStatsMixin
+from .scan_config import ScanConfig
 
 
-TCNT_PORT_SCANS = 10
-TCNT_PORT_TEST = 128
-TCNT_DEVICE_ISALIVE = 256
-
-@dataclass
-class ScanConfig:
-    subnet: str
-    port_list: str
-    t_multiplier: float = 1.0
-    t_cnt_port_scan: int = 10
-    t_cnt_port_test: int = 128
-    t_cnt_isalive: int = 256
-
-    task_scan_ports: bool = True
-    # below wont run if above false
-    task_scan_port_services: bool = False # disabling until more stable
-
-    def t_cnt(self, id: str) -> int:
-        return int(int(getattr(self, f't_cnt_{id}')) * float(self.t_multiplier))
-    
-    @staticmethod
-    def from_dict(data: dict) -> 'ScanConfig':
-        return ScanConfig(
-            subnet = data['subnet'],
-            port_list = data['port_list'],
-            t_multiplier = data.get('parallelism',1.0),
-            t_cnt_port_scan = data.get('t_cnt_port_scan',10),
-            t_cnt_port_test = data.get('t_cnt_port_test',128),
-            t_cnt_isalive = data.get('t_cnt_isalive',256),
-            task_scan_ports = data.get('task_scan_ports',True),
-            task_scan_port_services = data.get('task_scan_port_services',True)
-        )
-    
-    def get_ports(self) -> List[int]:
-        return PortManager().get_port_list(self.port_list).keys()
-    
-    def parse_subnet(self) -> List[ipaddress.IPv4Network]:
-        return parse_ip_input(self.subnet)
-    
-    def __str__(self):
-        return f'ScanCfg(subnet={self.subnet}, ports={self.port_list}, multiplier={self.t_multiplier})'
-
-
-
-
-class SubnetScanner:
+class SubnetScanner(JobStatsMixin):
     def __init__(
             self, 
             config: ScanConfig
@@ -76,7 +29,6 @@ class SubnetScanner:
         self.subnet_str = config.subnet
 
         
-        self.job_stats = JobStats()
         self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
@@ -236,7 +188,12 @@ class SubnetScanner:
         """
         Ping the given host and return True if it's reachable, False otherwise.
         """
-        return host.is_alive(host.ip)
+        return host.is_alive(
+            host.ip,
+            scan_type= self.cfg.lookup_type,
+            ping_config=self.cfg.ping_config,
+            arp_config=self.cfg.arp_config
+        )
     
     def _set_stage(self,stage):
         self.log.debug(f'[{self.uid}] Moving to Stage: {stage}')

@@ -1,16 +1,9 @@
 name: Test Pypi Packaging
 
 on:
-  workflow_dispatch:
-    inputs:
-      skip_tests:
-        description: 'Skip running tests'
-        required: false
-        default: 'false'
-      skip_upload:
-        description: 'Skip uploading to PyPI'
-        required: false
-        default: 'false'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:

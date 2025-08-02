@@ -6,7 +6,6 @@ $pythonVersions = @(8..13 | ForEach-Object { "3.$_" })
 # Define the project directory
 $projectDir = (Get-Location).Path
 $requirementsFile = Join-Path -Path $projectDir -ChildPath "requirements.txt"
-$testFile = Join-Path -Path $projectDir -ChildPath "test.py"
 
 # Check if pyenv is installed
 if (-not (Get-Command "pyenv" -ErrorAction SilentlyContinue)) {
@@ -74,7 +73,9 @@ foreach ($version in $pythonVersions) {
 
     # Run test.py
     Write-Output "Running test.py with Python $exactVersion..."
-    python $testFile
+    # Set PYTHONPATH inline to ensure it is available for this command
+    $env:PYTHONPATH = "$projectDir/src"
+    python -m unittest
     if ($LASTEXITCODE -eq 0) {
         Write-Output "✅  Python $exactVersion : Test succeeded."
         # Clean up by removing the virtual environment

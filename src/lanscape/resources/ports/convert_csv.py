@@ -1,6 +1,8 @@
 # Only used to import csv data - not during runtime
 
-import csv, json
+import csv
+import json
+
 
 def main():
     ans = {}
@@ -15,7 +17,7 @@ def main():
                 pass
     with open('valid_ports.json', 'w') as f:
         json.dump(ans, f, indent=2)
-        
+
 
 def csv_to_dict(data):
     """
@@ -23,5 +25,6 @@ def csv_to_dict(data):
     """
     header = next(data)
     return [dict(zip(header, row)) for row in data]
+
 
 main()

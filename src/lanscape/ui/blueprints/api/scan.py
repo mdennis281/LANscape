@@ -8,6 +8,8 @@ import traceback
 
 # Subnet Scanner API
 ############################################
+
+
 @api_bp.route('/api/scan', methods=['POST'])
 @api_bp.route('/api/scan/threaded', methods=['POST'])
 def scan_subnet_threaded():
@@ -18,7 +20,7 @@ def scan_subnet_threaded():
         return jsonify({'status': 'running', 'scan_id': scan.uid})
     except:
         return jsonify({'status': 'error', 'traceback': traceback.format_exc()}), 500
-    
+
 
 @api_bp.route('/api/scan/async', methods=['POST'])
 def scan_subnet_async():
@@ -28,17 +30,19 @@ def scan_subnet_async():
 
     return jsonify({'status': 'complete', 'scan_id': scan.uid})
 
+
 @api_bp.route('/api/scan/<scan_id>', methods=['GET'])
 def get_scan(scan_id):
     scan = scan_manager.get_scan(scan_id)
     # cast to str and back to handle custom JSON serialization
     return jsonify(json.loads(scan.results.export(str)))
 
-@api_bp.route('/api/scan/<scan_id>/summary',methods=['GET'])
+
+@api_bp.route('/api/scan/<scan_id>/summary', methods=['GET'])
 def get_scan_summary(scan_id):
     scan = scan_manager.get_scan(scan_id)
     if not scan:
-        return jsonify({'error':'scan not found'}), 404
+        return jsonify({'error': 'scan not found'}), 404
     return jsonify({
         'running': scan.running,
         'percent_complete': scan.calc_percent_complete(),
@@ -51,11 +55,13 @@ def get_scan_summary(scan_id):
         }
     })
 
+
 @api_bp.route('/api/scan/<scan_id>/terminate', methods=['GET'])
 def terminate_scan(scan_id):
     scan = scan_manager.get_scan(scan_id)
     scan.terminate()
     return jsonify({'success': True})
+
 
 def get_scan_config():
     """
@@ -63,7 +69,7 @@ def get_scan_config():
     """
     data = request.get_json()
     return ScanConfig(
-        subnet = data['subnet'],
-        port_list= data['port_list'],
-        t_multiplier=data.get('parallelism',1.0)
+        subnet=data['subnet'],
+        port_list=data['port_list'],
+        t_multiplier=data.get('parallelism', 1.0)
     )

@@ -15,11 +15,11 @@ log = logging.getLogger('MacLookup')
 
 class MacLookup:
     """High-level MAC address lookup service."""
-    
+
     def __init__(self):
         self._db = ResourceManager('mac_addresses').get_json('mac_db.json')
         self._resolver = MacResolver()
-    
+
     def lookup_vendor(self, mac: str) -> Optional[str]:
         """
         Lookup a MAC address in the database and return the vendor name.
@@ -29,7 +29,7 @@ class MacLookup:
                 if mac.upper().startswith(str(m).upper()):
                     return self._db[m]
         return None
-    
+
     def resolve_mac_addresses(self, ip: str) -> List[str]:
         """
         Get MAC addresses for an IP address using available methods.
@@ -39,11 +39,11 @@ class MacLookup:
 
 class MacResolver(JobStatsMixin):
     """Handles MAC address resolution using various methods."""
-    
+
     def __init__(self):
         super().__init__()
         self.caught_errors: List[DeviceError] = []
-    
+
     def get_macs(self, ip: str) -> List[str]:
         """Try to get the MAC address using Scapy, fallback to ARP if it fails."""
         if mac := self._get_mac_by_scapy(ip):
@@ -96,7 +96,7 @@ def lookup_mac(mac: str) -> Optional[str]:
     """Backward compatibility function for MAC vendor lookup."""
     return MacLookup().lookup_vendor(mac)
 
+
 def get_macs(ip: str) -> List[str]:
     """Backward compatibility function for MAC resolution."""
     return MacResolver().get_macs(ip)
-

@@ -38,12 +38,14 @@ def open_webapp(url: str) -> bool:
         subprocess.run(cmd, check=True, shell=True)
 
         if time.time() - start < 2:
-            log.debug(f'Unable to hook into closure of UI, listening for flask shutdown')
+            log.debug(
+                f'Unable to hook into closure of UI, listening for flask shutdown')
             return False
         return True
-        
+
     except Exception as e:
-        log.warning('Failed to open webpage as app, falling back to browser tab')
+        log.warning(
+            'Failed to open webpage as app, falling back to browser tab')
         log.debug(f'As app error: {e}')
         try:
             success = webbrowser.open(url)
@@ -51,11 +53,12 @@ def open_webapp(url: str) -> bool:
             if not success:
                 raise RuntimeError('Unknown error while opening browser tab')
         except Exception as e:
-            log.warning(f'Exhausted all options to open browser, you need to open manually')
+            log.warning(
+                f'Exhausted all options to open browser, you need to open manually')
             log.debug(f'As tab error: {e}')
             log.info(f'LANScape UI is running on {url}')
     return False
-    
+
 
 def get_default_browser_executable() -> Optional[str]:
     if sys.platform.startswith("win"):
@@ -133,7 +136,7 @@ def get_default_browser_executable() -> Optional[str]:
                 return f"{chrome_paths[0]}/Contents/MacOS/Google Chrome"
         except subprocess.CalledProcessError:
             pass
-        
+
         # Fallback to system default
         return "/usr/bin/open"
 

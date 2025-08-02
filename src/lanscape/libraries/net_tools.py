@@ -24,15 +24,13 @@ from .scan_config import ScanType, PingConfig, ArpConfig
 log = logging.getLogger('NetTools')
 
 
-
-
 class IPAlive(JobStatsMixin):
     caught_errors: List[DeviceError] = []
 
     @job_tracker
     def is_alive(
-        self, 
-        ip: str, 
+        self,
+        ip: str,
         scan_type: ScanType = ScanType.BOTH,
         arp_config: ArpConfig = ArpConfig(),
         ping_config: PingConfig = PingConfig()
@@ -47,24 +45,23 @@ class IPAlive(JobStatsMixin):
         else:  # ScanType.BOTH
             return self._arp_lookup(ip, arp_config) or self._ping_lookup(ip, ping_config)
 
-    
     @job_tracker
     def _arp_lookup(
-            self, ip: str, 
+            self, ip: str,
             cfg: ArpConfig = ArpConfig()
     ) -> bool:
-        
+
         enforcer_timeout = cfg.timeout * 1.3
+
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
         def do_arp_lookup():
             arp_request = ARP(pdst=ip)
-            broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
-            packet      = broadcast / arp_request
+            broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
+            packet = broadcast / arp_request
 
             answered, _ = srp(packet, timeout=cfg.timeout, verbose=False)
             self._arp_alive = any(resp.psrc == ip for _, resp in answered)
             return self._arp_alive
-        
 
         try:
             for _ in range(cfg.attempts):
@@ -80,20 +77,22 @@ class IPAlive(JobStatsMixin):
     ) -> bool:
 
         enforcer_timeout = cfg.timeout * cfg.ping_count * 1.3
+
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=False)
         def execute_ping(cmd: List[str]) -> subprocess.CompletedProcess:
             return subprocess.run(
-                cmd, 
-                text=True, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE, 
+                cmd,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 check=False
             )
 
         cmd = []
         os_name = platform.system().lower()
         if os_name == "windows":
-            cmd = ['ping', '-n', str(cfg.ping_count), '-w', str(cfg.timeout*1000)]
+            cmd = ['ping', '-n', str(cfg.ping_count),
+                   '-w', str(cfg.timeout*1000)]
         else:
             cmd = ['ping', '-c', str(cfg.ping_count), '-W', str(cfg.timeout)]
 
@@ -102,7 +101,7 @@ class IPAlive(JobStatsMixin):
         for r in range(cfg.attempts):
             try:
                 proc = execute_ping(cmd)
-                
+
                 if proc and proc.returncode == 0:
                     output = proc.stdout.lower()
 
@@ -123,11 +122,10 @@ class IPAlive(JobStatsMixin):
                 sleep(cfg.retry_delay)
         self._ping_alive = False
         return self._ping_alive
-    
 
 
 class Device(IPAlive):
-    def __init__(self,ip:str):
+    def __init__(self, ip: str):
         self.ip: str = ip
         self.alive: bool = None
         self.hostname: str = None
@@ -135,7 +133,7 @@ class Device(IPAlive):
         self.manufacturer: str = None
         self.ports: List[int] = []
         self.stage: str = 'found'
-        self.services: Dict[str,List[int]] = {}
+        self.services: Dict[str, List[int]] = {}
         self.caught_errors: List[DeviceError] = []
         self.log = logging.getLogger('Device')
         self._mac_lookup = MacLookup()
@@ -154,9 +152,8 @@ class Device(IPAlive):
         obj['manufacturer'] = self._get_manufacturer(primary_mac)
 
         return obj
-            
-    
-    def test_port(self,port:int) -> bool:
+
+    def test_port(self, port: int) -> bool:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
         result = sock.connect_ex((self.ip, port))
@@ -165,14 +162,14 @@ class Device(IPAlive):
             self.ports.append(port)
             return True
         return False
-    
+
     @job_tracker
-    def scan_service(self,port:int):
-        service = scan_service(self.ip,port)
-        service_ports = self.services.get(service,[])
+    def scan_service(self, port: int):
+        service = scan_service(self.ip, port)
+        service_ports = self.services.get(service, [])
         service_ports.append(port)
         self.services[service] = service_ports
-    
+
     def get_mac(self):
         if not self.macs:
             return ''
@@ -186,7 +183,7 @@ class Device(IPAlive):
         macs = get_macs(self.ip)
         mac_selector.import_macs(macs)
         return macs
-        
+
     @job_tracker
     def _get_hostname(self):
         """
@@ -198,14 +195,14 @@ class Device(IPAlive):
         except socket.herror as e:
             self.caught_errors.append(DeviceError(e))
             return None
-    
+
     @job_tracker
-    def _get_manufacturer(self,mac_addr=None):
+    def _get_manufacturer(self, mac_addr=None):
         """
         Get the manufacturer of a network device given its MAC address.
         """
         return self._mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
-    
+
 
 class MacSelector:
     """
@@ -216,10 +213,11 @@ class MacSelector:
     this was added because some lookups return multiple macs,
     usually the hwid of a vpn tunnel etc
     """
+
     def __init__(self):
         self.macs = {}
-    
-    def choose_mac(self,macs:List[str]) -> str:
+
+    def choose_mac(self, macs: List[str]) -> str:
         """
         Choose the most appropriate MAC address from a list.
         The mac address that has been seen the least is returned.
@@ -234,19 +232,19 @@ class MacSelector:
                 lowest_i = macs.index(mac)
         return macs[lowest_i] if lowest_i != -1 else None
 
-    
-    def import_macs(self,macs:List[str]):
+    def import_macs(self, macs: List[str]):
         """
         Import a list of MAC addresses associated with a device.
         """
         for mac in macs:
-            self.macs[mac] = self.macs.get(mac,0) + 1
-    
+            self.macs[mac] = self.macs.get(mac, 0) + 1
+
     def clear(self):
         self.macs = {}
 
+
 mac_selector = MacSelector()
-    
+
 
 def get_ip_address(interface: str):
     """
@@ -281,11 +279,12 @@ def get_ip_address(interface: str):
     else:  # Linux, macOS, and other Unix-like systems
         return unix_like()
 
+
 def get_netmask(interface: str):
     """
     Get the netmask of a network interface.
     """
-    
+
     def unix_like():  # Combined Linux and macOS
         try:
             import fcntl
@@ -303,22 +302,26 @@ def get_netmask(interface: str):
         output = subprocess.check_output("ipconfig", shell=True).decode()
         # Use a regular expression to match both interface and subnet mask
         interface_section_pattern = rf"{interface}.*?Subnet Mask.*?:\s+(\d+\.\d+\.\d+\.\d+)"
-        match = re.search(interface_section_pattern, output, re.S)  # Use re.S to allow dot to match newline
+        # Use re.S to allow dot to match newline
+        match = re.search(interface_section_pattern, output, re.S)
         if match:
             return match.group(1)
         return None
-    
+
     if psutil.WINDOWS:
         return windows()
     else:  # Linux, macOS, and other Unix-like systems
         return unix_like()
 
+
 def get_cidr_from_netmask(netmask: str):
     """
     Get the CIDR notation of a netmask.
     """
-    binary_str = ''.join([bin(int(x)).lstrip('0b').zfill(8) for x in netmask.split('.')])
+    binary_str = ''.join([bin(int(x)).lstrip('0b').zfill(8)
+                         for x in netmask.split('.')])
     return str(len(binary_str.rstrip('0')))
+
 
 def get_primary_interface():
     """
@@ -329,7 +332,8 @@ def get_primary_interface():
     try:
         if psutil.WINDOWS:
             # On Windows, parse route print output
-            output = subprocess.check_output("route print 0.0.0.0", shell=True, text=True)
+            output = subprocess.check_output(
+                "route print 0.0.0.0", shell=True, text=True)
             lines = output.strip().split('\n')
             for line in lines:
                 if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
@@ -343,44 +347,48 @@ def get_primary_interface():
         else:
             # Linux/Unix/Mac - use ip route or netstat
             try:
-                output = subprocess.check_output("ip route show default 2>/dev/null || netstat -rn | grep default", 
-                                               shell=True, text=True)
+                output = subprocess.check_output("ip route show default 2>/dev/null || netstat -rn | grep default",
+                                                 shell=True, text=True)
                 for line in output.split('\n'):
                     if 'default via' in line and 'dev' in line:
                         return line.split('dev')[1].split()[0]
                     elif 'default' in line:
                         parts = line.split()
                         if len(parts) > 3:
-                            return parts[-1]  # Interface is usually the last column
+                            # Interface is usually the last column
+                            return parts[-1]
             except (subprocess.SubprocessError, IndexError, FileNotFoundError):
                 pass
     except Exception as e:
         log.debug(f"Error determining primary interface: {e}")
-    
+
     # Fallback: Identify likely candidates based on heuristics
     candidates = []
-    
+
     for interface, addrs in psutil.net_if_addrs().items():
         stats = psutil.net_if_stats().get(interface)
         if stats and stats.isup:
-            ipv4_addrs = [addr for addr in addrs if addr.family == socket.AF_INET]
+            ipv4_addrs = [
+                addr for addr in addrs if addr.family == socket.AF_INET]
             if ipv4_addrs:
                 # Skip loopback and common virtual interfaces
-                is_loopback = any(addr.address.startswith('127.') for addr in ipv4_addrs)
-                is_virtual = any(name in interface.lower() for name in 
-                                ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth'])
-                
+                is_loopback = any(addr.address.startswith('127.')
+                                  for addr in ipv4_addrs)
+                is_virtual = any(name in interface.lower() for name in
+                                 ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth'])
+
                 if not is_loopback and not is_virtual:
                     candidates.append(interface)
-    
+
     # Prioritize interfaces with names typically used for physical connections
     for prefix in ['eth', 'en', 'wlan', 'wifi', 'wl', 'wi']:
         for interface in candidates:
             if interface.lower().startswith(prefix):
                 return interface
-    
+
     # Otherwise return the first candidate or None
     return candidates[0] if candidates else None
+
 
 def get_host_ip_mask(ip_with_cidr: str):
     """
@@ -390,14 +398,15 @@ def get_host_ip_mask(ip_with_cidr: str):
     network = ipaddress.ip_network(ip_with_cidr, strict=False)
     return f'{network.network_address}/{cidr}'
 
-def get_network_subnet(interface = None):
+
+def get_network_subnet(interface=None):
     """
     Get the network subnet for a given interface.
     Uses network_from_snicaddr for conversion.
     Default is primary interface.
     """
     interface = interface or get_primary_interface()
-    
+
     try:
         addrs = psutil.net_if_addrs()
         if interface in addrs:
@@ -411,6 +420,7 @@ def get_network_subnet(interface = None):
         log.debug(traceback.format_exc())
     return None
 
+
 def get_all_network_subnets():
     """
     Get the primary network interface.
@@ -418,20 +428,21 @@ def get_all_network_subnets():
     addrs = psutil.net_if_addrs()
     gateways = psutil.net_if_stats()
     subnets = []
-    
+
     for interface, snicaddrs in addrs.items():
         for snicaddr in snicaddrs:
             if snicaddr.family == socket.AF_INET and gateways[interface].isup:
 
                 subnet = network_from_snicaddr(snicaddr)
 
-                if subnet: 
-                    subnets.append({ 
-                        'subnet': subnet, 
-                        'address_cnt': get_address_count(subnet) 
+                if subnet:
+                    subnets.append({
+                        'subnet': subnet,
+                        'address_cnt': get_address_count(subnet)
                     })
 
     return subnets
+
 
 def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
     """
@@ -447,22 +458,23 @@ def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
         return f"{snicaddr.address}"
     return get_host_ip_mask(addr)
 
+
 def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
     """
     Intelligently select the primary subnet that is most likely handling internet traffic.
-    
+
     Selection priority:
     1. Subnet associated with the primary interface (with default gateway)
     2. Largest subnet within maximum allowed IP range
     3. First subnet in the list as fallback
-    
+
     Returns an empty string if no subnets are available.
     """
     subnets = subnets or get_all_network_subnets()
 
     if not subnets:
         return ""
-        
+
     # First priority: Get subnet for the primary interface
     primary_if = get_primary_interface()
     if primary_if:
@@ -485,14 +497,15 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
 
     return selected.get("subnet", "")
 
+
 def is_arp_supported():
     """
     Check if ARP requests are supported on the current platform.
     """
     try:
         arp_request = ARP(pdst='0.0.0.0')
-        broadcast   = Ether(dst="ff:ff:ff:ff:ff:ff")
-        packet      = broadcast / arp_request
+        broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
+        packet = broadcast / arp_request
 
         srp(packet, timeout=0, verbose=False)
         return True
@@ -501,5 +514,3 @@ def is_arp_supported():
     # RuntimeError = Windows
     except (Scapy_Exception, PermissionError, RuntimeError):
         return False
-
-

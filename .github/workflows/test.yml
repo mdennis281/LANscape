@@ -25,5 +25,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Run unittests
+        env:
+          PYTHONPATH: src
         run: |
           python -m unittest

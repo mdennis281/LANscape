@@ -1,9 +1,10 @@
-name: Package and Publish
+name: PyPi Package and Publish
 
 on:
   push:
     tags:
       - 'releases/*'
+      - 'pre-releases/*'
     
 jobs:
   build:

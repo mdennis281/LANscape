@@ -1,4 +1,4 @@
-name: Package and Publish
+name: Test Pypi Packaging
 
 on:
   workflow_dispatch:
@@ -28,11 +28,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install build twine
-
-      - name: Run tests
-        if: ${{ github.event.inputs.skip_tests != 'true' }}
-        run: |
-          python -m unittest
           
       - name: Clean dist directory
         run: |
@@ -44,14 +39,6 @@ jobs:
           python -m build
 
       - name: Check package
-        if: ${{ github.event.inputs.skip_upload != 'true' }}
         run: |
           python -m twine check dist/*
 
-      - name: Upload to PyPI
-        if: ${{ github.event.inputs.skip_upload != 'true' }}
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          python -m twine upload --repository pypi dist/*

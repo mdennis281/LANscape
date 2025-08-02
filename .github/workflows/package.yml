@@ -36,7 +36,7 @@ jobs:
 
       - name: Update version in pyproject.toml
         run: |
-          sed -i "s/^version = \".*\"/version = \"${{ env.tag_version }}\"/" pyproject.toml
+          sed -i 's/^version = ".*"/version = "'"${{ env.tag_version }}"'"/' pyproject.toml
 
       - name: Build package
         run: |
@@ -52,4 +52,4 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python -m twine upload --repository pypi dist/*
-      
+

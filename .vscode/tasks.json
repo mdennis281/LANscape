@@ -4,15 +4,9 @@
         {
             "label": "Tag and Push Release",
             "type": "shell",
-            "command": "${workspaceFolder}/scripts/tag_release.ps1",
             "args": [
                 "${input:releaseVersion}"
             ],
-            "options": {
-                "shell": {
-                    "executable": "powershell"
-                }
-            },
             "problemMatcher": [],
             "group": "build",
             "windows": {

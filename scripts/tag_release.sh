@@ -6,7 +6,13 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-TAG="releases/$1"
+if [[ "$1" == *a* || "$1" == *b* ]]; then
+    echo "Pre-release version detected: $1"
+    TAG="pre-releases/$1"
+else
+    echo "Release version detected: $1"
+    TAG="releases/$1"
+fi
 
 git tag "$TAG"
 git push origin "$TAG"

@@ -447,7 +447,7 @@ def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
         return f"{snicaddr.address}"
     return get_host_ip_mask(addr)
 
-def smart_select_primary_subnet(subnets: List[dict] | None = None) -> str:
+def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
     """
     Intelligently select the primary subnet that is most likely handling internet traffic.
     

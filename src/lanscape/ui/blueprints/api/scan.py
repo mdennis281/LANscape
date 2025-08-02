@@ -18,7 +18,7 @@ def scan_subnet_threaded():
         scan = scan_manager.new_scan(config)
 
         return jsonify({'status': 'running', 'scan_id': scan.uid})
-    except:
+    except BaseException:
         return jsonify({'status': 'error', 'traceback': traceback.format_exc()}), 500
 
 

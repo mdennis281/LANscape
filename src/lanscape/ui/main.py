@@ -63,7 +63,7 @@ def try_check_update():
             log.info('An update is available!')
             log.info(
                 'Run "pip install --upgrade lanscape --no-cache" to supress this message.')
-    except:
+    except BaseException:
         log.debug(traceback.format_exc())
         log.warning('Unable to check for updates.')
 
@@ -78,7 +78,7 @@ def open_browser(url: str, wait=2) -> bool:
         log.info(f'Starting UI - http://127.0.0.1:{args.port}')
         return open_webapp(url)
 
-    except:
+    except BaseException:
         log.debug(traceback.format_exc())
         log.info(f'Unable to open web browser, server running on {url}')
     return False

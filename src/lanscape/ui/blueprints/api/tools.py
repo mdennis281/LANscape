@@ -14,11 +14,15 @@ def test_subnet():
     try:
         ips = parse_ip_input(subnet)
         length = len(ips)
-        return jsonify({'valid': True, 'msg': f"{length} IP{'s' if length > 1 else ''}", 'count': length})
+        return jsonify({'valid': True,
+                        'msg': f"{length} IP{'s' if length > 1 else ''}",
+                        'count': length})
     except SubnetTooLargeError:
-        return jsonify({'valid': False, 'msg': 'subnet too large', 'error': traceback.format_exc(), 'count': -1})
-    except:
-        return jsonify({'valid': False, 'msg': 'invalid subnet', 'error': traceback.format_exc(), 'count': -1})
+        return jsonify({'valid': False, 'msg': 'subnet too large',
+                       'error': traceback.format_exc(), 'count': -1})
+    except BaseException:
+        return jsonify({'valid': False, 'msg': 'invalid subnet',
+                       'error': traceback.format_exc(), 'count': -1})
 
 
 @api_bp.route('/api/tools/subnet/list')
@@ -28,5 +32,5 @@ def list_subnet():
     """
     try:
         return jsonify(get_all_network_subnets())
-    except:
+    except BaseException:
         return jsonify({'error': traceback.format_exc()})

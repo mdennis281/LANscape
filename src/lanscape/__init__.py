@@ -1,3 +1,6 @@
+"""
+Lanscape package initialization.
+"""
 from .libraries.subnet_scan import (
     SubnetScanner,
     ScanConfig,

@@ -25,7 +25,7 @@ def open_webapp(url: str) -> bool:
     will try to open the web page as an app
     on failure, will open as a tab in default browser
 
-    returns: 
+    returns:
     """
     start = time.time()
     try:

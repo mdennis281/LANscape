@@ -40,7 +40,7 @@ def lookup_latest_version(package=PACKAGE):
             response.raise_for_status()  # Raise an exception for HTTP errors
             latest = response.json()['info']['version']
             log.debug(f'Latest pypi version: {latest}')
-        except:
+        except BaseException:
             log.debug(traceback.format_exc())
             log.warning('Unable to fetch package version from PyPi')
     return latest

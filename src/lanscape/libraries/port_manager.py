@@ -18,7 +18,8 @@ class PortManager:
 
         if port_list not in self.get_port_lists():
             raise ValueError(
-                f"Port list '{port_list}' does not exist. Available port lists: {self.get_port_lists()}")
+                f"Port list '{port_list}' does not exist. Available port lists: {
+                    self.get_port_lists()}")
 
         data = json.loads(self.rm.get(f'{port_list}.json'))
 
@@ -62,5 +63,5 @@ class PortManager:
                 if not 0 <= port <= 65535:
                     return False
             return True
-        except:
+        except BaseException:
             return False

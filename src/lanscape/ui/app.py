@@ -48,7 +48,7 @@ def set_global_safe(key: str, value):
 
         app_globals[key] = value
         log.debug(f'jinja_globals[{key}] = {value}')
-    except:
+    except BaseException:
         default = app_globals.get(key)
         log.debug(traceback.format_exc())
         log.info(

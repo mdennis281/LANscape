@@ -13,7 +13,7 @@ def main():
         if service['Vendor Name'] and service['Mac Prefix']:
             try:
                 ans[service['Mac Prefix']] = service['Vendor Name']
-            except:
+            except BaseException:
                 pass
     with open('mac_db.json', 'w') as f:
         json.dump(ans, f, indent=2)

@@ -92,7 +92,7 @@ class IPAlive(JobStatsMixin):
         os_name = platform.system().lower()
         if os_name == "windows":
             cmd = ['ping', '-n', str(cfg.ping_count),
-                   '-w', str(cfg.timeout*1000)]
+                   '-w', str(cfg.timeout * 1000)]
         else:
             cmd = ['ping', '-c', str(cfg.ping_count), '-W', str(cfg.timeout)]
 
@@ -207,7 +207,7 @@ class Device(IPAlive):
 class MacSelector:
     """
     Essentially filters out bad mac addresses
-    you send in a list of macs, 
+    you send in a list of macs,
     it will return the one that has been seen the least
     (ideally meaning it is the most likely to be the correct one)
     this was added because some lookups return multiple macs,
@@ -347,8 +347,8 @@ def get_primary_interface():
         else:
             # Linux/Unix/Mac - use ip route or netstat
             try:
-                output = subprocess.check_output("ip route show default 2>/dev/null || netstat -rn | grep default",
-                                                 shell=True, text=True)
+                output = subprocess.check_output(
+                    "ip route show default 2>/dev/null || netstat -rn | grep default", shell=True, text=True)
                 for line in output.split('\n'):
                     if 'default via' in line and 'dev' in line:
                         return line.split('dev')[1].split()[0]

@@ -39,7 +39,7 @@ def get_address_count(subnet: str):
     try:
         net = ipaddress.IPv4Network(subnet, strict=False)
         return net.num_addresses
-    except:
+    except BaseException:
         return 0
 
 

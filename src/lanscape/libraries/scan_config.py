@@ -21,7 +21,11 @@ class PingConfig(BaseModel):
         return self.model_dump()
 
     def __str__(self):
-        return f'PingCfg(attempts={self.attempts}, ping_count={self.ping_count}, timeout={self.timeout}, retry_delay={self.retry_delay})'
+        return f'PingCfg(attempts={
+            self.attempts}, ping_count={
+            self.ping_count}, timeout={
+            self.timeout}, retry_delay={
+                self.retry_delay})'
 
 
 class ArpConfig(BaseModel):
@@ -86,4 +90,7 @@ class ScanConfig(BaseModel):
         return parse_ip_input(self.subnet)
 
     def __str__(self):
-        return f'ScanCfg(subnet={self.subnet}, ports={self.port_list}, multiplier={self.t_multiplier})'
+        return f'ScanCfg(subnet={
+            self.subnet}, ports={
+            self.port_list}, multiplier={
+            self.t_multiplier})'

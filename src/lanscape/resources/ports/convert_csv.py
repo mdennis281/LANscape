@@ -13,7 +13,7 @@ def main():
         if service['Service Name'] and service['Port Number']:
             try:
                 ans[service['Port Number']] = service['Service Name']
-            except:
+            except BaseException:
                 pass
     with open('valid_ports.json', 'w') as f:
         json.dump(ans, f, indent=2)

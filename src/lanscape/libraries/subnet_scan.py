@@ -106,7 +106,7 @@ class SubnetScanner(JobStatsMixin):
             '_test_port', 1) if device_ports_scanned > 20 else 1
 
         device_ports_unscanned = max(
-            0, (est_subnet_devices*len(self.ports)) - device_ports_scanned)
+            0, (est_subnet_devices * len(self.ports)) - device_ports_scanned)
 
         remaining_port_test_sec = device_ports_unscanned * avg_port_test_sec
         total_port_test_sec = est_subnet_devices * \
@@ -125,13 +125,13 @@ class SubnetScanner(JobStatsMixin):
 
     def debug_active_scan(self, sleep_sec=1):
         """
-            Run this after running scan_subnet_threaded 
+            Run this after running scan_subnet_threaded
             to see the progress of the scan
         """
         while self.running:
             percent = self.calc_percent_complete()
             t_elapsed = time() - self.results.start_time
-            t_remain = int((100-percent) * (t_elapsed / percent)
+            t_remain = int((100 - percent) * (t_elapsed / percent)
                            ) if percent else '∞'
             buffer = f'{self.uid} - {self.subnet_str}\n'
             buffer += f'Elapsed: {int(t_elapsed)} sec - Remain: {t_remain} sec\n'
@@ -237,8 +237,8 @@ class ScannerResults:
 
     def get_runtime(self):
         if self.scan.running:
-            return int(time()-self.start_time)
-        return int(self.end_time-self.start_time)
+            return int(time() - self.start_time)
+        return int(self.end_time - self.start_time)
 
     def export(self, out_type=dict) -> Union[str, dict]:
         """
@@ -287,7 +287,7 @@ class ScannerResults:
 
 class ScanManager:
     """
-    Maintain active and completed scans in memory for 
+    Maintain active and completed scans in memory for
     future reference. Singleton implementation.
     """
     _instance = None

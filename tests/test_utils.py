@@ -8,10 +8,12 @@ from src.lanscape.libraries.port_manager import PortManager
 from src.lanscape.libraries.decorators import timeout_enforcer
 import time
 
+
 class IPParserTests(unittest.TestCase):
     def test_parse_cidr(self):
         ips = parse_ip_input('192.168.0.0/30')
-        self.assertEqual([str(ip) for ip in ips], ['192.168.0.1', '192.168.0.2'])
+        self.assertEqual([str(ip) for ip in ips], [
+                         '192.168.0.1', '192.168.0.2'])
 
     def test_parse_range(self):
         ips = parse_ip_input('10.0.0.1-10.0.0.3')
@@ -21,11 +23,13 @@ class IPParserTests(unittest.TestCase):
 
     def test_parse_shorthand_range(self):
         ips = parse_ip_input('10.0.0.1-3')
-        self.assertEqual([str(ip) for ip in ips], ['10.0.0.1', '10.0.0.2', '10.0.0.3'])
+        self.assertEqual([str(ip) for ip in ips], [
+                         '10.0.0.1', '10.0.0.2', '10.0.0.3'])
 
     def test_parse_too_large_subnet(self):
         with self.assertRaises(SubnetTooLargeError):
             parse_ip_input('10.0.0.0/8')
+
     def test_parse_ip_input_mixed(self):
         ip_input = "10.0.0.1/30, 10.0.0.10-10.0.0.12, 10.0.0.20-22, 10.0.0.50"
         result = ip_parser.parse_ip_input(ip_input)

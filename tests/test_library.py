@@ -6,6 +6,7 @@ from src.lanscape.libraries.scan_config import ScanConfig, PingConfig, ArpConfig
 
 sm = ScanManager()
 
+
 class LibraryTestCase(unittest.TestCase):
     def test_scan_config(self):
 
@@ -19,7 +20,7 @@ class LibraryTestCase(unittest.TestCase):
             port_list='small'
         )
         self.assertEqual(len(cfg.parse_subnet()), 254)
-        
+
         cfg.task_scan_ports = do_port_scan
         cfg.ping_config.attempts = ping_attempts
         cfg.arp_config.timeout = arp_timeout
@@ -39,12 +40,11 @@ class LibraryTestCase(unittest.TestCase):
         self.assertEqual(cfg2.arp_config.timeout, arp_timeout)
         self.assertEqual(cfg2.lookup_type, ScanType.PING)
 
-
     def test_scan(self):
         subnet = smart_select_primary_subnet()
         self.assertIsNotNone(subnet)
         cfg = ScanConfig(
-            subnet = right_size_subnet(subnet),
+            subnet=right_size_subnet(subnet),
             t_multiplier=1.0,
             port_list='small'
         )
@@ -55,16 +55,16 @@ class LibraryTestCase(unittest.TestCase):
         self.assertFalse(scan.running)
 
         # ensure there are not any remaining running threads
-        self.assertDictEqual(scan.job_stats.running,{})
-
+        self.assertDictEqual(scan.job_stats.running, {})
 
         cnt_with_hostname = 0
         ips = []
         macs = []
         for d in scan.results.devices:
-            if d.hostname: cnt_with_hostname += 1
+            if d.hostname:
+                cnt_with_hostname += 1
             # ensure there arent dupe mac addresses
-            
+
             if d.get_mac() in macs:
                 print(f"Warning: Duplicate MAC address found: {d.get_mac()}")
             macs.append(d.get_mac())
@@ -75,15 +75,10 @@ class LibraryTestCase(unittest.TestCase):
 
             # device must be alive to be in this list
             self.assertTrue(d.alive)
-    
+
         # find at least one device
-        self.assertGreater(len(scan.results.devices),0)
+        self.assertGreater(len(scan.results.devices), 0)
 
         # ensure everything got scanned
-        self.assertEqual(scan.results.devices_scanned, scan.results.devices_total)
-
-
-
-
-        
-        
+        self.assertEqual(scan.results.devices_scanned,
+                         scan.results.devices_total)

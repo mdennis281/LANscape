@@ -6,7 +6,6 @@ from ._helpers import right_size_subnet
 import time
 
 
-
 class ApiTestCase(unittest.TestCase):
     app = app.test_client()
 
@@ -21,9 +20,9 @@ class ApiTestCase(unittest.TestCase):
 
         # Create a new port list
         new_port_list = {'80': 'http', '443': 'https'}
-        response = self.app.post('/api/port/list/test_port_list_lifecycle', json=new_port_list)
+        response = self.app.post(
+            '/api/port/list/test_port_list_lifecycle', json=new_port_list)
         self.assertEqual(response.status_code, 200)
-
 
         # Get the list of port lists again
         response = self.app.get('/api/port/list')
@@ -40,7 +39,8 @@ class ApiTestCase(unittest.TestCase):
 
         # Update the new port list
         updated_port_list = {'22': 'ssh', '8080': 'http-alt'}
-        response = self.app.put('/api/port/list/test_port_list_lifecycle', json=updated_port_list)
+        response = self.app.put(
+            '/api/port/list/test_port_list_lifecycle', json=updated_port_list)
         self.assertEqual(response.status_code, 200)
 
         # Get the new port list again
@@ -61,11 +61,13 @@ class ApiTestCase(unittest.TestCase):
 
         # Create a new port list
         new_port_list = {'80': 'http', '443': 'https'}
-        response = self.app.post('/api/port/list/test_port_list_scan', json=new_port_list)
+        response = self.app.post(
+            '/api/port/list/test_port_list_scan', json=new_port_list)
         self.assertEqual(response.status_code, 200)
 
         # Create a new scan, wait for completion
-        new_scan = {'subnet': right_size_subnet(get_network_subnet()), 'port_list': 'test_port_list_scan'}
+        new_scan = {'subnet': right_size_subnet(
+            get_network_subnet()), 'port_list': 'test_port_list_scan'}
         response = self.app.post('/api/scan/async', json=new_scan)
         self.assertEqual(response.status_code, 200)
         scan_info = json.loads(response.data)
@@ -78,17 +80,14 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         scan_data = json.loads(response.data)
         self.assertEqual(scan_data['errors'], [])
-        self.assertEqual(scan_data['stage'],'complete')
+        self.assertEqual(scan_data['stage'], 'complete')
 
         self._render_scan_ui(scanid)
-
-
 
         # Delete the new port list
         response = self.app.delete('/api/port/list/test_port_list_scan')
         self.assertEqual(response.status_code, 200)
 
-    
     def test_subnet_ports(self):
         """
         Test to ensure multi-subnet dectection is working
@@ -99,8 +98,8 @@ class ApiTestCase(unittest.TestCase):
 
         subnets = json.loads(response.data)
         self.assertIsNot(len(subnets), 0)
-        self.assertIsInstance(subnets[0],dict)
-        subnet:dict = subnets[0]
+        self.assertIsInstance(subnets[0], dict)
+        subnet: dict = subnets[0]
         self.assertIsNotNone(subnet.get('address_cnt'))
 
     def test_subnet_validation(self):
@@ -116,9 +115,9 @@ class ApiTestCase(unittest.TestCase):
             '10.0.0.1/24, 192.168.1.1-100': 354,
             '10.0.0.1/20': 4094,
             '10.0.0.1/19': 8190,
-            '': -1, # blank
-            '10.0.1/24': -1, # invalid
-            '10.0.0.1/2': -1, # too big
+            '': -1,  # blank
+            '10.0.1/24': -1,  # invalid
+            '10.0.0.1/2': -1,  # too big
             '10.0.0.1/19, 192.168.1.1/20': 12284,
             '10.0.0.1/17, 192.168.0.1/16': 98300,
             '10.0.0.1/20, 192.168.0.1/20, 10.100.0.1/20': 12282,
@@ -130,8 +129,8 @@ class ApiTestCase(unittest.TestCase):
             response = self.app.get(uri)
             self.assertEqual(response.status_code, 200)
 
-            data:dict = json.loads(response.data)
-            self.assertEqual(data.get('count'),count)
+            data: dict = json.loads(response.data)
+            self.assertEqual(data.get('count'), count)
             self.assertIsNotNone(data.get('msg'))
             if count == -1:
                 self.assertFalse(data.get('valid'))
@@ -146,8 +145,8 @@ class ApiTestCase(unittest.TestCase):
         ]
         for uri in uris:
             response = self.app.get(uri)
-            self.assertEqual(response.status_code,200)
-    
+            self.assertEqual(response.status_code, 200)
+
     def test_scan_api(self):
         """
         Test the scan API endpoints
@@ -171,7 +170,8 @@ class ApiTestCase(unittest.TestCase):
             response = self.app.get(f'/api/scan/{scan_id}/summary')
             self.assertEqual(response.status_code, 200)
             summary = json.loads(response.data)
-            self.assertTrue(summary['running'] or summary['stage'] == 'complete')
+            self.assertTrue(summary['running']
+                            or summary['stage'] == 'complete')
             percent_complete = summary['percent_complete']
             self.assertGreaterEqual(percent_complete, 0)
             self.assertLessEqual(percent_complete, 100)
@@ -179,7 +179,7 @@ class ApiTestCase(unittest.TestCase):
 
             self._render_scan_ui(scan_id)
             time.sleep(2)
-        
+
         self.assertEqual(summary['running'], False)
         self.assertEqual(summary['stage'], 'complete')
         self.assertGreater(summary['runtime'], 0)
@@ -192,8 +192,5 @@ class ApiTestCase(unittest.TestCase):
         self.assertGreater(devices_alive, 0)
 
 
-
-
-        
 if __name__ == '__main__':
     unittest.main()

@@ -1,7 +1,7 @@
 import unittest
 import json
-from ..ui.app import app
-from ..libraries.net_tools import get_network_subnet
+from src.lanscape.ui.app import app
+from src.lanscape.libraries.net_tools import get_network_subnet
 from ._helpers import right_size_subnet
 import time
 
@@ -80,17 +80,8 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(scan_data['errors'], [])
         self.assertEqual(scan_data['stage'],'complete')
 
-        # Render UI
-        uris = [
-            '/info',
-            f'/?scan_id={scanid}',
-            f'/scan/{scanid}/overview',
-            f'/scan/{scanid}/table',
-            f'/export/{scanid}'
-        ]
-        for uri in uris:
-            response = self.app.get(uri)
-            self.assertEqual(response.status_code,200)
+        self._render_scan_ui(scanid)
+
 
 
         # Delete the new port list
@@ -144,6 +135,18 @@ class ApiTestCase(unittest.TestCase):
             self.assertIsNotNone(data.get('msg'))
             if count == -1:
                 self.assertFalse(data.get('valid'))
+
+    def _render_scan_ui(self, scanid):
+        uris = [
+            '/info',
+            f'/?scan_id={scanid}',
+            f'/scan/{scanid}/overview',
+            f'/scan/{scanid}/table',
+            f'/export/{scanid}'
+        ]
+        for uri in uris:
+            response = self.app.get(uri)
+            self.assertEqual(response.status_code,200)
     
     def test_scan_api(self):
         """
@@ -173,6 +176,8 @@ class ApiTestCase(unittest.TestCase):
             self.assertGreaterEqual(percent_complete, 0)
             self.assertLessEqual(percent_complete, 100)
             # Wait for a bit before checking again
+
+            self._render_scan_ui(scan_id)
             time.sleep(2)
         
         self.assertEqual(summary['running'], False)

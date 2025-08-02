@@ -1,8 +1,8 @@
 import unittest
 
-from ..libraries.version_manager import lookup_latest_version 
-from ..libraries.app_scope import ResourceManager, is_local_run
-from ..libraries.net_tools import is_arp_supported
+from src.lanscape.libraries.version_manager import lookup_latest_version 
+from src.lanscape.libraries.app_scope import ResourceManager, is_local_run
+from src.lanscape.libraries.net_tools import is_arp_supported
 
 
 

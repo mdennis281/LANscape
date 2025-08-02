@@ -496,7 +496,8 @@ def is_arp_supported():
 
         srp(packet, timeout=0, verbose=False)
         return True
-    except Scapy_Exception:
+    # Linux rases PermissionError, All else Scapy_Exception
+    except (Scapy_Exception, PermissionError):
         return False
 
 

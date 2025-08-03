@@ -64,7 +64,7 @@ class PortManagerValidateTests(unittest.TestCase):
         ]
         for case in invalid_cases:
             with self.subTest(case=case):
-                self.assertFalse(PortManager.validate_port_data(self.pm, case))
+                self.assertFalse(self.pm.validate_port_data(case))
 
 
 class DecoratorTimeoutTests(unittest.TestCase):

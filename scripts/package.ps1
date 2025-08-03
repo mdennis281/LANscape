@@ -9,6 +9,8 @@ param (
     [switch]$SkipUpload
 )
 
+Set-Location ../
+
 if (-not $SkipTests) {
     # Run Python unit tests
     python -m unittest
@@ -19,6 +21,7 @@ if (-not $SkipTests) {
         exit $LASTEXITCODE
     }
 }
+
 
 # Remove files in dist directory
 Remove-Item -Path dist -Recurse -Force

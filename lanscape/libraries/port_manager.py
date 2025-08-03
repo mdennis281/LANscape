@@ -17,9 +17,9 @@ class PortManager:
     def get_port_list(self, port_list: str) -> dict:
 
         if port_list not in self.get_port_lists():
-            raise ValueError(
-                f"Port list '{port_list}' does not exist. Available port lists: {
-                    self.get_port_lists()}")
+            msg = f"Port list '{port_list}' does not exist. "
+            msg += f"Available port lists: {self.get_port_lists()}"
+            raise ValueError(msg)
 
         data = json.loads(self.rm.get(f'{port_list}.json'))
 

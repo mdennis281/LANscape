@@ -1,4 +1,4 @@
-from src.lanscape import ScanManager, ScanConfig, net_tools
+from lanscape import ScanManager, ScanConfig, net_tools
 
 sm = ScanManager()
 
@@ -13,6 +13,7 @@ try:
 
     scan.debug_active_scan()
 except KeyboardInterrupt:
+    print("Terminating scan...")
     scan.terminate()
 
 print(scan.results)

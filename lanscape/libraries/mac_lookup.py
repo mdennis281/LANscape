@@ -82,10 +82,10 @@ class MacResolver(JobStatsMixin):
             packet = broadcast / arp_request
 
             # Send the packet and wait for a response
-            result = srp(packet, timeout=1, verbose=0)[0]
+            answered, _ = srp(packet, timeout=1, verbose=False)[0]
 
             # Extract the MAC addresses from the response
-            return [res[1].hwsrc for res in result]
+            return [res[1].hwsrc for res in answered]
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []

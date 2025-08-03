@@ -3,15 +3,15 @@ import ipaddress
 from pydantic import BaseModel, Field
 from enum import Enum
 
-from .port_manager import PortManager
-from .ip_parser import parse_ip_input
+from lanscape.libraries.port_manager import PortManager
+from lanscape.libraries.ip_parser import parse_ip_input
 
 
 class PingConfig(BaseModel):
-    attempts: int = 1
-    ping_count: int = 2
-    timeout: float = 2.0
-    retry_delay: float = 0.5
+    attempts: int = 2
+    ping_count: int = 1
+    timeout: float = 1.0
+    retry_delay: float = 0.25
 
     @classmethod
     def from_dict(cls, data: dict) -> 'PingConfig':
@@ -21,11 +21,12 @@ class PingConfig(BaseModel):
         return self.model_dump()
 
     def __str__(self):
-        return f'PingCfg(attempts={
-            self.attempts}, ping_count={
-            self.ping_count}, timeout={
-            self.timeout}, retry_delay={
-                self.retry_delay})'
+        return (
+            f"PingCfg(attempts={self.attempts}, "
+            f"ping_count={self.ping_count}, "
+            f"timeout={self.timeout}, "
+            f"retry_delay={self.retry_delay})"
+        )
 
 
 class ArpConfig(BaseModel):

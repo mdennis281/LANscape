@@ -1,12 +1,12 @@
 """
 Local network scanner
 """
-from .libraries.subnet_scan import (
+from lanscape.libraries.subnet_scan import (
     SubnetScanner,
     ScanConfig,
     ScanManager
 )
 
-from .libraries.port_manager import PortManager
+from lanscape.libraries.port_manager import PortManager
 
-from .libraries import net_tools
+from lanscape.libraries import net_tools

@@ -9,6 +9,7 @@ import socket
 import struct
 import re
 import psutil
+from icmplib import ping
 
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
@@ -43,7 +44,7 @@ class IPAlive(JobStatsMixin):
             return self._arp_lookup(ip, arp_config)
         if scan_type == ScanType.PING:
             return self._ping_lookup(ip, ping_config)
-        return self._arp_lookup(ip, arp_config) or self._ping_lookup(ip, ping_config)
+        return self._ping_lookup(ip, ping_config) or self._arp_lookup(ip, arp_config)
 
     @job_tracker
     def _arp_lookup(
@@ -73,53 +74,37 @@ class IPAlive(JobStatsMixin):
 
     @job_tracker
     def _ping_lookup(
-        self, host: str,
+        self, ip: str,
         cfg: PingConfig = PingConfig()
     ) -> bool:
-        """Perform a ping lookup to check if the device is alive."""
+        """Perform a ping lookup to check if the device is alive using icmplib."""
         enforcer_timeout = cfg.timeout * cfg.ping_count * 1.3
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=False)
-        def execute_ping(cmd: List[str]) -> subprocess.CompletedProcess:
-            return subprocess.run(
-                cmd,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False
-            )
-
-        cmd = []
-        os_name = platform.system().lower()
-        if os_name == "windows":
-            cmd = ['ping', '-n', str(cfg.ping_count),
-                   '-w', str(cfg.timeout * 1000)]
-        else:
-            cmd = ['ping', '-c', str(cfg.ping_count), '-W', str(cfg.timeout)]
-
-        cmd = cmd + [host]
-
-        for r in range(cfg.attempts):
+        def do_icmp_ping():
             try:
-                proc = execute_ping(cmd)
-
-                if proc and proc.returncode == 0:
-                    output = proc.stdout.lower()
-
-                    if psutil.WINDOWS or psutil.LINUX:
-                        if 'ttl' in output:
-                            self._ping_alive = True
-                            return self._ping_alive
-                    if psutil.MACOS or psutil.LINUX:
-                        if 'ping statistics' in output and '100.0% packet loss' not in output:
-                            self._ping_alive = True
-                            return self._ping_alive
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+                result = ping(
+                    ip,
+                    count=cfg.ping_count,
+                    interval=cfg.retry_delay,
+                    timeout=cfg.timeout,
+                    privileged=True
+                )
+                return result.is_alive
+            except Exception as e:
                 self.caught_errors.append(DeviceError(e))
-            if r < cfg.attempts - 1:
+                return False
+
+        try:
+            for _ in range(cfg.attempts):
+                if do_icmp_ping():
+                    self._icmp_alive = True
+                    return True
                 sleep(cfg.retry_delay)
-        self._ping_alive = False
-        return self._ping_alive
+        except Exception as e:
+            self.caught_errors.append(DeviceError(e))
+        self._icmp_alive = False
+        return False
 
 
 class Device(IPAlive):

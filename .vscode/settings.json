@@ -1,0 +1,19 @@
+{
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./src",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "python.analysis.autoFormatStrings": true,
+    "python.terminal.shellIntegration.enabled": false,
+    "pylint.cwd": "${workspaceFolder}/lanscape",
+    "cSpell.words": [
+        "jsonify",
+        "lanscape"
+    ]
+}

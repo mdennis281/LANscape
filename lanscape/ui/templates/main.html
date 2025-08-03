@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="header">
+      <!-- Header and Scan Submission Inline -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap">
+        <a href="/" class="text-decoration-none" aria-label="Go to homepage">
+            <h1 class="title">
+                <span>LAN</span>scape 
+            </h1>
+        </a>
+        <!-- Form -->
+        <form id="scan-form" class="d-flex align-items-end">
+            <div class="form-group me-2">
+                <div class="label-container">
+                    <label for="subnet">Subnet:</label>
+                    <div id="subnet-info"></div>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="subnet" name="subnet" class="form-control" value="{{ subnet }}" placeholder="Enter subnet">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="subnet-dropdown" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                    <ul class="dropdown-menu" aria-labelledby="subnet-dropdown" id="dropdown-list">
+                        {% for subnet_option in alternate_subnets %}
+                        <li><a class="dropdown-item" href="#">{{ subnet_option['subnet'] }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <button type="submit" id="scan-submit" class="btn btn-primary mb-3">Scan</button>
+        </form>
+    </div>
+
+    <!-- Advanced Section -->
+    <details onclick="rightSizeDocLayout()">
+        <summary>Advanced</summary>
+        <div class="form-group mt-2">
+            <label for="port_list">Port List:</label>
+            <div class="port-list-wrapper">
+                <div id="port-list" class="port-list">{{port_list}}</div>
+                <div id="port-list-dropdown" class="port-list-dropdown"></div>
+            </div>
+        </div>
+        
+        <div class="form-group mt-2">
+            <label for="parallelism">Parallelism:</label>
+            <input type="range" id="parallelism" name="parallelism" min="0.25" max="3" step="0.05" value="{{parallelism}}">
+            <output id="parallelism-value">{{parallelism}}</output>
+        </div>
+    </details>
+    <div id="scan-progress-bar"></div>
+</div>
+<div id="content">
+    <div class="container-fluid my-4">
+        <!-- ARP Error -->
+        <div id="arp-error" class="{{ 'div-hide' if is_arp_supported else '' }}">
+            <span>
+                Unable to use ARP lookup. Device discovery is degraded.
+                <a target="_blank" href="https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md">Steps to fix</a>
+            </span>
+        </div>
+        <!-- Scan Results -->
+        <div id="scan-results" class="div-hide">
+            <div class="d-flex justify-content-between">
+                <h2>Scan Results</h2>
+                <div id="scan-actions">
+                    <a href="" id="export-link">
+                        <span 
+                            class="material-symbols-outlined secondary-icon-btn"
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Export scan to json">
+                            ios_share
+                        </span>
+                    </a>
+                </div>
+            </div>
+            
+            {% include 'scan/overview.html' %}
+            <input type="text" id="filter" placeholder="Filter results" class="form-control mb-3 mt-3">
+            <div class="table-frame-container">
+                <iframe id="ip-table-frame" src=""></iframe>
+            </div>
+        </div>
+        <div id="no-scan">
+            <h2>No results to show</h2>
+            <p>Submit a scan above</p>
+        </div>
+    </div>
+</div>
+
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/subnet-info.js') }}"></script>
+<script src="{{ url_for('static', filename='js/subnet-selector.js') }}"></script>
+{% endblock %}
+
+
+

@@ -15,7 +15,7 @@ jobs:
       - name: Get the latest commit message
         id: get_commit
         run: |
-          echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+            echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B | head -n1)" >> $GITHUB_ENV
 
       - name: Validate commit message
         id: validate

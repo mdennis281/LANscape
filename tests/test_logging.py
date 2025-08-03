@@ -34,6 +34,7 @@ class LoggingConfigTests(unittest.TestCase):
             with open(logfile, 'r') as fh:
                 contents = fh.read()
             self.assertIn('hello file', contents)
+            self.tearDown()
 
     def test_configure_logging_without_file(self):
         configure_logging('INFO', None, flask_logging=True)

@@ -21,11 +21,15 @@ jobs:
       - name: Validate commit message
         id: validate
         run: |
-          if [[ "${{ env.COMMIT_MESSAGE }}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) - .+$ ]]; then
+          COMMIT_MSG="${{ env.COMMIT_MESSAGE }}"
+          # Extract the version part (before the first space)
+          VERSION_PART=$(echo "$COMMIT_MSG" | cut -d' ' -f1)
+          # Check if it has two dots and starts with a digit
+          if echo "$VERSION_PART" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
             echo "VALID=true" >> $GITHUB_ENV
-            MAJOR=$(echo "${{ env.COMMIT_MESSAGE }}" | sed -E 's/^([0-9]+)\..*$/\1/')
-            MINOR=$(echo "${{ env.COMMIT_MESSAGE }}" | sed -E 's/^[0-9]+\.([0-9]+)\..*$/\1/')
-            MINISCULE=$(echo "${{ env.COMMIT_MESSAGE }}" | sed -E 's/^[0-9]+\.[0-9]+\.([0-9]+) - .*$/\1/')
+            MAJOR=$(echo "$VERSION_PART" | cut -d. -f1)
+            MINOR=$(echo "$VERSION_PART" | cut -d. -f2)
+            MINISCULE=$(echo "$VERSION_PART" | cut -d. -f3)
             echo "MAJOR=$MAJOR" >> $GITHUB_ENV
             echo "MINOR=$MINOR" >> $GITHUB_ENV
             echo "MINISCULE=$MINISCULE" >> $GITHUB_ENV

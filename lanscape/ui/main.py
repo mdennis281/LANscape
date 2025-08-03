@@ -1,16 +1,18 @@
 
 import socket
-from .app import start_webserver_daemon, start_webserver
-from ..libraries.version_manager import get_installed_version, is_update_available
+
+
 import threading
 import time
 import logging
 import traceback
 import os
-from ..libraries.logger import configure_logging
-from ..libraries.runtime_args import parse_args, RuntimeArgs
-from ..libraries.web_browser import open_webapp
-from ..libraries.net_tools import is_arp_supported
+from lanscape.libraries.logger import configure_logging
+from lanscape.libraries.runtime_args import parse_args, RuntimeArgs
+from lanscape.libraries.web_browser import open_webapp
+from lanscape.libraries.net_tools import is_arp_supported
+from lanscape.libraries.version_manager import get_installed_version, is_update_available
+from lanscape.ui.app import start_webserver_daemon, start_webserver
 # do this so any logs generated on import are displayed
 args = parse_args()
 configure_logging(args.loglevel, args.logfile, args.flask_logging)
@@ -62,7 +64,7 @@ def try_check_update():
         if is_update_available():
             log.info('An update is available!')
             log.info(
-                'Run "pip install --upgrade lanscape --no-cache" to supress this message.')
+                'Run "pip install --upgrade lanscape --no-cache" to suppress this message.')
     except BaseException:
         log.debug(traceback.format_exc())
         log.warning('Unable to check for updates.')

@@ -1,8 +1,8 @@
 import unittest
 
-from src.lanscape.libraries.version_manager import lookup_latest_version
-from src.lanscape.libraries.app_scope import ResourceManager, is_local_run
-from src.lanscape.libraries.net_tools import is_arp_supported
+from lanscape.libraries.version_manager import lookup_latest_version
+from lanscape.libraries.app_scope import ResourceManager, is_local_run
+from lanscape.libraries.net_tools import is_arp_supported
 
 
 class EnvTestCase(unittest.TestCase):

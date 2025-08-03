@@ -8,10 +8,10 @@ import threading
 import logging
 import os
 
-from ..libraries.runtime_args import RuntimeArgs, parse_args
-from ..libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
-from ..libraries.app_scope import is_local_run
-from ..libraries.net_tools import is_arp_supported
+from lanscape.libraries.runtime_args import RuntimeArgs, parse_args
+from lanscape.libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
+from lanscape.libraries.app_scope import is_local_run
+from lanscape.libraries.net_tools import is_arp_supported
 
 app = Flask(
     __name__

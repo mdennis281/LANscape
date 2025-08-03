@@ -1,11 +1,11 @@
 import unittest
-from src.lanscape.libraries.ip_parser import parse_ip_input
-from src.lanscape.libraries.errors import SubnetTooLargeError
+from lanscape.libraries.ip_parser import parse_ip_input
+from lanscape.libraries.errors import SubnetTooLargeError
 import ipaddress
-from src.lanscape.libraries import ip_parser
-from src.lanscape.libraries.errors import SubnetTooLargeError
-from src.lanscape.libraries.port_manager import PortManager
-from src.lanscape.libraries.decorators import timeout_enforcer
+from lanscape.libraries import ip_parser
+from lanscape.libraries.errors import SubnetTooLargeError
+from lanscape.libraries.port_manager import PortManager
+from lanscape.libraries.decorators import timeout_enforcer
 import time
 
 

@@ -1,5 +1,5 @@
 
-from src.lanscape.libraries.ip_parser import get_address_count
+from lanscape.libraries.ip_parser import get_address_count
 
 
 def right_size_subnet(subnet: str):

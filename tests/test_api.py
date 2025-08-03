@@ -1,7 +1,7 @@
 import unittest
 import json
-from src.lanscape.ui.app import app
-from src.lanscape.libraries.net_tools import get_network_subnet
+from lanscape.ui.app import app
+from lanscape.libraries.net_tools import get_network_subnet
 from ._helpers import right_size_subnet
 import time
 

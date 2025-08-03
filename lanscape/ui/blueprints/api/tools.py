@@ -1,8 +1,8 @@
 from flask import request, jsonify
 from . import api_bp
-from ....libraries.net_tools import get_all_network_subnets
-from ....libraries.ip_parser import parse_ip_input
-from ....libraries.errors import SubnetTooLargeError
+from lanscape.libraries.net_tools import get_all_network_subnets
+from lanscape.libraries.ip_parser import parse_ip_input
+from lanscape.libraries.errors import SubnetTooLargeError
 import traceback
 
 

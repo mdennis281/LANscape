@@ -1,5 +1,5 @@
 """
-Lanscape package initialization.
+Local network scanner
 """
 from .libraries.subnet_scan import (
     SubnetScanner,

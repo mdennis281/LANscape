@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect
 from . import web_bp
-from ....libraries.subnet_scan import SubnetScanner
-from ....libraries.net_tools import (
+from ..lanscape.libraries.subnet_scan import SubnetScanner
+from ..lanscape.libraries.net_tools import (
     get_all_network_subnets,
     smart_select_primary_subnet
 )

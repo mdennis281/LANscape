@@ -1,6 +1,6 @@
-from . import api_bp
-from ....libraries.subnet_scan import ScanConfig
-from .. import scan_manager
+from lanscape.ui.blueprints.api import api_bp
+from lanscape.libraries.subnet_scan import ScanConfig
+from lanscape.ui.blueprints import scan_manager
 
 from flask import request, jsonify
 import json

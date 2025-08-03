@@ -1,7 +1,3 @@
-import re
-import psutil
-import socket
-import struct
 import logging
 import platform
 import ipaddress
@@ -9,22 +5,27 @@ import traceback
 import subprocess
 from time import sleep
 from typing import List, Dict
+import socket
+import struct
+import re
+import psutil
+
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
 from scapy.error import Scapy_Exception
 
-from .service_scan import scan_service
-from .mac_lookup import MacLookup, get_macs
-from .ip_parser import get_address_count, MAX_IPS_ALLOWED
-from .errors import DeviceError
-from .decorators import job_tracker, JobStatsMixin, timeout_enforcer
-from .scan_config import ScanType, PingConfig, ArpConfig
-
+from lanscape.libraries.service_scan import scan_service
+from lanscape.libraries.mac_lookup import MacLookup, get_macs
+from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
+from lanscape.libraries.errors import DeviceError
+from lanscape.libraries.decorators import job_tracker, JobStatsMixin, timeout_enforcer
+from lanscape.libraries.scan_config import ScanType, PingConfig, ArpConfig
 
 log = logging.getLogger('NetTools')
 
 
 class IPAlive(JobStatsMixin):
+    """Class to check if a device is alive using ARP and/or ping scans."""
     caught_errors: List[DeviceError] = []
 
     @job_tracker
@@ -40,17 +41,16 @@ class IPAlive(JobStatsMixin):
         """
         if scan_type == ScanType.ARP:
             return self._arp_lookup(ip, arp_config)
-        elif scan_type == ScanType.PING:
+        if scan_type == ScanType.PING:
             return self._ping_lookup(ip, ping_config)
-        else:  # ScanType.BOTH
-            return self._arp_lookup(ip, arp_config) or self._ping_lookup(ip, ping_config)
+        return self._arp_lookup(ip, arp_config) or self._ping_lookup(ip, ping_config)
 
     @job_tracker
     def _arp_lookup(
-            self, ip: str,
-            cfg: ArpConfig = ArpConfig()
+        self, ip: str,
+        cfg: ArpConfig = ArpConfig()
     ) -> bool:
-
+        """Perform an ARP lookup to check if the device is alive."""
         enforcer_timeout = cfg.timeout * 1.3
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
@@ -65,7 +65,8 @@ class IPAlive(JobStatsMixin):
 
         try:
             for _ in range(cfg.attempts):
-                do_arp_lookup()
+                if do_arp_lookup():
+                    return True
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
         return False
@@ -75,7 +76,7 @@ class IPAlive(JobStatsMixin):
         self, host: str,
         cfg: PingConfig = PingConfig()
     ) -> bool:
-
+        """Perform a ping lookup to check if the device is alive."""
         enforcer_timeout = cfg.timeout * cfg.ping_count * 1.3
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=False)
@@ -105,19 +106,14 @@ class IPAlive(JobStatsMixin):
                 if proc and proc.returncode == 0:
                     output = proc.stdout.lower()
 
-                    if psutil.WINDOWS or psutil.LINUX:
-                        if 'ttl' in output:
-                            self._ping_alive = True
-                            return self._ping_alive
-                    if psutil.MACOS or psutil.LINUX:
-                        bad = '100.0% packet loss'
-                        good = 'ping statistics'
-                        if good in output and bad not in output:
-                            self._ping_alive = True
-                            return self._ping_alive
+                    if 'ttl' in output:
+                        self._ping_alive = True
+                        return self._ping_alive
+                    if 'ping statistics' in output and '100.0% packet loss' not in output:
+                        self._ping_alive = True
+                        return self._ping_alive
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 self.caught_errors.append(DeviceError(e))
-                pass
             if r < cfg.attempts - 1:
                 sleep(cfg.retry_delay)
         self._ping_alive = False
@@ -125,7 +121,9 @@ class IPAlive(JobStatsMixin):
 
 
 class Device(IPAlive):
+    """Represents a network device with metadata and scanning capabilities."""
     def __init__(self, ip: str):
+        super().__init__()
         self.ip: str = ip
         self.alive: bool = None
         self.hostname: str = None
@@ -139,11 +137,13 @@ class Device(IPAlive):
         self._mac_lookup = MacLookup()
 
     def get_metadata(self):
+        """Retrieve metadata such as hostname and MAC addresses."""
         if self.alive:
             self.hostname = self._get_hostname()
             self.macs = self._get_mac_addresses()
 
     def dict(self) -> dict:
+        """Convert the device object to a dictionary."""
         obj = vars(self).copy()
         obj.pop('log')
         obj.pop('job_stats', None)  # Remove job_stats if it exists
@@ -154,6 +154,7 @@ class Device(IPAlive):
         return obj
 
     def test_port(self, port: int) -> bool:
+        """Test if a specific port is open on the device."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
         result = sock.connect_ex((self.ip, port))
@@ -165,30 +166,28 @@ class Device(IPAlive):
 
     @job_tracker
     def scan_service(self, port: int):
+        """Scan a specific port for services."""
         service = scan_service(self.ip, port)
         service_ports = self.services.get(service, [])
         service_ports.append(port)
         self.services[service] = service_ports
 
     def get_mac(self):
+        """Get the primary MAC address of the device."""
         if not self.macs:
             return ''
         return mac_selector.choose_mac(self.macs)
 
     @job_tracker
     def _get_mac_addresses(self):
-        """
-        Get the possible MAC addresses of a network device given its IP address.
-        """
+        """Get the possible MAC addresses of a network device given its IP address."""
         macs = get_macs(self.ip)
         mac_selector.import_macs(macs)
         return macs
 
     @job_tracker
     def _get_hostname(self):
-        """
-        Get the hostname of a network device given its IP address.
-        """
+        """Get the hostname of a network device given its IP address."""
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
             return hostname
@@ -198,9 +197,7 @@ class Device(IPAlive):
 
     @job_tracker
     def _get_manufacturer(self, mac_addr=None):
-        """
-        Get the manufacturer of a network device given its MAC address.
-        """
+        """Get the manufacturer of a network device given its MAC address."""
         return self._mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
 
 
@@ -252,12 +249,12 @@ def get_ip_address(interface: str):
     """
     def unix_like():  # Combined Linux and macOS
         try:
-            import fcntl
-            import struct
+            # pylint: disable=import-outside-toplevel, import-error
+            import fcntl 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             ip_address = socket.inet_ntoa(fcntl.ioctl(
                 sock.fileno(),
-                0x8915,  # SIOCGIFADDR
+                0x8915,  # SIOCGIFADDRf
                 struct.pack('256s', interface[:15].encode('utf-8'))
             )[20:24])
             return ip_address
@@ -287,7 +284,8 @@ def get_netmask(interface: str):
 
     def unix_like():  # Combined Linux and macOS
         try:
-            import fcntl
+            # pylint: disable=import-outside-toplevel, import-error
+            import fcntl 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             netmask = socket.inet_ntoa(fcntl.ioctl(
                 sock.fileno(),

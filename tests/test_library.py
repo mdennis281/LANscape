@@ -1,8 +1,8 @@
 import unittest
-from src.lanscape.libraries.net_tools import smart_select_primary_subnet
+from lanscape.libraries.net_tools import smart_select_primary_subnet
 from ._helpers import right_size_subnet
-from src.lanscape.libraries.subnet_scan import ScanManager
-from src.lanscape.libraries.scan_config import ScanConfig, PingConfig, ArpConfig, ScanType
+from lanscape.libraries.subnet_scan import ScanManager
+from lanscape.libraries.scan_config import ScanConfig, PingConfig, ArpConfig, ScanType
 
 sm = ScanManager()
 

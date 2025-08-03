@@ -8,7 +8,7 @@ from .ip_parser import parse_ip_input
 
 
 class PingConfig(BaseModel):
-    attempts: int = 2
+    attempts: int = 1
     ping_count: int = 2
     timeout: float = 2.0
     retry_delay: float = 0.5
@@ -33,7 +33,7 @@ class ArpConfig(BaseModel):
     Configuration for ARP scanning.
     """
     attempts: int = 1
-    timeout: float = 1.0
+    timeout: float = 2.0
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ArpConfig':
@@ -64,7 +64,7 @@ class ScanConfig(BaseModel):
     # below wont run if above false
     task_scan_port_services: bool = False  # disabling until more stable
 
-    lookup_type: ScanType = ScanType.PING
+    lookup_type: ScanType = ScanType.BOTH
 
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
@@ -90,7 +90,7 @@ class ScanConfig(BaseModel):
         return parse_ip_input(self.subnet)
 
     def __str__(self):
-        return f'ScanCfg(subnet={
+        return f'''ScanCfg(subnet={
             self.subnet}, ports={
             self.port_list}, multiplier={
-            self.t_multiplier})'
+            self.t_multiplier})'''

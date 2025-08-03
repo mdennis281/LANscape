@@ -1,0 +1,44 @@
+name: Tag New Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get the latest commit message
+        id: get_commit
+        run: |
+          echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+
+      - name: Validate commit message
+        id: validate
+        run: |
+          COMMIT_MSG="${{ env.COMMIT_MESSAGE }}"
+          # Extract the version part (before the first space)
+          VERSION_PART=$(echo "$COMMIT_MSG" | cut -d' ' -f1)
+          # Check if it has two dots and starts with a digit
+          if echo "$VERSION_PART" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
+            echo "VALID=true" >> $GITHUB_ENV
+            MAJOR=$(echo "$VERSION_PART" | cut -d. -f1)
+            MINOR=$(echo "$VERSION_PART" | cut -d. -f2)
+            MINISCULE=$(echo "$VERSION_PART" | cut -d. -f3)
+            echo "MAJOR=$MAJOR" >> $GITHUB_ENV
+            echo "MINOR=$MINOR" >> $GITHUB_ENV
+            echo "MINISCULE=$MINISCULE" >> $GITHUB_ENV
+          else
+            echo "VALID=false" >> $GITHUB_ENV
+          fi
+
+      - name: Create tag
+        if: ${{ env.VALID == 'true' }}
+        run: |
+          TAG_NAME="releases/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
+          git tag $TAG_NAME
+          git push origin $TAG_NAME

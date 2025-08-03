@@ -1,14 +1,13 @@
-import argparse
 from dataclasses import dataclass, fields
 import argparse
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 @dataclass
 class RuntimeArgs:
     reloader: bool = False
     port: int = 5001
-    logfile: bool = False
+    logfile: Optional[str] = None
     loglevel: str = 'INFO'
     flask_logging: bool = False
     persistent: bool = False
@@ -21,8 +20,8 @@ def parse_args() -> RuntimeArgs:
                         help='Use flask\'s reloader (helpful for local development)')
     parser.add_argument('--port', type=int, default=5001,
                         help='Port to run the webserver on')
-    parser.add_argument('--logfile', action='store_true',
-                        help='Log output to lanscape.log')
+    parser.add_argument('--logfile', type=str, default=None,
+                        help='Log output to the specified file path')
     parser.add_argument('--loglevel', default='INFO', help='Set the log level')
     parser.add_argument('--flask-logging', action='store_true',
                         help='Enable flask logging (disables click output)')

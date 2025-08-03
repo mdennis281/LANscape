@@ -3,7 +3,7 @@ param(
     [string]$Version
 )
 
-if ($Version -contains "a" -or $Version -contains "b") {
+if ($Version -like "*a*" -or $Version -like "*b*") {
     Write-Host "Pre-release version detected: $Version"
     $tag = "pre-releases/$Version"
 } else {

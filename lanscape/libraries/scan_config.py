@@ -90,7 +90,7 @@ class ScanConfig(BaseModel):
         return parse_ip_input(self.subnet)
 
     def __str__(self):
-        return f'''ScanCfg(subnet={
-            self.subnet}, ports={
-            self.port_list}, multiplier={
-            self.t_multiplier})'''
+        a = f'subnet={self.subnet}'
+        b = f'ports={self.port_list}'
+        c = f'scan_type={self.lookup_type.value}'
+        return f'ScanConfig({a}, {b}, {c})'

@@ -19,8 +19,8 @@ class LoggingConfigTests(unittest.TestCase):
         self.original_click_secho = click.secho
 
     def tearDown(self):
-        logging.shutdown()
         self.root.handlers.clear()
+        logging.shutdown()
         click.echo = self.original_click_echo
         click.secho = self.original_click_secho
 

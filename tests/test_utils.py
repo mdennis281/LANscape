@@ -53,7 +53,7 @@ class PortManagerValidateTests(unittest.TestCase):
 
     def test_validate_port_data_valid(self):
         valid = {"80": "http", "443": "https"}
-        self.assertTrue(PortManager.validate_port_data(self.pm, valid))
+        self.assertTrue(self.pm.validate_port_data(valid))
 
     def test_validate_port_data_invalid(self):
         invalid_cases = [

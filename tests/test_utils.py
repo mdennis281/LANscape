@@ -3,7 +3,6 @@ from lanscape.libraries.ip_parser import parse_ip_input
 from lanscape.libraries.errors import SubnetTooLargeError
 import ipaddress
 from lanscape.libraries import ip_parser
-from lanscape.libraries.errors import SubnetTooLargeError
 from lanscape.libraries.port_manager import PortManager
 from lanscape.libraries.decorators import timeout_enforcer
 import time

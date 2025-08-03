@@ -88,12 +88,20 @@ class IPAlive(JobStatsMixin):
                     count=cfg.ping_count,
                     interval=cfg.retry_delay,
                     timeout=cfg.timeout,
-                    privileged=True
+                    privileged=psutil.WINDOWS  # Use privileged mode on Windows
                 )
                 return result.is_alive
             except Exception as e:
                 self.caught_errors.append(DeviceError(e))
-                return False
+                # Fallback to system ping command
+                try:
+                    cmd = ["ping", "-c", str(cfg.ping_count), "-W", str(cfg.timeout), ip] if not psutil.WINDOWS else \
+                          ["ping", "-n", str(cfg.ping_count), "-w", str(cfg.timeout * 1000), ip]
+                    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    return result.returncode == 0
+                except Exception as fallback_error:
+                    self.caught_errors.append(DeviceError(fallback_error))
+                    return False
 
         try:
             for _ in range(cfg.attempts):

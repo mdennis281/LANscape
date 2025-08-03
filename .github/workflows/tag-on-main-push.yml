@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - bugs/*
 
 jobs:
   tag:
@@ -15,7 +16,7 @@ jobs:
       - name: Get the latest commit message
         id: get_commit
         run: |
-          echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
+            echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B | head -n1)" >> $GITHUB_ENV
 
       - name: Validate commit message
         id: validate
@@ -39,6 +40,6 @@ jobs:
       - name: Create tag
         if: ${{ env.VALID == 'true' }}
         run: |
-          TAG_NAME="releases/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
+          TAG_NAME="test/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
           git tag $TAG_NAME
           git push origin $TAG_NAME

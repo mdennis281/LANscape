@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - bugs/*
 
 jobs:
   tag:
@@ -40,6 +39,6 @@ jobs:
       - name: Create tag
         if: ${{ env.VALID == 'true' }}
         run: |
-          TAG_NAME="test/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
+          TAG_NAME="releases/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
           git tag $TAG_NAME
           git push origin $TAG_NAME

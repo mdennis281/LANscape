@@ -1,8 +1,4 @@
-from .blueprints.web import web_bp
-from .blueprints.api import api_bp
 from flask import Flask, render_template, request
-from time import sleep
-import multiprocessing
 import traceback
 import threading
 import logging
@@ -20,7 +16,8 @@ log = logging.getLogger('flask')
 
 # Import and register BPs
 ################################
-
+from lanscape.ui.blueprints.api import api_bp, tools, port, scan
+from lanscape.ui.blueprints.web import web_bp, routes
 
 app.register_blueprint(api_bp)
 app.register_blueprint(web_bp)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Get the executable path of the system’s default web browser.
 
@@ -15,7 +14,6 @@ import logging
 import re
 import time
 from typing import Optional
-from ..ui.app import app
 
 log = logging.getLogger('WebBrowser')
 

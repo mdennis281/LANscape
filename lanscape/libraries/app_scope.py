@@ -68,21 +68,8 @@ def is_local_run() -> bool:
     """
     module_path = Path(__file__).parent
 
-    # Check if the path is in site-packages/dist-packages
-
-    if module_path:
-        package_folders = ["site-packages", "dist-packages"]
-        parts = [part in module_path.parts for part in package_folders]
-        if any(parts):
-            return False
-        return False  # Installed package
-
-    # Check for a .git directory in the path or its parents
-    if module_path and any((parent / ".git").exists() for parent in module_path.parents):
-        return True  # Local development
-
-    # Check sys.path for non-standard local paths
-    if any(not str(Path(p)).startswith(('/usr', '/lib', '/site-packages')) for p in sys.path):
-        return True  # Local run
-
-    return False  # Default to installed package
+    package_folders = ["site-packages", "dist-packages"]
+    parts = [part in module_path.parts for part in package_folders]
+    if any(parts):
+        return False
+    return True  # Installed package

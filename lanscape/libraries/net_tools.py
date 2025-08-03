@@ -106,12 +106,14 @@ class IPAlive(JobStatsMixin):
                 if proc and proc.returncode == 0:
                     output = proc.stdout.lower()
 
-                    if 'ttl' in output:
-                        self._ping_alive = True
-                        return self._ping_alive
-                    if 'ping statistics' in output and '100.0% packet loss' not in output:
-                        self._ping_alive = True
-                        return self._ping_alive
+                    if psutil.WINDOWS or psutil.LINUX:
+                        if 'ttl' in output:
+                            self._ping_alive = True
+                            return self._ping_alive
+                    if psutil.MACOS or psutil.LINUX:
+                        if 'ping statistics' in output and '100.0% packet loss' not in output:
+                            self._ping_alive = True
+                            return self._ping_alive
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 self.caught_errors.append(DeviceError(e))
             if r < cfg.attempts - 1:

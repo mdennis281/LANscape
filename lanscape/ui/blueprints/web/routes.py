@@ -1,12 +1,10 @@
 from flask import render_template, request, redirect
-from . import web_bp
-from ..lanscape.libraries.subnet_scan import SubnetScanner
-from ..lanscape.libraries.net_tools import (
+from lanscape.ui.blueprints.web import web_bp
+from lanscape.libraries.net_tools import (
     get_all_network_subnets,
     smart_select_primary_subnet
 )
-from .. import scan_manager, log
-import os
+from lanscape.ui.blueprints import scan_manager, log
 
 # Template Renderer
 ############################################

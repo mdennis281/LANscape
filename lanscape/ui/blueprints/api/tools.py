@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from . import api_bp
+from lanscape.ui.blueprints.api import api_bp
 from lanscape.libraries.net_tools import get_all_network_subnets
 from lanscape.libraries.ip_parser import parse_ip_input
 from lanscape.libraries.errors import SubnetTooLargeError
@@ -28,7 +28,7 @@ def test_subnet():
 @api_bp.route('/api/tools/subnet/list')
 def list_subnet():
     """
-    list all interface subets
+    list all interface subnets
     """
     try:
         return jsonify(get_all_network_subnets())

@@ -64,7 +64,7 @@ class ScanConfig(BaseModel):
     # below wont run if above false
     task_scan_port_services: bool = False  # disabling until more stable
 
-    lookup_type: ScanType = ScanType.BOTH
+    lookup_type: ScanType = ScanType.PING
 
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_config: ArpConfig = Field(default_factory=ArpConfig)

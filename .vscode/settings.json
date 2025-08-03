@@ -13,6 +13,7 @@
     "python.terminal.shellIntegration.enabled": false,
     "pylint.cwd": "${workspaceFolder}/lanscape",
     "cSpell.words": [
+        "jsonify",
         "lanscape"
     ]
 }

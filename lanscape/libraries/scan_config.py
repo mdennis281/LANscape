@@ -1,7 +1,8 @@
-from typing import List
+from typing import List, Dict
 import ipaddress
 from pydantic import BaseModel, Field
 from enum import Enum
+
 
 from lanscape.libraries.port_manager import PortManager
 from lanscape.libraries.ip_parser import parse_ip_input
@@ -95,3 +96,48 @@ class ScanConfig(BaseModel):
         b = f'ports={self.port_list}'
         c = f'scan_type={self.lookup_type.value}'
         return f'ScanConfig({a}, {b}, {c})'
+
+
+DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
+    'balanced': ScanConfig(subnet='', port_list='medium'),
+    'accurate': ScanConfig(
+        subnet='',
+        port_list='large',
+        t_cnt_port_scan=5,
+        t_cnt_port_test=64,
+        t_cnt_isalive=64,
+        task_scan_ports=True,
+        task_scan_port_services=False,
+        lookup_type=ScanType.BOTH,
+        arp_config= ArpConfig(
+            attempts=3,
+            timeout=2.5
+        ),
+        ping_config=PingConfig(
+            attempts=3,
+            ping_count=2,
+            timeout=1.5,
+            retry_delay=0.5
+        )
+    ),
+    'fast': ScanConfig(
+        subnet='',
+        port_list='small',
+        t_cnt_port_scan=20,
+        t_cnt_port_test=256,
+        t_cnt_isalive=512,
+        task_scan_ports=True,
+        task_scan_port_services=False,
+        lookup_type=ScanType.BOTH,
+        arp_config=ArpConfig(
+            attempts=1,
+            timeout=1.0
+        ),
+        ping_config=PingConfig(
+            attempts=1,
+            ping_count=1,
+            timeout=0.5,
+            retry_delay=0.25
+        )
+    )
+}

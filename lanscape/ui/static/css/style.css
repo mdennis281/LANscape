@@ -163,24 +163,35 @@ details {
     border-radius: 5px !important; /* override bootstrap stuff */
     padding-right: 34px;
     margin-right: -34px;
+    margin-left: -41px;
+    padding-left: calc(41px + 5px);
 }
 
 
 #scan-form .input-group button {
     background-color: var(--primary-bg-accent);
     border: 0;
-    border-left: 1px var(--border-color) solid;
+    
     transition: all .2s ease-in-out;
     height: 40px;
-    border-radius: 0 5px 5px 0;
     margin-top: 1px;
     transform: translateX(.5px);
+    z-index: 3;
+    margin-left: 0;
 }
 #scan-form .input-group button:hover {
     background-color: var(--primary-bg-accent-hover);
 }
 #scan-form .input-group button:active {
     background-color: var(--primary-accent);
+}
+#scan-form .input-group button.start {
+    border-radius: 5px 0 0 5px;
+    border-right: 1px var(--border-color) solid;
+}
+#scan-form .input-group button.end {
+    border-radius: 0 5px 5px 0;
+    border-left: 1px var(--border-color) solid;
 }
 
 .label-container {
@@ -286,7 +297,7 @@ form {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    margin-bottom: 15px;
+    margin-bottom: 5px;
 }
 
 label {
@@ -326,6 +337,7 @@ button {
 #scan-form #scan-submit {
     border: none;
     padding: 10px 20px;
+    margin-top: 15px;
 }
 
 /* Button Styling */

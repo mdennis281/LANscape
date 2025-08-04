@@ -68,8 +68,4 @@ def get_scan_config():
     pulls config from the request body
     """
     data = request.get_json()
-    return ScanConfig(
-        subnet=data['subnet'],
-        port_list=data['port_list'],
-        t_multiplier=data.get('parallelism', 1.0)
-    )
+    return ScanConfig.from_dict(data)

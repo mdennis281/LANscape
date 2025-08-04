@@ -11,33 +11,36 @@
         </a>
         <!-- Right side: settings + form -->
         <div class="d-flex align-items-center justify-content-end ms-auto">
-            <span
-                id="settings-btn"
-                class="material-symbols-outlined secondary-icon-btn me-2"
-                data-bs-toggle="tooltip"
-                data-bs-placement="top"
-                title="Advanced scan settings"
-            >
-                settings
-            </span>
-        <form id="scan-form" class="d-flex align-items-center">
-            <div class="form-group me-2">
-                <div class="label-container">
-                    <label for="subnet">Subnet:</label>
-                    <div id="subnet-info"></div>
+            <form id="scan-form" class="d-flex align-items-center">
+                <div class="form-group me-2">
+                    <!-- Above subnet input -->
+                    <div class="label-container">
+                        <label for="subnet">Subnet:</label>
+                        <div id="subnet-info"></div>
+                    </div>
+                    <!-- Subnet input with dropdown -->
+                    <div class="input-group">
+                        <button
+                            type="button"
+                            id="settings-btn"
+                            class="btn btn-secondary start material-symbols-outlined"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="Advanced scan settings"
+                        >
+                            settings
+                        </button>
+                        <input type="text" id="subnet" name="subnet" class="form-control" value="{{ subnet }}" placeholder="Enter subnet">
+                        <button class="btn btn-secondary dropdown-toggle end" type="button" id="subnet-dropdown" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                        <ul class="dropdown-menu" aria-labelledby="subnet-dropdown" id="dropdown-list">
+                            {% for subnet_option in alternate_subnets %}
+                            <li><a class="dropdown-item" href="#">{{ subnet_option['subnet'] }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <input type="text" id="subnet" name="subnet" class="form-control" value="{{ subnet }}" placeholder="Enter subnet">
-                    <button class="btn btn-secondary dropdown-toggle" type="button" id="subnet-dropdown" data-bs-toggle="dropdown" aria-expanded="false"></button>
-                    <ul class="dropdown-menu" aria-labelledby="subnet-dropdown" id="dropdown-list">
-                        {% for subnet_option in alternate_subnets %}
-                        <li><a class="dropdown-item" href="#">{{ subnet_option['subnet'] }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-            <button type="submit" id="scan-submit" class="btn btn-primary mb-3">Scan</button>
-        </form>
+                <button type="submit" id="scan-submit" class="btn btn-primary">Scan</button>
+            </form>
         </div>
     </div>
 

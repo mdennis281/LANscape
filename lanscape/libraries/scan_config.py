@@ -83,7 +83,9 @@ class ScanConfig(BaseModel):
         return cls.model_validate(data)
 
     def to_dict(self) -> dict:
-        return self.model_dump()
+        dump = self.model_dump()
+        dump['lookup_type'] = self.lookup_type.value
+        return dump
 
     def get_ports(self) -> List[int]:
         return PortManager().get_port_list(self.port_list).keys()

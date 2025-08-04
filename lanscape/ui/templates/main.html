@@ -56,6 +56,20 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
+        <div class="d-flex justify-content-around mb-2">
+            <div class="config-option p-3" click="setScanConfig('fast')">
+                <h5>Fast</h5>
+                <p>Fast scan, Low accuracy</p>
+            </div>
+            <div class="config-option p-3" click="setScanConfig('balanced')">
+                <h5>Balanced</h5>
+                <p>Balanced scan, Moderate accuracy</p>
+            </div>
+            <div class="config-option p-3" click="setScanConfig('accurate')">
+                <h5>Accurate</h5>
+                <p>Thorough scan, High accuracy</p>
+            </div>
+        </div>
         <div class="form-group mt-2">
             <label for="port_list">Port List:</label>
             <div class="port-list-wrapper">
@@ -119,6 +133,7 @@
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/subnet-info.js') }}"></script>
 <script src="{{ url_for('static', filename='js/subnet-selector.js') }}"></script>
+<script src="{{ url_for('static', filename='js/scan-config.js') }}"></script>
 {% endblock %}
 
 

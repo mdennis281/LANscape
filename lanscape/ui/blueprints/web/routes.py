@@ -16,12 +16,10 @@ def index():
     subnet = smart_select_primary_subnet(subnets)
 
     port_list = 'medium'
-    parallelism = 1
     if scan_id := request.args.get('scan_id'):
         if scan := scan_manager.get_scan(scan_id):
             subnet = scan.cfg.subnet
             port_list = scan.cfg.port_list
-            parallelism = scan.cfg.t_multiplier
 
         else:
             log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
@@ -30,7 +28,6 @@ def index():
         'main.html',
         subnet=subnet,
         port_list=port_list,
-        parallelism=parallelism,
         alternate_subnets=subnets
     )
 

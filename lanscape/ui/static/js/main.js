@@ -3,16 +3,6 @@
 $(document).ready(function() {
     // Load port lists into the dropdown
     getPortLists();
-    
-    $('#parallelism').on('input', function() {
-        const val = $('#parallelism').val();
-        let ans = val;
-
-        if (parseFloat(val) > 1) {
-            ans += ' <span>Warning: Increased parallelism may have inaccurate results<span>'
-        }
-        $('#parallelism-value').html(ans);
-    });
     const scanId = getActiveScanId();
     if (scanId) {
         showScan(scanId);
@@ -46,15 +36,12 @@ $(document).ready(function() {
 });
 
 function submitNewScan() {
-    const formData = {
-        subnet: $('#subnet').val(),
-        port_list: $('#port-list').text(),
-        parallelism: $('#parallelism').val()
-    };
+    const config = getScanConfig();
+    config.subnet = $('#subnet').val();
     $.ajax('/api/scan', {
-        data : JSON.stringify(formData),
-        contentType : 'application/json',
-        type : 'POST',
+        data: JSON.stringify(config),
+        contentType: 'application/json',
+        type: 'POST',
         success: function(response) {
             if (response.status === 'running') {
                 showScan(response.scan_id);

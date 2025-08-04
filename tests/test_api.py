@@ -154,8 +154,7 @@ class ApiTestCase(unittest.TestCase):
         # Create a new scan
         new_scan = {
             'subnet': right_size_subnet(get_network_subnet()),
-            'port_list': 'small',
-            'parallelism': 1
+            'port_list': 'small'
         }
         response = self.app.post('/api/scan', json=new_scan)
         self.assertEqual(response.status_code, 200)

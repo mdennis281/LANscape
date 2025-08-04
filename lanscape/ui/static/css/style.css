@@ -390,20 +390,6 @@ input[type="range"] {
     margin: 5px 0;
 }
 
-input[type="range"]::-webkit-slider-thumb,
-input[type="range"]::-moz-range-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--primary-accent);
-    cursor: pointer;
-}
-#parallelism-value span {
-    color: var(--text-danger-color);
-    font-weight: 500;
-}
 .port-list-wrapper {
     position: relative;
     display: inline-block;
@@ -461,6 +447,20 @@ input[type="range"]::-moz-range-thumb {
 .port-list-dropdown div:hover {
     background-color: var(--secondary-accent);
     color: var(--text-color);
+}
+
+.config-option {
+    background-color: var(--primary-bg-accent);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    margin: 0 5px;
+}
+
+.config-option.active {
+    border-color: var(--primary-accent);
+    box-shadow: 0 0 5px var(--primary-accent);
 }
 
 .text-secondary {

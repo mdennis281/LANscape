@@ -1,0 +1,45 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Tag and Push Release",
+            "type": "shell",
+            "args": [
+                "${input:releaseVersion}"
+            ],
+            "problemMatcher": [],
+            "group": "build",
+            "windows": {
+                "command": "${workspaceFolder}/scripts/tag_release.ps1",
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "command": "${workspaceFolder}/scripts/tag_release.sh",
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "command": "${workspaceFolder}/scripts/tag_release.sh",
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "releaseVersion",
+            "type": "promptString",
+            "description": "Enter release version (e.g. v1.2.3):"
+        }
+    ]
+}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="header">
+      <!-- Header and Scan Submission Inline -->
+    <div class="d-flex justify-content-start align-items-center">
+        <a href="/" class="text-decoration-none" aria-label="Go to homepage">
+            <h1 class="title">
+                <span>LAN</span>scape 
+            </h1>
+        </a>
+    </div>
+</div>
+<div class="scroll-container" id="content">
+    {% if update_available %} 
+    <div class="container-fluid my-4">
+        <h3>New version available!</h3>
+        <p>
+            A new version has been published to PyPi. 
+            ({{app_version}} -> {{latest_version}})
+        </p>
+        <input type="text" readonly class="form-control mb-3 mt-3" value="pip install --upgrade lanscape --no-cache"/>
+        <a class="text-decoration-none" href="https://pypi.org/project/lanscape/" target="_blank">
+            <button class="btn btn-primary m-2">PyPi - Lanscape</button>
+        </a>
+    </div>  
+    {% endif %}
+    <div class="container-fluid my-4">
+        <h3>About</h3>
+        <p>
+            LANscape was born from my frustration with existing local network scanning tools 
+            alongside my desire to dive deeper into technologies like 
+            Address Resolution Protocol (ARP), threadpooling, & Python packaging. 
+            I set out to create something faster, lightweight, & easier to use.
+            This project has been a learning journey, & I hope it helps you 
+            discover more about your network as well. Enjoy!
+        </p>
+        <a  href="https://github.com/mdennis281/" class="text-decoration-none" target="_blank">
+            <button class="btn btn-primary m-2">GitHub</button>
+        </a>
+        <a  href="https://github.com/mdennis281/LANscape" class="text-decoration-none" target="_blank">
+            <button class="btn btn-secondary m-2">Project Repo</button>
+        </a>
+    </div>  
+    <div class="container-fluid my-4">
+        <h3>Runtime Arguments</h3>
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, value in runtime_args.items() %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+     
+</div>
+
+{% endblock %}
+

@@ -13,7 +13,7 @@ python -m lanscape
  - `--port <port number>` port of the flask app (default: automagic)
  - `--persistent` dont shutdown server when browser tab is closed (default: false)
  - `--reloader` essentially flask debug mode- good for local development (default: false)
- - `--logfile` save log output to lanscape.log
+ - `--logfile <path>` save log output to the given file path
  - `--loglevel <level>` set the logger's log level (default: INFO)
  - `--flask-logging` turn on flask logging (default: false)
 
@@ -21,7 +21,7 @@ Examples:
 ```shell
 python -m lanscape --reloader
 python -m lanscape --port 5002
-python -m lanscape --logfile --loglevel DEBUG
+python -m lanscape --logfile /tmp/lanscape.log --loglevel DEBUG
 ```
 
 ## Troubleshooting

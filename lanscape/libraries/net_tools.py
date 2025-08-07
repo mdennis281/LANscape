@@ -29,7 +29,6 @@ class IPAlive(JobStatsMixin):
     caught_errors: List[DeviceError] = []
     _icmp_alive: bool = False
     _arp_alive: bool = False
-    
 
     @job_tracker
     def is_alive(
@@ -99,15 +98,15 @@ class IPAlive(JobStatsMixin):
                 try:
                     if psutil.WINDOWS:
                         cmd = [
-                            "ping", "-n", str(cfg.ping_count), 
+                            "ping", "-n", str(cfg.ping_count),
                             "-w", str(int(cfg.timeout * 1000)), ip
                         ]
                     else:
                         cmd = ["ping", "-c", str(cfg.ping_count), "-W", str(cfg.timeout), ip]
 
                     result = subprocess.run(
-                        cmd, stdout=subprocess.PIPE, 
-                        stderr=subprocess.PIPE, 
+                        cmd, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
                         text=True, check=False
                     )
                     return result.returncode == 0

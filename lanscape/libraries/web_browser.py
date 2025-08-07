@@ -62,7 +62,6 @@ def get_default_browser_executable() -> Optional[str]:
     if sys.platform.startswith("win"):
         return windows_get_browser_from_registry()
 
-
     elif sys.platform.startswith("linux"):
         # First, find the .desktop file name
         desktop_file = None
@@ -135,7 +134,7 @@ def get_default_browser_executable() -> Optional[str]:
 def windows_get_browser_from_registry() -> Optional[str]:
     """Get the default web browser executable path on Windows."""
 
-    import winreg # pylint: disable=import-outside-toplevel
+    import winreg  # pylint: disable=import-outside-toplevel
 
     def get_reg(base, path, key=None):
         """Helper function to read a registry key."""

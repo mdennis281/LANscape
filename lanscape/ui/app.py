@@ -1,13 +1,17 @@
-from flask import Flask, render_template, request
+
+from lanscape.ui.blueprints.web import web_bp, routes
+from lanscape.ui.blueprints.api import api_bp, tools, port, scan
 import traceback
 import threading
 import logging
 import os
+from flask import Flask, render_template, request
 
 from lanscape.libraries.runtime_args import RuntimeArgs, parse_args
 from lanscape.libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
 from lanscape.libraries.app_scope import is_local_run
 from lanscape.libraries.net_tools import is_arp_supported
+from lanscape.ui.shutdown_handler import FlaskShutdownHandler
 
 app = Flask(
     __name__
@@ -16,8 +20,6 @@ log = logging.getLogger('flask')
 
 # Import and register BPs
 ################################
-from lanscape.ui.blueprints.api import api_bp, tools, port, scan
-from lanscape.ui.blueprints.web import web_bp, routes
 
 app.register_blueprint(api_bp)
 app.register_blueprint(web_bp)
@@ -65,32 +67,8 @@ set_global_safe('is_arp_supported', is_arp_supported)
 # External hook to kill flask server
 ################################
 
-exiting = False
-
-
-@app.route("/shutdown", methods=['GET', 'POST'])
-def exit_app():
-
-    req_type = request.args.get('type')
-    if req_type == 'browser-close':
-        args = parse_args()
-        if args.persistent:
-            log.info('Dectected browser close, not exiting flask.')
-            return "Ignored"
-        log.info('Web browser closed, terminating flask. (disable with --peristent)')
-    elif req_type == 'core':
-        log.info('Core requested exit, terminating flask.')
-    else:
-        log.info('Received external exit request. Terminating flask.')
-    global exiting
-    exiting = True
-    return "Done"
-
-
-@app.teardown_request
-def teardown(exception):
-    if exiting:
-        os._exit(0)
+shutdown_handler = FlaskShutdownHandler(app)
+shutdown_handler.register_endpoints()
 
 # Generalized error handling
 ################################
@@ -111,14 +89,16 @@ def internal_error(e):
 
 
 def start_webserver_daemon(args: RuntimeArgs) -> threading.Thread:
+    """Start the web server in a daemon thread."""
     proc = threading.Thread(target=start_webserver, args=(args,))
     proc.daemon = True  # Kill thread when main thread exits
     proc.start()
-    log.info('Flask server initializing as dameon')
+    log.info('Flask server initializing as daemon')
     return proc
 
 
 def start_webserver(args: RuntimeArgs) -> int:
+    """Start webserver (blocking)"""
     run_args = {
         'host': '0.0.0.0',
         'port': args.port,

@@ -1,5 +1,4 @@
 import logging
-import platform
 import ipaddress
 import traceback
 import subprocess
@@ -28,6 +27,9 @@ log = logging.getLogger('NetTools')
 class IPAlive(JobStatsMixin):
     """Class to check if a device is alive using ARP and/or ping scans."""
     caught_errors: List[DeviceError] = []
+    _icmp_alive: bool = False
+    _arp_alive: bool = False
+    
 
     @job_tracker
     def is_alive(
@@ -95,11 +97,21 @@ class IPAlive(JobStatsMixin):
                 self.caught_errors.append(DeviceError(e))
                 # Fallback to system ping command
                 try:
-                    cmd = ["ping", "-c", str(cfg.ping_count), "-W", str(cfg.timeout), ip] if not psutil.WINDOWS else \
-                          ["ping", "-n", str(cfg.ping_count), "-w", str(cfg.timeout * 1000), ip]
-                    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    if psutil.WINDOWS:
+                        cmd = [
+                            "ping", "-n", str(cfg.ping_count), 
+                            "-w", str(int(cfg.timeout * 1000)), ip
+                        ]
+                    else:
+                        cmd = ["ping", "-c", str(cfg.ping_count), "-W", str(cfg.timeout), ip]
+
+                    result = subprocess.run(
+                        cmd, stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE, 
+                        text=True, check=False
+                    )
                     return result.returncode == 0
-                except Exception as fallback_error:
+                except subprocess.CalledProcessError as fallback_error:
                     self.caught_errors.append(DeviceError(fallback_error))
                     return False
 
@@ -117,6 +129,7 @@ class IPAlive(JobStatsMixin):
 
 class Device(IPAlive):
     """Represents a network device with metadata and scanning capabilities."""
+
     def __init__(self, ip: str):
         super().__init__()
         self.ip: str = ip
@@ -245,7 +258,7 @@ def get_ip_address(interface: str):
     def unix_like():  # Combined Linux and macOS
         try:
             # pylint: disable=import-outside-toplevel, import-error
-            import fcntl 
+            import fcntl
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             ip_address = socket.inet_ntoa(fcntl.ioctl(
                 sock.fileno(),
@@ -280,7 +293,7 @@ def get_netmask(interface: str):
     def unix_like():  # Combined Linux and macOS
         try:
             # pylint: disable=import-outside-toplevel, import-error
-            import fcntl 
+            import fcntl
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             netmask = socket.inet_ntoa(fcntl.ioctl(
                 sock.fileno(),

@@ -1,4 +1,4 @@
-
+"""Helper functions for tests in the lanscape project."""
 from lanscape.libraries.ip_parser import get_address_count
 
 

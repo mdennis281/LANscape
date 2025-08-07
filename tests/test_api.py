@@ -1,15 +1,30 @@
-import unittest
+"""
+API integration tests for the LANscape application.
+Tests REST API endpoints for port management, subnet validation, and scan operations.
+"""
 import json
+import time
+import unittest
+
 from lanscape.ui.app import app
 from lanscape.libraries.net_tools import get_network_subnet
+
 from ._helpers import right_size_subnet
-import time
 
 
 class ApiTestCase(unittest.TestCase):
+    """
+    Test cases for the LANscape REST API.
+    Tests the full lifecycle of API operations including port list management,
+    subnet validation, and network scanning functionality.
+    """
     app = app.test_client()
 
     def test_port_lifecycle(self):
+        """
+        Test the complete lifecycle of port list management through the API.
+        Creates, retrieves, updates, and deletes a port list through API endpoints.
+        """
         # Delete the new port list if it exists
         self.app.delete('/api/port/list/test_port_list_lifecycle')
 
@@ -56,6 +71,10 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_scan(self):
+        """
+        Test the scan API functionality by creating and monitoring a network scan.
+        Verifies scan creation, status retrieval, and UI rendering for scan results.
+        """
         # Delete the new port list if it exists
         self.app.delete('/api/port/list/test_port_list_scan')
 

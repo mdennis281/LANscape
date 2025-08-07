@@ -78,7 +78,7 @@ class DecoratorTimeoutTests(unittest.TestCase):
 
         @timeout_enforcer(0.1, raise_on_timeout=True)
         def slow_raise():
-            time.sleep(0.2)
+            time.sleep(0.5)
             return "done"
 
         with self.assertRaises(TimeoutError):

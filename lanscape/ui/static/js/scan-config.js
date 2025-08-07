@@ -2,10 +2,16 @@ let defaultScanConfigs = {};
 let activeConfigName = 'balanced';
 
 $(document).ready(function() {
-    getScanDefaults(function() {
-        setScanConfig('balanced');
+    // load port lists
+    getPortLists(function() {
+        // THEN get scan config defaults
+        getScanDefaults(function() {
+            // THEN set the default scan config
+            setScanConfig('balanced');
+        })
     });
-    $('#t_cnt_port_scan, #t_cnt_port_test, #t_multiplier').on('input', updatePortTotals);
+    
+    $('#t_cnt_port_scan, #t_cnt_port_test').on('input', updatePortTotals);
     $('#ping_attempts, #ping_ping_count').on('input', updatePingTotals);
 });
 
@@ -26,7 +32,7 @@ function setScanConfig(configName) {
     $(`#config-${configName}`).addClass('active');
 
     // basic settings
-    $('#port-list').text(config.port_list);
+    $('#port_list').val(config.port_list);
     $('#t_multiplier').val(config.t_multiplier);
     $('#t_cnt_port_scan').val(config.t_cnt_port_scan);
     $('#t_cnt_port_test').val(config.t_cnt_port_test);
@@ -51,8 +57,7 @@ function setScanConfig(configName) {
 
 function getScanConfig() {
     return {
-        port_list: $('#port-list').text(),
-        t_multiplier: parseFloat($('#t_multiplier').val()),
+        port_list: $('#port_list').val(),
         t_cnt_port_scan: parseInt($('#t_cnt_port_scan').val()),
         t_cnt_port_test: parseInt($('#t_cnt_port_test').val()),
         t_cnt_isalive: parseInt($('#t_cnt_isalive').val()),
@@ -72,17 +77,29 @@ function getScanConfig() {
     };
 }
 
+function getPortLists(callback=null) {
+    $.get('/api/port/list', function(data) {
+        const customSelectDropdown = $('#port_list');
+        customSelectDropdown.empty();
+    
+        // Populate the dropdown with the options
+        data.forEach(function(portList) {
+            customSelectDropdown.append('<option>' + portList + '</option>');
+        });
+        if (callback) callback();
+    });
+}
+
 function updatePortTotals() {
     const scan = parseInt($('#t_cnt_port_scan').val()) || 0;
     const test = parseInt($('#t_cnt_port_test').val()) || 0;
-    const mult = parseFloat($('#t_multiplier').val()) || 0;
-    $('#total-port-tests').text(scan * test * mult);
+    $('#total-port-tests').val(scan * test);
 }
 
 function updatePingTotals() {
     const attempts = parseInt($('#ping_attempts').val()) || 0;
     const count = parseInt($('#ping_ping_count').val()) || 0;
-    $('#total-ping-attempts').text(attempts * count);
+    $('#total-ping-attempts').val(attempts * count);
 }
 
 // expose functions globally

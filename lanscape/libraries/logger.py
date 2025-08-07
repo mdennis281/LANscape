@@ -1,10 +1,31 @@
+"""
+Logging configuration module for the lanscape application.
+
+This module provides utilities to configure logging for both console and file output,
+with options to control log levels and disable Flask's verbose logging output.
+"""
 import logging
 from logging.handlers import RotatingFileHandler
-import click
 from typing import Optional
+
+import click
 
 
 def configure_logging(loglevel: str, logfile: Optional[str], flask_logging: bool = False) -> None:
+    """
+    Configure the application's logging system.
+
+    Sets up logging with the specified log level and optionally directs output to a file.
+    When a logfile is specified, rotating file handlers are configured to manage log size.
+
+    Args:
+        loglevel (str): Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        logfile (Optional[str]): Path to log file, or None for console-only logging
+        flask_logging (bool): Whether to allow Flask's default logging (defaults to False)
+
+    Raises:
+        ValueError: If an invalid log level is specified
+    """
     numeric_level = getattr(logging, loglevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f'Invalid log level: {loglevel}')
@@ -30,12 +51,19 @@ def configure_logging(loglevel: str, logfile: Optional[str], flask_logging: bool
 
 
 def disable_flask_logging() -> None:
+    """
+    Disable Flask and Werkzeug logging output.
 
+    Overrides click's echo and secho functions to suppress output and
+    sets Werkzeug's logger level to ERROR to reduce log verbosity.
+    """
     def override_click_logging():
-        def secho(text, file=None, nl=None, err=None, color=None, **styles):
+        def secho(*, text=None, file=None, nl=None, err=None, color=None, **styles):  # pylint: disable=unused-argument
+            """Dummy function to override click.secho and suppress output."""
             pass
 
-        def echo(text, file=None, nl=None, err=None, color=None, **styles):
+        def echo(*, text=None, file=None, nl=None, err=None, color=None, **styles):  # pylint: disable=unused-argument
+            """Dummy function to override click.echo and suppress output."""
             pass
 
         click.echo = echo

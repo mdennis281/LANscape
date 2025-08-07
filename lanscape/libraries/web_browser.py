@@ -60,18 +60,8 @@ def open_webapp(url: str) -> bool:
 
 def get_default_browser_executable() -> Optional[str]:
     if sys.platform.startswith("win"):
-        try:
-            import winreg
-            # On Windows the HKEY_CLASSES_ROOT\http\shell\open\command key
-            # holds the command for opening HTTP URLs.
-            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r"http\shell\open\command") as key:
-                cmd, _ = winreg.QueryValueEx(key, None)
-        except Exception:
-            return None
+        return windows_get_browser_from_registry()
 
-        # cmd usually looks like: '"C:\\Program Files\\Foo\\foo.exe" %1'
-        m = re.match(r'\"?(.+?\.exe)\"?', cmd)
-        return m.group(1) if m else None
 
     elif sys.platform.startswith("linux"):
         # First, find the .desktop file name
@@ -140,3 +130,64 @@ def get_default_browser_executable() -> Optional[str]:
 
     else:
         raise NotImplementedError(f"Unsupported platform: {sys.platform!r}")
+
+
+def windows_get_browser_from_registry() -> Optional[str]:
+    """Get the default web browser executable path on Windows."""
+
+    import winreg # pylint: disable=import-outside-toplevel
+
+    def get_reg(base, path, key=None):
+        """Helper function to read a registry key."""
+        try:
+            with winreg.OpenKey(base, path) as reg:
+                return winreg.QueryValueEx(reg, key)[0]
+        except FileNotFoundError:
+            return None
+
+    def extract_executable(cmd: str) -> Optional[str]:
+        """Extract the executable path from a command string."""
+        match = re.match(r'"?([^"]+)"?', cmd)
+        return match.group(1) if match else None
+
+    def get_user_preferred_browser():
+        """Get the user preferred browser from the registry."""
+        progid = get_reg(
+            winreg.HKEY_CURRENT_USER,
+            r'Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice',
+            'ProgId'
+        )
+        if not progid:
+            log.debug('No user preferred browser found in registry')
+            return None
+
+        browser_path = get_reg(
+            winreg.HKEY_CLASSES_ROOT,
+            f'{progid}\\shell\\open\\command'
+        )
+
+        if not browser_path:
+            log.debug(f'progid {progid} does not have a command in registry')
+            return None
+
+        return extract_executable(browser_path)
+
+    def get_system_default_browser():
+        """Get the system default browser from the registry."""
+        reg = get_reg(
+            winreg.HKEY_CLASSES_ROOT,
+            r'http\shell\open\command'
+        )
+        if not reg:
+            log.debug('No system default browser found in registry')
+            return None
+
+        return extract_executable(reg)
+
+    user_browser = get_user_preferred_browser()
+    if user_browser:
+        return extract_executable(user_browser)
+
+    system_browser = get_system_default_browser()
+    if system_browser:
+        return extract_executable(system_browser)

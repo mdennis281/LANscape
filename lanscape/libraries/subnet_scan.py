@@ -272,7 +272,7 @@ class ScannerResults:
         self.devices_total: int = len(list(scan.subnet))
         self.devices_scanned: int = 0
         self.devices: List[Device] = []
-        self.devices_alive = 0  # Initialize here to avoid attribute-defined-outside-init
+        self.devices_alive = 0
 
         # Status tracking
         self.errors: List[str] = []
@@ -280,7 +280,7 @@ class ScannerResults:
         self.start_time: float = time()
         self.end_time: int = None
         self.stage = 'instantiated'
-        self.run_time = 0  # Initialize here to avoid attribute-defined-outside-init
+        self.run_time = 0
 
         # Logging
         self.log = logging.getLogger('ScannerResults')

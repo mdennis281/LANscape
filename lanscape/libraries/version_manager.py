@@ -62,7 +62,7 @@ def lookup_latest_version(package=PACKAGE):
         The latest version string from PyPI or None if retrieval fails
     """
     # Fetch the latest version from PyPI
-    global LATEST_VERSION # pylint: disable=global-statement
+    global LATEST_VERSION  # pylint: disable=global-statement
     if not LATEST_VERSION:
         no_cache = f'?cachebust={randint(0, 6969)}'
         url = f"https://pypi.org/pypi/{package}/json{no_cache}"

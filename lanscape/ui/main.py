@@ -1,4 +1,4 @@
-
+"""Main entry point for the LANscape application when running as a module."""
 import socket
 
 
@@ -7,8 +7,10 @@ import time
 import logging
 import traceback
 import os
+import requests
+
 from lanscape.libraries.logger import configure_logging
-from lanscape.libraries.runtime_args import parse_args, RuntimeArgs
+from lanscape.libraries.runtime_args import parse_args
 from lanscape.libraries.web_browser import open_webapp
 from lanscape.libraries.net_tools import is_arp_supported
 from lanscape.libraries.version_manager import get_installed_version, is_update_available
@@ -25,6 +27,7 @@ IS_FLASK_RELOAD = os.environ.get("WERKZEUG_RUN_MAIN")
 
 
 def main():
+    """core entry point for running lanscape as a module."""
     try:
         _main()
     except KeyboardInterrupt:
@@ -47,10 +50,15 @@ def _main():
     args.port = get_valid_port(args.port)
 
     if not is_arp_supported():
-        log.warning('ARP is not supported, device discovery is degraded. For more information, see the help guide: https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md')
+        warn = (
+            'ARP is not supported, device discovery is degraded. ',
+            'For more information, see the help guide: ',
+            'https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md'
+        )
+        log.warning(''.join(warn))
 
     try:
-        start_webserver_ui(args)
+        start_webserver_ui()
         log.info('Exiting...')
     except Exception as e:
         # showing error in debug only because this is handled gracefully
@@ -60,6 +68,7 @@ def _main():
 
 
 def try_check_update():
+    """Check for updates and log if available."""
     try:
         if is_update_available():
             log.info('An update is available!')
@@ -86,7 +95,8 @@ def open_browser(url: str, wait=2) -> bool:
     return False
 
 
-def start_webserver_ui(args: RuntimeArgs):
+def start_webserver_ui():
+    """Start the web server and open the UI in a browser."""
     uri = f'http://127.0.0.1:{args.port}'
 
     # running reloader requires flask to run in main thread
@@ -128,9 +138,9 @@ def get_valid_port(port: int):
 
 
 def terminate():
-    import requests
+    """send a request to the shutdown flask"""
     log.info('Attempting flask shutdown')
-    requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core')
+    requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core', timeout=2)
 
 
 if __name__ == "__main__":

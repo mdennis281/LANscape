@@ -1,5 +1,6 @@
+"""Network tools for scanning and managing devices on a network."""
+
 import logging
-import platform
 import ipaddress
 import traceback
 import subprocess
@@ -28,6 +29,8 @@ log = logging.getLogger('NetTools')
 class IPAlive(JobStatsMixin):
     """Class to check if a device is alive using ARP and/or ping scans."""
     caught_errors: List[DeviceError] = []
+    _icmp_alive: bool = False
+    _arp_alive: bool = False
 
     @job_tracker
     def is_alive(
@@ -95,11 +98,22 @@ class IPAlive(JobStatsMixin):
                 self.caught_errors.append(DeviceError(e))
                 # Fallback to system ping command
                 try:
-                    cmd = ["ping", "-c", str(cfg.ping_count), "-W", str(cfg.timeout), ip] if not psutil.WINDOWS else \
-                          ["ping", "-n", str(cfg.ping_count), "-w", str(cfg.timeout * 1000), ip]
-                    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    if psutil.WINDOWS:
+                        cmd = [
+                            "ping", "-n", str(cfg.ping_count),
+                            "-w", str(int(cfg.timeout * 1000)), ip
+                        ]
+                    else:
+                        cmd = ["ping", "-c",
+                               str(cfg.ping_count), "-W", str(cfg.timeout), ip]
+
+                    result = subprocess.run(
+                        cmd, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True, check=False
+                    )
                     return result.returncode == 0
-                except Exception as fallback_error:
+                except subprocess.CalledProcessError as fallback_error:
                     self.caught_errors.append(DeviceError(fallback_error))
                     return False
 
@@ -117,6 +131,7 @@ class IPAlive(JobStatsMixin):
 
 class Device(IPAlive):
     """Represents a network device with metadata and scanning capabilities."""
+
     def __init__(self, ip: str):
         super().__init__()
         self.ip: str = ip
@@ -232,6 +247,7 @@ class MacSelector:
             self.macs[mac] = self.macs.get(mac, 0) + 1
 
     def clear(self):
+        """Clear the stored MAC addresses."""
         self.macs = {}
 
 
@@ -245,7 +261,7 @@ def get_ip_address(interface: str):
     def unix_like():  # Combined Linux and macOS
         try:
             # pylint: disable=import-outside-toplevel, import-error
-            import fcntl 
+            import fcntl
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             ip_address = socket.inet_ntoa(fcntl.ioctl(
                 sock.fileno(),
@@ -268,19 +284,19 @@ def get_ip_address(interface: str):
     # Call the appropriate function based on the platform
     if psutil.WINDOWS:
         return windows()
-    else:  # Linux, macOS, and other Unix-like systems
-        return unix_like()
+
+    # Linux, macOS, and other Unix-like systems
+    return unix_like()
 
 
 def get_netmask(interface: str):
     """
     Get the netmask of a network interface.
     """
-
     def unix_like():  # Combined Linux and macOS
         try:
             # pylint: disable=import-outside-toplevel, import-error
-            import fcntl 
+            import fcntl
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             netmask = socket.inet_ntoa(fcntl.ioctl(
                 sock.fileno(),
@@ -303,8 +319,9 @@ def get_netmask(interface: str):
 
     if psutil.WINDOWS:
         return windows()
-    else:  # Linux, macOS, and other Unix-like systems
-        return unix_like()
+
+    # Linux, macOS, and other Unix-like systems
+    return unix_like()
 
 
 def get_cidr_from_netmask(netmask: str):
@@ -316,71 +333,122 @@ def get_cidr_from_netmask(netmask: str):
     return str(len(binary_str.rstrip('0')))
 
 
+def _find_interface_by_default_gateway_windows():
+    """Find the network interface with the default gateway on Windows."""
+    try:
+        output = subprocess.check_output(
+            "route print 0.0.0.0", shell=True, text=True)
+        return _parse_windows_route_output(output)
+    except Exception as e:
+        log.debug(f"Error finding Windows interface by gateway: {e}")
+    return None
+
+
+def _parse_windows_route_output(output):
+    """Parse the output of Windows route command to extract interface index."""
+    lines = output.strip().split('\n')
+    interface_idx = None
+
+    # First find the interface index from the routing table
+    for line in lines:
+        if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
+            parts = [p for p in line.split() if p]
+            if len(parts) >= 4:
+                interface_idx = parts[3]
+                break
+
+    # If we found an index, find the corresponding interface name
+    if interface_idx:
+        for iface_name in psutil.net_if_addrs():
+            if str(interface_idx) in iface_name:
+                return iface_name
+
+    return None
+
+
+def _find_interface_by_default_gateway_unix():
+    """Find the network interface with the default gateway on Unix-like systems."""
+    try:
+        cmd = "ip route show default 2>/dev/null || netstat -rn | grep default"
+        output = subprocess.check_output(cmd, shell=True, text=True)
+        return _parse_unix_route_output(output)
+    except Exception as e:
+        log.debug(f"Error finding Unix interface by gateway: {e}")
+    return None
+
+
+def _parse_unix_route_output(output):
+    """Parse the output of Unix route commands to extract interface name."""
+    for line in output.split('\n'):
+        # Parse lines with 'default via ... dev ...'
+        if 'default via' in line and 'dev' in line:
+            return line.split('dev')[1].split()[0]
+
+        # Parse simpler 'default ...' lines
+        if 'default' in line:
+            parts = line.split()
+            if len(parts) > 3:
+                # Interface is usually the last column
+                return parts[-1]
+    return None
+
+
+def _get_candidate_interfaces():
+    """Get a list of candidate network interfaces."""
+    candidates = []
+    for interface, addrs in psutil.net_if_addrs().items():
+        stats = psutil.net_if_stats().get(interface)
+        if not stats or not stats.isup:
+            continue
+
+        ipv4_addrs = [addr for addr in addrs if addr.family == socket.AF_INET]
+        if not ipv4_addrs:
+            continue
+
+        # Skip loopback and common virtual interfaces
+        is_loopback = any(addr.address.startswith('127.')
+                          for addr in ipv4_addrs)
+        if is_loopback:
+            continue
+
+        virtual_names = ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth']
+        is_virtual = any(name in interface.lower() for name in virtual_names)
+        if is_virtual:
+            continue
+
+        candidates.append(interface)
+    return candidates
+
+
 def get_primary_interface():
     """
     Get the primary network interface that is likely handling internet traffic.
     Uses heuristics to identify the most probable interface.
     """
     # Try to find the interface with the default gateway
-    try:
-        if psutil.WINDOWS:
-            # On Windows, parse route print output
-            output = subprocess.check_output(
-                "route print 0.0.0.0", shell=True, text=True)
-            lines = output.strip().split('\n')
-            for line in lines:
-                if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
-                    parts = [p for p in line.split() if p]
-                    if len(parts) >= 4:
-                        interface_idx = parts[3]
-                        # Find interface name in the output
-                        for iface_name, addrs in psutil.net_if_addrs().items():
-                            if str(interface_idx) in iface_name:
-                                return iface_name
-        else:
-            # Linux/Unix/Mac - use ip route or netstat
-            try:
-                output = subprocess.check_output(
-                    "ip route show default 2>/dev/null || netstat -rn | grep default", shell=True, text=True)
-                for line in output.split('\n'):
-                    if 'default via' in line and 'dev' in line:
-                        return line.split('dev')[1].split()[0]
-                    elif 'default' in line:
-                        parts = line.split()
-                        if len(parts) > 3:
-                            # Interface is usually the last column
-                            return parts[-1]
-            except (subprocess.SubprocessError, IndexError, FileNotFoundError):
-                pass
-    except Exception as e:
-        log.debug(f"Error determining primary interface: {e}")
+    if psutil.WINDOWS:
+        interface = _find_interface_by_default_gateway_windows()
+        if interface:
+            return interface
+    else:
+        interface = _find_interface_by_default_gateway_unix()
+        if interface:
+            return interface
 
     # Fallback: Identify likely candidates based on heuristics
-    candidates = []
-
-    for interface, addrs in psutil.net_if_addrs().items():
-        stats = psutil.net_if_stats().get(interface)
-        if stats and stats.isup:
-            ipv4_addrs = [
-                addr for addr in addrs if addr.family == socket.AF_INET]
-            if ipv4_addrs:
-                # Skip loopback and common virtual interfaces
-                is_loopback = any(addr.address.startswith('127.')
-                                  for addr in ipv4_addrs)
-                is_virtual = any(name in interface.lower() for name in
-                                 ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth'])
-
-                if not is_loopback and not is_virtual:
-                    candidates.append(interface)
+    candidates = _get_candidate_interfaces()
+    if not candidates:
+        return None
 
     # Prioritize interfaces with names typically used for physical connections
-    for prefix in ['eth', 'en', 'wlan', 'wifi', 'wl', 'wi']:
+    physical_prefixes = ['eth', 'en', 'wlan', 'wifi', 'wl', 'wi']
+    for prefix in physical_prefixes:
         for interface in candidates:
             if interface.lower().startswith(prefix):
                 return interface
 
-    # Otherwise return the first candidate or None
-    return candidates[0] if candidates else None
+    # Otherwise return the first candidate
+    return candidates[0]
 
 
 def get_host_ip_mask(ip_with_cidr: str):
@@ -443,13 +511,16 @@ def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
     """
     if not snicaddr.address or not snicaddr.netmask:
         return None
-    elif snicaddr.family == socket.AF_INET:
+
+    if snicaddr.family == socket.AF_INET:
         addr = f"{snicaddr.address}/{get_cidr_from_netmask(snicaddr.netmask)}"
-    elif snicaddr.family == socket.AF_INET6:
+        return get_host_ip_mask(addr)
+
+    if snicaddr.family == socket.AF_INET6:
         addr = f"{snicaddr.address}/{snicaddr.netmask}"
-    else:
-        return f"{snicaddr.address}"
-    return get_host_ip_mask(addr)
+        return get_host_ip_mask(addr)
+
+    return f"{snicaddr.address}"
 
 
 def smart_select_primary_subnet(subnets: List[dict] = None) -> str:

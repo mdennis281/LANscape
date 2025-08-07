@@ -1,3 +1,8 @@
+"""
+MAC address lookup and resolution service.
+This module provides functionality to look up MAC addresses and resolve them
+"""
+
 import re
 import logging
 import platform

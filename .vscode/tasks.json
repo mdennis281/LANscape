@@ -33,8 +33,54 @@
                     }
                 }
             }
+        },
+        {
+            "label": "Run Linter (Autopep8)",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "autopep8",
+                "--in-place",
+                "--recursive",
+                ".",
+                "--max-line-length",
+                "100",
+                "-aa"
+            ],
+            "problemMatcher": ["$python"],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
         }
     ],
+    
     "inputs": [
         {
             "id": "releaseVersion",

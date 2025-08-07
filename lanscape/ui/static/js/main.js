@@ -2,21 +2,15 @@
 
 $(document).ready(function() {
     // Load port lists into the dropdown
-    getPortLists();
-    
-    $('#parallelism').on('input', function() {
-        const val = $('#parallelism').val();
-        let ans = val;
-
-        if (parseFloat(val) > 1) {
-            ans += ' <span>Warning: Increased parallelism may have inaccurate results<span>'
-        }
-        $('#parallelism-value').html(ans);
-    });
     const scanId = getActiveScanId();
     if (scanId) {
         showScan(scanId);
     }
+
+    // this prevents the browser from
+    // triggering the shutdown beacon
+    // when user clicks the logo
+    setUrlParam('loaded', 'true')
     
 
     // Handle form submission
@@ -39,18 +33,19 @@ $(document).ready(function() {
         $('#ip-table-frame').attr('src', newSrc);
     });
 
+    $('#settings-btn').on('click', function() {
+        $('#advanced-modal').modal('show');
+    });
+
 });
 
 function submitNewScan() {
-    const formData = {
-        subnet: $('#subnet').val(),
-        port_list: $('#port-list').text(),
-        parallelism: $('#parallelism').val()
-    };
+    const config = getScanConfig();
+    config.subnet = $('#subnet').val();
     $.ajax('/api/scan', {
-        data : JSON.stringify(formData),
-        contentType : 'application/json',
-        type : 'POST',
+        data: JSON.stringify(config),
+        contentType: 'application/json',
+        type: 'POST',
         success: function(response) {
             if (response.status === 'running') {
                 showScan(response.scan_id);
@@ -75,37 +70,9 @@ function showScan(scanId) {
     //$('#overview-frame').attr('src', '/scan/' + scanId + '/overview');
     $('#ip-table-frame').attr('src', '/scan/' + scanId + '/table');
     
-    // set url query string 'scan_id' to the scan_id
-    const url = new URL(window.location.href);
-    url.searchParams.set('scan_id', scanId);
-    // set url to the new url
-    window.history.pushState({}, '', url);
+    setUrlParam('scan_id', scanId);
 }
 
-function getPortLists() {
-    $.get('/api/port/list', function(data) {
-        const customSelect = $('#port-list');
-        const customSelectDropdown = $('#port-list-dropdown');
-        customSelectDropdown.empty();
-    
-        // Populate the dropdown with the options
-        data.forEach(function(portList) {
-            customSelectDropdown.append('<div>' + portList + '</div>');
-        });
-    
-        // Handle dropdown click
-        customSelect.on('click', function() {
-            customSelectDropdown.toggleClass('open');
-        });
-    
-        // Handle option selection
-        customSelectDropdown.on('click', 'div', function() {
-            const selectedOption = $(this).text();
-            customSelect.text(selectedOption);
-            customSelectDropdown.removeClass('open');
-        });
-    });
-}
 
 $(document).on('click', function(event) {
     if (!$(event.target).closest('.port-list-wrapper').length) {
@@ -233,6 +200,16 @@ $('#ip-table-frame').on('load', function() {
     resizeIframe(this); // Initial resizing after iframe loads
     observeIframeContent(this); // Start observing for dynamic changes
 });
+
+function setUrlParam(param, value) {
+    const url = new URL(window.location.href);
+    if (value === null || value === undefined) {
+        url.searchParams.delete(param);
+    } else {
+        url.searchParams.set(param, value);
+    }
+    window.history.pushState({}, '', url);
+}
 
 
 

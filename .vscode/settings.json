@@ -13,7 +13,24 @@
     "python.terminal.shellIntegration.enabled": false,
     "pylint.cwd": "${workspaceFolder}/lanscape",
     "cSpell.words": [
+        "addrs",
+        "DGRAM",
+        "gethostbyaddr",
+        "hwid",
+        "icmplib",
+        "isup",
         "jsonify",
-        "lanscape"
+        "lanscape",
+        "mdfind",
+        "ntoa",
+        "pdst",
+        "sendrecv",
+        "SIOCGIFADD",
+        "SIOCGIFNETMASK",
+        "snicaddr",
+        "snicaddrs",
+        "veth",
+        "vmnet",
+        "wlan"
     ]
 }

@@ -1,7 +1,8 @@
+"""Service scanning module for identifying services running on network ports."""
 import asyncio
 import logging
 import traceback
-from .app_scope import ResourceManager
+from lanscape.libraries.app_scope import ResourceManager
 
 log = logging.getLogger('ServiceScan')
 SERVICES = ResourceManager('services').get_jsonc('definitions.jsonc')
@@ -24,8 +25,7 @@ def scan_service(ip: str, port: int, timeout=10) -> str:
             reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout=5)
 
             # Send a probe appropriate for common services
-            probe = "GET / HTTP/1.1\r\nHost: {}\r\n\r\n".format(
-                ip).encode("utf-8")
+            probe = f"GET / HTTP/1.1\r\nHost: {ip}\r\n\r\n".encode("utf-8")
             writer.write(probe)
             await writer.drain()
 

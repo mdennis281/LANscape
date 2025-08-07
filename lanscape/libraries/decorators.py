@@ -18,9 +18,12 @@ class JobStats:
     """
     Tracks statistics for job execution, including running, finished, and timing data.
     """
-    running: DefaultDict[str, int] = field(default_factory=lambda: defaultdict(int))
-    finished: DefaultDict[str, int] = field(default_factory=lambda: defaultdict(int))
-    timing: DefaultDict[str, float] = field(default_factory=lambda: defaultdict(float))
+    running: DefaultDict[str, int] = field(
+        default_factory=lambda: defaultdict(int))
+    finished: DefaultDict[str, int] = field(
+        default_factory=lambda: defaultdict(int))
+    timing: DefaultDict[str, float] = field(
+        default_factory=lambda: defaultdict(float))
 
     def __str__(self):
         """Return a formatted string representation of the job statistics."""
@@ -57,7 +60,8 @@ class JobStatsMixin:  # pylint: disable=too-few-public-methods
 
 def job_tracker(func):
     """
-    Decorator to track job statistics for a method, including running count, finished count, and average timing.
+    Decorator to track job statistics for a method,
+    including running count, finished count, and average timing.
     """
     def get_fxn_src_name(func, first_arg) -> str:
         """
@@ -112,7 +116,8 @@ def job_tracker(func):
 
 def terminator(func):
     """
-    Decorator designed specifically for the SubnetScanner class, helps facilitate termination of a job.
+    Decorator designed specifically for the SubnetScanner class,
+    helps facilitate termination of a job.
     """
     def wrapper(*args, **kwargs):
         """Wrap the function to check if the scan is running before execution."""

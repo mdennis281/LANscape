@@ -1,15 +1,30 @@
+"""
+Integration tests for core library components of the LANscape application.
+Tests scan configuration, network discovery, and subnet selection functionality.
+"""
+
 import unittest
+
 from lanscape.libraries.net_tools import smart_select_primary_subnet
-from ._helpers import right_size_subnet
 from lanscape.libraries.subnet_scan import ScanManager
-from lanscape.libraries.scan_config import ScanConfig, PingConfig, ArpConfig, ScanType
+from lanscape.libraries.scan_config import ScanConfig, ScanType
+
+from ._helpers import right_size_subnet
 
 sm = ScanManager()
 
 
 class LibraryTestCase(unittest.TestCase):
-    def test_scan_config(self):
+    """
+    Test cases for the core library functionality including scan configuration
+    and network discovery capabilities.
+    """
 
+    def test_scan_config(self):
+        """
+        Test the ScanConfig class serialization and deserialization functionality.
+        Verifies that configs can be properly converted to and from dictionaries.
+        """
         subnet_val = '192.168.1.1/24'
         do_port_scan = False
         ping_attempts = 3
@@ -41,6 +56,10 @@ class LibraryTestCase(unittest.TestCase):
         self.assertEqual(cfg2.lookup_type, ScanType.PING)
 
     def test_scan(self):
+        """
+        Test the network scanning functionality with a dynamically selected subnet.
+        Verifies that devices can be discovered and that scan results are valid.
+        """
         subnet = smart_select_primary_subnet()
         self.assertIsNotNone(subnet)
         cfg = ScanConfig(

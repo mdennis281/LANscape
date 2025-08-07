@@ -117,6 +117,7 @@ hr {
 }
 h1.title{
     cursor: pointer;
+    margin: 0;
 }
 .title span {
     color: var(--text-accent-color);
@@ -163,24 +164,36 @@ details {
     border-radius: 5px !important; /* override bootstrap stuff */
     padding-right: 34px;
     margin-right: -34px;
+    margin-left: -41px;
+    padding-left: calc(41px + 5px);
 }
 
 
 #scan-form .input-group button {
     background-color: var(--primary-bg-accent);
     border: 0;
-    border-left: 1px var(--border-color) solid;
+    
     transition: all .2s ease-in-out;
     height: 40px;
-    border-radius: 0 5px 5px 0;
     margin-top: 1px;
     transform: translateX(.5px);
+    z-index: 3;
+    margin-left: 0;
 }
 #scan-form .input-group button:hover {
     background-color: var(--primary-bg-accent-hover);
 }
 #scan-form .input-group button:active {
     background-color: var(--primary-accent);
+}
+#scan-form .input-group button.start {
+    border-radius: 5px 0 0 5px;
+    border-right: 1px var(--border-color) solid;
+    width: 40px; /* added because it looks gross on icon load */
+}
+#scan-form .input-group button.end {
+    border-radius: 0 5px 5px 0;
+    border-left: 1px var(--border-color) solid;
 }
 
 .label-container {
@@ -256,8 +269,69 @@ details {
     }
 }
 
+#advanced-modal {
+    --bs-modal-width: 750px;
+}
+#advanced-modal .modal-content {
+    background-color: var(--primary-bg);
+}
+#advanced-modal .descriptor {
+    align-content: end;
+    text-align: center;
+    color: var(--text-placeholder);
+    padding-bottom: 10px;
+}
+#advanced-modal .col-2-percent {
+    flex: 0 0 auto;
+    width: 2%;
+}
+#advanced-modal label {
+    font-size: 12px;
+}
+#advanced-modal .form-check {
+    width: fit-content;
+}
+#advanced-modal h6 {
+    color: var(--primary-accent);
+}
+#advanced-modal .config-option {
+    background-color: var(--primary-bg-accent);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    margin: 0 5px;
+    transition: all .2s ease-in-out;
+}
 
-
+#advanced-modal .config-option.active {
+    border-color: var(--primary-accent);
+    box-shadow: 0 0 5px var(--primary-accent);
+    background-color: var(--primary-bg);
+}
+#advanced-modal .config-option:hover {
+    background-color: var(--primary-bg);
+    box-shadow: 0 0 5px var(--primary-accent);
+}
+#advanced-modal .config-option.active:hover {
+    background-color: var(--primary-bg-accent);
+    box-shadow: 0 0 5px var(--primary-accent);
+}
+#advanced-modal .config-option h5 {
+    flex-wrap: wrap;
+}
+#advanced-modal .config-option h5 span {
+    display: block; /* "waaaah span shouldnt be block" bite me. */
+    width: 100%;
+    padding: 5px;
+    font-size: 2em;
+}
+#advanced-modal .config-option p {
+    font-size: 0.8em;
+    color: var(--text-placeholder);
+    margin: 0;
+    padding: 5px;
+}
 
 
 /* Card Styles */
@@ -286,7 +360,7 @@ form {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    margin-bottom: 15px;
+    margin-bottom: 5px;
 }
 
 label {
@@ -310,6 +384,12 @@ input[type="text"]:focus, select:focus, .form-control:focus {
     border-color: var(--primary-accent);
     outline: none;
 }
+input[type="text"]:read-only, .form-control:read-only {
+    background-color: var(--secondary-bg);
+    color: var(--text-placeholder);
+    border-color: var(--secondary-accent);
+    outline: none;
+}
 
 input::placeholder {
     color: var(--text-placeholder) !important;
@@ -326,6 +406,7 @@ button {
 #scan-form #scan-submit {
     border: none;
     padding: 10px 20px;
+    margin-top: 15px;
 }
 
 /* Button Styling */
@@ -378,20 +459,6 @@ input[type="range"] {
     margin: 5px 0;
 }
 
-input[type="range"]::-webkit-slider-thumb,
-input[type="range"]::-moz-range-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--primary-accent);
-    cursor: pointer;
-}
-#parallelism-value span {
-    color: var(--text-danger-color);
-    font-weight: 500;
-}
 .port-list-wrapper {
     position: relative;
     display: inline-block;
@@ -400,12 +467,13 @@ input[type="range"]::-moz-range-thumb {
 
 .port-list {
     position: relative;
-    background-color: var(--body-bg);
+    background-color: var(--secondary-bg);
     border: 1px solid var(--border-color);
     color: var(--text-color);
     padding: 10px;
     cursor: pointer;
     width: 100%;
+    height: 42px;
     user-select: none;
     appearance: none;  /* Hide default arrow */
     transition: all .2s ease-in-out;
@@ -419,7 +487,7 @@ input[type="range"]::-moz-range-thumb {
 .port-list-wrapper::after {
     content: '▼';
     position: absolute;
-    top: 14px;
+    top: 10px;
     right: 10px;
     pointer-events: none;
     color: var(--text-color);
@@ -449,6 +517,12 @@ input[type="range"]::-moz-range-thumb {
 .port-list-dropdown div:hover {
     background-color: var(--secondary-accent);
     color: var(--text-color);
+}
+
+
+
+.text-color {
+    color: var(--text-color) !important;
 }
 
 .text-secondary {

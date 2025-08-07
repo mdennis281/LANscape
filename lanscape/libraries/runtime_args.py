@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 
 @dataclass
 class RuntimeArgs:
+    """Class representing runtime arguments for the application."""
     reloader: bool = False
     port: int = 5001
     logfile: Optional[str] = None
@@ -14,6 +15,9 @@ class RuntimeArgs:
 
 
 def parse_args() -> RuntimeArgs:
+    """
+    Parse command line arguments and return a RuntimeArgs instance.
+    """
     parser = argparse.ArgumentParser(description='LANscape')
 
     parser.add_argument('--reloader', action='store_true',
@@ -27,6 +31,8 @@ def parse_args() -> RuntimeArgs:
                         help='Enable flask logging (disables click output)')
     parser.add_argument('--persistent', action='store_true',
                         help='Don\'t exit after browser is closed')
+    parser.add_argument('--debug', action='store_true',
+                        help='Shorthand debug mode (equivalent to "--loglevel DEBUG --reloader")')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -36,6 +42,10 @@ def parse_args() -> RuntimeArgs:
     args_dict: Dict[str, Any] = vars(args)
     field_names = {field.name for field in fields(
         RuntimeArgs)}  # Get dataclass field names
+    
+    if args.debug:
+        args_dict['loglevel'] = 'DEBUG'
+        args_dict['reloader'] = True
 
     # Only pass arguments that exist in the Args dataclass
     filtered_args = {name: args_dict[name]

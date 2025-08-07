@@ -338,18 +338,31 @@ def _find_interface_by_default_gateway_windows():
     try:
         output = subprocess.check_output(
             "route print 0.0.0.0", shell=True, text=True)
-        lines = output.strip().split('\n')
-        for line in lines:
-            if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
-                parts = [p for p in line.split() if p]
-                if len(parts) >= 4:
-                    interface_idx = parts[3]
-                    # Find interface name in the output
-                    for iface_name in psutil.net_if_addrs():
-                        if str(interface_idx) in iface_name:
-                            return iface_name
+        return _parse_windows_route_output(output)
     except Exception as e:
         log.debug(f"Error finding Windows interface by gateway: {e}")
+    return None
+
+
+def _parse_windows_route_output(output):
+    """Parse the output of Windows route command to extract interface index."""
+    lines = output.strip().split('\n')
+    interface_idx = None
+    
+    # First find the interface index from the routing table
+    for line in lines:
+        if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
+            parts = [p for p in line.split() if p]
+            if len(parts) >= 4:
+                interface_idx = parts[3]
+                break
+    
+    # If we found an index, find the corresponding interface name
+    if interface_idx:
+        for iface_name in psutil.net_if_addrs():
+            if str(interface_idx) in iface_name:
+                return iface_name
+                
     return None
 
 
@@ -358,16 +371,25 @@ def _find_interface_by_default_gateway_unix():
     try:
         cmd = "ip route show default 2>/dev/null || netstat -rn | grep default"
         output = subprocess.check_output(cmd, shell=True, text=True)
-        for line in output.split('\n'):
-            if 'default via' in line and 'dev' in line:
-                return line.split('dev')[1].split()[0]
-            if 'default' in line:
-                parts = line.split()
-                if len(parts) > 3:
-                    # Interface is usually the last column
-                    return parts[-1]
+        return _parse_unix_route_output(output)
     except Exception as e:
         log.debug(f"Error finding Unix interface by gateway: {e}")
+    return None
+
+
+def _parse_unix_route_output(output):
+    """Parse the output of Unix route commands to extract interface name."""
+    for line in output.split('\n'):
+        # Parse lines with 'default via ... dev ...'
+        if 'default via' in line and 'dev' in line:
+            return line.split('dev')[1].split()[0]
+            
+        # Parse simpler 'default ...' lines
+        if 'default' in line:
+            parts = line.split()
+            if len(parts) > 3:
+                # Interface is usually the last column
+                return parts[-1]
     return None
 
 

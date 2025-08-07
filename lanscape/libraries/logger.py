@@ -58,12 +58,11 @@ def disable_flask_logging() -> None:
     sets Werkzeug's logger level to ERROR to reduce log verbosity.
     """
     def override_click_logging():
-        def secho(*, text=None, file=None, nl=None, err=None, color=None, **styles):  # pylint: disable=unused-argument
-            """Dummy function to override click.secho and suppress output."""
+        # pylint: disable=unused-argument
+        def secho(text, file=None, nl=None, err=None, color=None, **styles):
             pass
-
-        def echo(*, text=None, file=None, nl=None, err=None, color=None, **styles):  # pylint: disable=unused-argument
-            """Dummy function to override click.echo and suppress output."""
+        # pylint: disable=unused-argument
+        def echo(text, file=None, nl=None, err=None, color=None, **styles):
             pass
 
         click.echo = echo

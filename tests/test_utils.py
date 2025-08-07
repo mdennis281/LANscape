@@ -89,7 +89,10 @@ class DecoratorTimeoutTests(unittest.TestCase):
     """Test cases for the timeout_enforcer decorator functionality."""
 
     def test_timeout_enforcer(self):
-        """Test that timeout_enforcer properly handles timeouts with and without raising exceptions."""
+        """
+        Test that timeout_enforcer properly handles timeouts 
+        with and without raising exceptions.
+        """
         @timeout_enforcer(0.1, raise_on_timeout=False)
         def slow_return():
             time.sleep(0.5)

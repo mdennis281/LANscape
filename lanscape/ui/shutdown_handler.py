@@ -49,6 +49,7 @@ class FlaskShutdownHandler:
         else:
             log.info('Received external exit request. Terminating flask.')
         self._exiting = True
+        return "Done"
 
     def exit_if_requested(self):
         """Exits the application if a shutdown request has been made."""

@@ -34,7 +34,7 @@ class EnvTestCase(unittest.TestCase):
         self.assertIsNotNone(mac_list)
 
     def test_local_version(self):
-        """Test that the app correctly identifies it's running in a local environment."""
+        """Test that the app correctly identifies its running in a local environment."""
         self.assertTrue(is_local_run())
 
     def test_arp_support(self):

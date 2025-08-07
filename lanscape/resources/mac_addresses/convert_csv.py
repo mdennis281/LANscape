@@ -1,10 +1,21 @@
-# Only used to import csv data - not during runtime
+"""
+CSV to JSON converter for MAC address vendor mappings.
+Processes vendor MAC address prefix data from CSV format to a simplified JSON lookup table
+for use in the LANscape application. Only used during development, not at runtime.
+"""
 
 import csv
 import json
 
 
 def main():
+    """
+    Main function to convert CSV MAC vendor data to a JSON mapping.
+
+    Reads MAC vendor information from a CSV file, processes it to extract
+    MAC address prefixes and vendor names, and writes the resulting mapping
+    to a JSON file for efficient lookup.
+    """
     ans = {}
     with open('mac-vendors-export.csv', 'r', encoding='utf-8') as f:
         data = csv.reader(f)
@@ -15,7 +26,7 @@ def main():
                 ans[service['Mac Prefix']] = service['Vendor Name']
             except BaseException:
                 pass
-    with open('mac_db.json', 'w') as f:
+    with open('mac_db.json', 'w', encoding='utf-8') as f:
         json.dump(ans, f, indent=2)
 
 

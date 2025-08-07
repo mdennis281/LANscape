@@ -1,12 +1,10 @@
 
-from lanscape.ui.blueprints.web import web_bp, routes
-from lanscape.ui.blueprints.api import api_bp, tools, port, scan
 import traceback
 import threading
 import logging
-import os
-from flask import Flask, render_template, request
-
+from flask import Flask, render_template
+from lanscape.ui.blueprints.web import web_bp, routes # pylint: ignore=unused-import
+from lanscape.ui.blueprints.api import api_bp, tools, port, scan # pylint: ignore=unused-import
 from lanscape.libraries.runtime_args import RuntimeArgs, parse_args
 from lanscape.libraries.version_manager import is_update_available, get_installed_version, lookup_latest_version
 from lanscape.libraries.app_scope import is_local_run
@@ -19,7 +17,7 @@ app = Flask(
 log = logging.getLogger('flask')
 
 # Import and register BPs
-################################
+#################################
 
 app.register_blueprint(api_bp)
 app.register_blueprint(web_bp)

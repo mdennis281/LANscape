@@ -62,6 +62,7 @@ def disable_flask_logging() -> None:
         def secho(text, file=None, nl=None, err=None, color=None, **styles):
             pass
         # pylint: disable=unused-argument
+
         def echo(text, file=None, nl=None, err=None, color=None, **styles):
             pass
 

@@ -60,7 +60,7 @@ class JobStatsMixin:  # pylint: disable=too-few-public-methods
 
 def job_tracker(func):
     """
-    Decorator to track job statistics for a method, 
+    Decorator to track job statistics for a method,
     including running count, finished count, and average timing.
     """
     def get_fxn_src_name(func, first_arg) -> str:
@@ -116,7 +116,7 @@ def job_tracker(func):
 
 def terminator(func):
     """
-    Decorator designed specifically for the SubnetScanner class, 
+    Decorator designed specifically for the SubnetScanner class,
     helps facilitate termination of a job.
     """
     def wrapper(*args, **kwargs):

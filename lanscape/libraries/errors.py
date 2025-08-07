@@ -5,6 +5,7 @@ This module contains custom exception classes for handling various error cases
 in the network scanning and device management operations.
 """
 
+
 class SubnetTooLargeError(Exception):
     """Custom exception raised when the subnet size exceeds the allowed limit."""
 
@@ -15,7 +16,7 @@ class SubnetTooLargeError(Exception):
 
 class SubnetScanTerminationFailure(Exception):
     """Exception raised when subnet scanning threads cannot be terminated properly."""
-    
+
     def __init__(self, running_threads):
         super().__init__(
             f'Unable to terminate active threads: {running_threads}')
@@ -23,7 +24,7 @@ class SubnetScanTerminationFailure(Exception):
 
 class DeviceError(Exception):
     """Exception wrapper for device-related errors to provide context about failure source."""
-    
+
     def __init__(self, e: Exception):
         self.base: Exception = e
         self.method = self._attempt_extract_method()

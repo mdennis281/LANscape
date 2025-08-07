@@ -348,7 +348,7 @@ def _parse_windows_route_output(output):
     """Parse the output of Windows route command to extract interface index."""
     lines = output.strip().split('\n')
     interface_idx = None
-    
+
     # First find the interface index from the routing table
     for line in lines:
         if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
@@ -356,13 +356,13 @@ def _parse_windows_route_output(output):
             if len(parts) >= 4:
                 interface_idx = parts[3]
                 break
-    
+
     # If we found an index, find the corresponding interface name
     if interface_idx:
         for iface_name in psutil.net_if_addrs():
             if str(interface_idx) in iface_name:
                 return iface_name
-                
+
     return None
 
 
@@ -383,7 +383,7 @@ def _parse_unix_route_output(output):
         # Parse lines with 'default via ... dev ...'
         if 'default via' in line and 'dev' in line:
             return line.split('dev')[1].split()[0]
-            
+
         # Parse simpler 'default ...' lines
         if 'default' in line:
             parts = line.split()

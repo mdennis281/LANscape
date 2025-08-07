@@ -49,8 +49,9 @@ def open_webapp(url: str) -> bool:
             success = webbrowser.open(url)
             log.debug(f'Opened {url} in browser tab: {success}')
             if not success:
+                # pylint: disable=raise-missing-from
                 raise RuntimeError(
-                    'Unknown error while opening browser tab')  # pylint: disable=raise-missing-from
+                    'Unknown error while opening browser tab')  
         except Exception as e2:
             log.warning(
                 'Exhausted all options to open browser, you need to open manually')
@@ -148,7 +149,7 @@ def windows_get_browser_from_registry() -> Optional[str]:
         return None
 
     try:
-        import winreg
+        import winreg # pylint: disable=import-outside-toplevel
     except ImportError:
         log.debug("winreg module not available")
         return None

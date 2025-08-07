@@ -71,6 +71,15 @@ def get_scan(scan_id):
 
 @api_bp.route('/api/scan/<scan_id>/summary', methods=['GET'])
 def get_scan_summary(scan_id):
+    """
+    Retrieve a summary of the scan results.
+
+    Args:
+        scan_id: Unique identifier for the scan
+
+    Returns:
+        JSON representation of scan summary
+    """
     scan = scan_manager.get_scan(scan_id)
     if not scan:
         return jsonify({'error': 'scan not found'}), 404
@@ -89,6 +98,15 @@ def get_scan_summary(scan_id):
 
 @api_bp.route('/api/scan/<scan_id>/terminate', methods=['GET'])
 def terminate_scan(scan_id):
+    """Terminate a running scan.
+
+    Args:
+        scan_id (str): Unique identifier for the scan
+
+    Returns:
+        JSON response indicating success or failure
+    """
+
     scan = scan_manager.get_scan(scan_id)
     scan.terminate()
     return jsonify({'success': True})

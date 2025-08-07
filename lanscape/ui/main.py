@@ -1,4 +1,4 @@
-
+"""Main entry point for the LANscape application when running as a module."""
 import socket
 
 

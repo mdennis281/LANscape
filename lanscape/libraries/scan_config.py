@@ -71,8 +71,8 @@ class ScanConfig(BaseModel):
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
 
-    def t_cnt(self, id: str) -> int:
-        return int(int(getattr(self, f't_cnt_{id}')) * float(self.t_multiplier))
+    def t_cnt(self, thread_id: str) -> int:
+        return int(int(getattr(self, f't_cnt_{thread_id}')) * float(self.t_multiplier))
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ScanConfig':

@@ -13,6 +13,7 @@ from lanscape.libraries.scan_config import DEFAULT_CONFIGS
 
 @api_bp.route('/api/tools/subnet/test')
 def test_subnet():
+    """check validity of a subnet"""
     subnet = request.args.get('subnet')
     if not subnet:
         return jsonify({'valid': False, 'msg': 'Subnet cannot be blank', 'count': -1})

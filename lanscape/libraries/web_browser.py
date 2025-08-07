@@ -37,7 +37,7 @@ def open_webapp(url: str) -> bool:
 
         if time.time() - start < 2:
             log.debug(
-                f'Unable to hook into closure of UI, listening for flask shutdown')
+                'Unable to hook into closure of UI, listening for flask shutdown')
             return False
         return True
 
@@ -50,10 +50,10 @@ def open_webapp(url: str) -> bool:
             log.debug(f'Opened {url} in browser tab: {success}')
             if not success:
                 raise RuntimeError('Unknown error while opening browser tab')
-        except Exception as e:
+        except Exception as e2:
             log.warning(
-                f'Exhausted all options to open browser, you need to open manually')
-            log.debug(f'As tab error: {e}')
+                'Exhausted all options to open browser, you need to open manually')
+            log.debug(f'As tab error: {e2}')
             log.info(f'LANScape UI is running on {url}')
     return False
 

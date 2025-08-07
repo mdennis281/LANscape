@@ -1,3 +1,5 @@
+"""Logic for handling shutdown requests in a Flask application."""
+
 import logging
 import os
 from flask import request

@@ -1,3 +1,5 @@
+"""Runtime argument handler for LANscape as module"""
+
 from dataclasses import dataclass, fields
 import argparse
 from typing import Any, Dict, Optional
@@ -42,7 +44,7 @@ def parse_args() -> RuntimeArgs:
     args_dict: Dict[str, Any] = vars(args)
     field_names = {field.name for field in fields(
         RuntimeArgs)}  # Get dataclass field names
-    
+
     if args.debug:
         args_dict['loglevel'] = 'DEBUG'
         args_dict['reloader'] = True

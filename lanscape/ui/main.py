@@ -7,6 +7,8 @@ import time
 import logging
 import traceback
 import os
+import requests
+
 from lanscape.libraries.logger import configure_logging
 from lanscape.libraries.runtime_args import parse_args, RuntimeArgs
 from lanscape.libraries.web_browser import open_webapp
@@ -25,6 +27,7 @@ IS_FLASK_RELOAD = os.environ.get("WERKZEUG_RUN_MAIN")
 
 
 def main():
+    """core entry point for running lanscape as a module."""
     try:
         _main()
     except KeyboardInterrupt:
@@ -60,6 +63,7 @@ def _main():
 
 
 def try_check_update():
+    """Check for updates and log if available."""
     try:
         if is_update_available():
             log.info('An update is available!')
@@ -87,6 +91,7 @@ def open_browser(url: str, wait=2) -> bool:
 
 
 def start_webserver_ui(args: RuntimeArgs):
+    """Start the web server and open the UI in a browser."""
     uri = f'http://127.0.0.1:{args.port}'
 
     # running reloader requires flask to run in main thread
@@ -128,9 +133,8 @@ def get_valid_port(port: int):
 
 
 def terminate():
-    import requests
     log.info('Attempting flask shutdown')
-    requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core')
+    requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core', timeout=2)
 
 
 if __name__ == "__main__":

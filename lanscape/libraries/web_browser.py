@@ -51,7 +51,7 @@ def open_webapp(url: str) -> bool:
             if not success:
                 # pylint: disable=raise-missing-from
                 raise RuntimeError(
-                    'Unknown error while opening browser tab') from e2
+                    'Unknown error while opening browser tab') from e
         except Exception as e2:
             log.warning(
                 'Exhausted all options to open browser, you need to open manually')

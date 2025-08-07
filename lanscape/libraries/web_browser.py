@@ -49,7 +49,7 @@ def open_webapp(url: str) -> bool:
             success = webbrowser.open(url)
             log.debug(f'Opened {url} in browser tab: {success}')
             if not success:
-                raise RuntimeError('Unknown error while opening browser tab')
+                raise RuntimeError('Unknown error while opening browser tab') # pylint: disable=raise-missing-from
         except Exception as e2:
             log.warning(
                 'Exhausted all options to open browser, you need to open manually')
@@ -59,6 +59,7 @@ def open_webapp(url: str) -> bool:
 
 
 def get_default_browser_executable() -> Optional[str]:
+    """Platform-agnostic method to get the default browser executable path."""
     if sys.platform.startswith("win"):
         return windows_get_browser_from_registry()
 

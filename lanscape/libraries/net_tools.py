@@ -1,3 +1,5 @@
+"""Network tools for scanning and managing devices on a network."""
+
 import logging
 import ipaddress
 import traceback
@@ -244,6 +246,7 @@ class MacSelector:
             self.macs[mac] = self.macs.get(mac, 0) + 1
 
     def clear(self):
+        """Clear the stored MAC addresses."""
         self.macs = {}
 
 
@@ -353,7 +356,9 @@ def get_primary_interface():
             # Linux/Unix/Mac - use ip route or netstat
             try:
                 output = subprocess.check_output(
-                    "ip route show default 2>/dev/null || netstat -rn | grep default", shell=True, text=True)
+                    "ip route show default 2>/dev/null || netstat -rn | grep default", 
+                    shell=True, text=True
+                )
                 for line in output.split('\n'):
                     if 'default via' in line and 'dev' in line:
                         return line.split('dev')[1].split()[0]

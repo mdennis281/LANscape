@@ -35,7 +35,7 @@
             }
         },
         {
-            "label": "Run Linter - App (Autopep8)",
+            "label": "Run Linter (Autopep8)",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
@@ -43,52 +43,7 @@
                 "autopep8",
                 "--in-place",
                 "--recursive",
-                "lanscape",
-                "--max-line-length",
-                "100",
-                "-aa"
-            ],
-            "problemMatcher": ["$python"],
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "new"
-            },
-            "windows": {
-                "options": {
-                    "shell": {
-                        "executable": "powershell"
-                    }
-                }
-            },
-            "linux": {
-                "options": {
-                    "shell": {
-                        "executable": "/bin/bash"
-                    }
-                }
-            },
-            "osx": {
-                "options": {
-                    "shell": {
-                        "executable": "/bin/bash"
-                    }
-                }
-            }
-        },
-        {
-            "label": "Run Linter - Tests (Autopep8)",
-            "type": "shell",
-            "command": "${command:python.interpreterPath}",
-            "args": [
-                "-m",
-                "autopep8",
-                "--in-place",
-                "--recursive",
-                "tests",
+                ".",
                 "--max-line-length",
                 "100",
                 "-aa"

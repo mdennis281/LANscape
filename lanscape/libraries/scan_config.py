@@ -17,7 +17,7 @@ from lanscape.libraries.ip_parser import parse_ip_input
 class PingConfig(BaseModel):
     """
     Configuration settings for ICMP ping-based network scanning.
-    
+
     Controls parameters such as the number of ping attempts, count per ping,
     timeout values, and retry delays to optimize ping scanning behavior.
     """
@@ -30,10 +30,10 @@ class PingConfig(BaseModel):
     def from_dict(cls, data: dict) -> 'PingConfig':
         """
         Create a PingConfig instance from a dictionary.
-        
+
         Args:
             data: Dictionary containing PingConfig parameters
-            
+
         Returns:
             A new PingConfig instance with the provided settings
         """
@@ -42,7 +42,7 @@ class PingConfig(BaseModel):
     def to_dict(self) -> dict:
         """
         Convert the PingConfig instance to a dictionary.
-        
+
         Returns:
             Dictionary representation of the PingConfig
         """
@@ -68,10 +68,10 @@ class ArpConfig(BaseModel):
     def from_dict(cls, data: dict) -> 'ArpConfig':
         """
         Create an ArpConfig instance from a dictionary.
-        
+
         Args:
             data: Dictionary containing ArpConfig parameters
-            
+
         Returns:
             A new ArpConfig instance with the provided settings
         """
@@ -80,7 +80,7 @@ class ArpConfig(BaseModel):
     def to_dict(self) -> dict:
         """
         Convert the ArpConfig instance to a dictionary.
-        
+
         Returns:
             Dictionary representation of the ArpConfig
         """
@@ -93,7 +93,7 @@ class ArpConfig(BaseModel):
 class ScanType(Enum):
     """
     Enumeration of supported network scan types.
-    
+
     PING: Uses ICMP echo requests to determine if hosts are alive
     ARP: Uses Address Resolution Protocol to discover hosts on the local network
     BOTH: Uses both PING and ARP methods for maximum coverage
@@ -106,7 +106,7 @@ class ScanType(Enum):
 class ScanConfig(BaseModel):
     """
     Main configuration class for network scanning operations.
-    
+
     Contains settings for subnet targets, port ranges, thread counts,
     scan tasks to perform, and configurations for different scan methods.
     """
@@ -129,10 +129,10 @@ class ScanConfig(BaseModel):
     def t_cnt(self, thread_id: str) -> int:
         """
         Calculate thread count for a specific operation based on multiplier.
-        
+
         Args:
             thread_id: String identifier for the thread type (e.g., 'port_scan')
-            
+
         Returns:
             Calculated thread count for the specified operation
         """
@@ -142,12 +142,12 @@ class ScanConfig(BaseModel):
     def from_dict(cls, data: dict) -> 'ScanConfig':
         """
         Create a ScanConfig instance from a dictionary.
-        
+
         Handles special cases like converting string enum values to proper Enum types.
-        
+
         Args:
             data: Dictionary containing ScanConfig parameters
-            
+
         Returns:
             A new ScanConfig instance with the provided settings
         """
@@ -160,9 +160,9 @@ class ScanConfig(BaseModel):
     def to_dict(self) -> dict:
         """
         Convert the ScanConfig instance to a dictionary.
-        
+
         Handles special cases like converting Enum values to strings.
-        
+
         Returns:
             Dictionary representation of the ScanConfig
         """
@@ -173,7 +173,7 @@ class ScanConfig(BaseModel):
     def get_ports(self) -> List[int]:
         """
         Get the list of ports to scan based on the configured port list name.
-        
+
         Returns:
             List of port numbers to scan
         """
@@ -182,7 +182,7 @@ class ScanConfig(BaseModel):
     def parse_subnet(self) -> List[ipaddress.IPv4Network]:
         """
         Parse the configured subnet string into IPv4Network objects.
-        
+
         Returns:
             List of IPv4Network objects representing the target networks
         """

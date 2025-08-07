@@ -11,9 +11,11 @@ from tabulate import tabulate
 
 # LANscape imports
 from lanscape import ScanManager, ScanConfig, net_tools
+
+
 def main():
     """run reliability test for local network scans"""
-    
+
     # Initialize scan manager
     sm = ScanManager()
 
@@ -37,7 +39,7 @@ def main():
                         f"Stage: {current_scan.results.stage}, "
                         f"Progress: {current_scan.calc_percent_complete()}%"
                     )
-                    
+
                     # Add device stats if scan is running
                     if current_scan.running:
                         results = current_scan.results
@@ -46,12 +48,12 @@ def main():
                             f'{results.devices_total} scanned'
                         )
                         status_line += f' found/scanned/total: {found_scanned_total}'
-                    
+
                     status_text += status_line + '\n'
-                    
+
                 os.system('cls' if os.name == 'nt' else 'clear')
                 print(status_text)
-                
+
     except KeyboardInterrupt:
         print("Terminating scans...")
         scan.terminate()
@@ -72,6 +74,7 @@ def main():
         table.append(row)
 
     print(tabulate(table, headers=headers, tablefmt="grid"))
-    
+
+
 if __name__ == '__main__':
     main()

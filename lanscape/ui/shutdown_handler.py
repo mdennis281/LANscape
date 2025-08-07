@@ -42,7 +42,8 @@ class FlaskShutdownHandler:
             if args.persistent:
                 log.info('Detected browser close, not exiting flask.')
                 return "Ignored"
-            log.info('Web browser closed, terminating flask. (disable with --persistent)')
+            log.info(
+                'Web browser closed, terminating flask. (disable with --persistent)')
         elif req_type == 'core':
             log.info('Core requested exit, terminating flask.')
         else:

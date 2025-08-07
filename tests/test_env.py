@@ -16,7 +16,7 @@ class EnvTestCase(unittest.TestCase):
     Test cases verifying the application's environment-related functionality.
     Tests version lookups, resource access, and system feature detection.
     """
-    
+
     def test_versioning(self):
         """Test that the version lookup functionality works correctly."""
         version = lookup_latest_version()

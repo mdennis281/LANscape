@@ -49,7 +49,8 @@ def open_webapp(url: str) -> bool:
             success = webbrowser.open(url)
             log.debug(f'Opened {url} in browser tab: {success}')
             if not success:
-                raise RuntimeError('Unknown error while opening browser tab') # pylint: disable=raise-missing-from
+                raise RuntimeError(
+                    'Unknown error while opening browser tab')  # pylint: disable=raise-missing-from
         except Exception as e2:
             log.warning(
                 'Exhausted all options to open browser, you need to open manually')
@@ -123,7 +124,7 @@ def linux_get_browser_executable() -> Optional[str]:
         "/usr/local/share/applications",
         "/usr/share/applications",
     ]
-    
+
     exec_cmd = None
     for path in search_paths:
         full_path = os.path.join(path, desktop_file)
@@ -136,7 +137,7 @@ def linux_get_browser_executable() -> Optional[str]:
                         exec_cmd = exec_cmd.split()[0]
                         exec_cmd = exec_cmd.split("%")[0]
                         return exec_cmd
-    
+
     return exec_cmd
 
 
@@ -145,7 +146,7 @@ def windows_get_browser_from_registry() -> Optional[str]:
     # Import winreg only on Windows platforms
     if not sys.platform.startswith("win"):
         return None
-        
+
     try:
         import winreg
     except ImportError:

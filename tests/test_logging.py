@@ -22,7 +22,7 @@ class LoggingConfigTests(unittest.TestCase):
     Test cases for the logging configuration functionality.
     Verifies that log handlers are properly configured based on settings.
     """
-    
+
     def setUp(self):
         """Prepare the test environment by clearing existing log handlers."""
         self.root = logging.getLogger()
@@ -54,7 +54,8 @@ class LoggingConfigTests(unittest.TestCase):
         """Test that no file handlers are created when no log file is specified."""
         configure_logging('INFO', None, flask_logging=True)
         root_handlers = logging.getLogger().handlers
-        self.assertTrue(all(not isinstance(h, RotatingFileHandler) for h in root_handlers))
+        self.assertTrue(all(not isinstance(h, RotatingFileHandler)
+                        for h in root_handlers))
 
     def test_disable_flask_logging_overrides_click(self):
         """Test that disabling Flask logging properly overrides click echo functions."""
@@ -69,7 +70,7 @@ class RuntimeArgsLoggingTests(unittest.TestCase):
     Test cases for runtime argument parsing related to logging configuration.
     Verifies command-line arguments are correctly handled.
     """
-    
+
     def test_parse_args_logfile_path(self):
         """Test that the logfile argument is correctly parsed from command-line arguments."""
         with patch('sys.argv', ['prog', '--logfile', '/tmp/custom.log']):

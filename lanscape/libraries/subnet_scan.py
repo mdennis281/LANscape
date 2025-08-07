@@ -29,10 +29,11 @@ from lanscape.libraries.errors import SubnetScanTerminationFailure
 class SubnetScanner(JobStatsMixin):
     """
     Scans a subnet for devices and open ports.
-    
+
     Manages the scanning process including device discovery and port scanning.
     Tracks scan progress and provides mechanisms for controlled termination.
     """
+
     def __init__(
         self,
         config: ScanConfig
@@ -42,13 +43,13 @@ class SubnetScanner(JobStatsMixin):
         self.subnet = config.parse_subnet()
         self.ports: List[int] = config.get_ports()
         self.subnet_str = config.subnet
-        
+
         # Status properties
         self.running = False
         self.uid = str(uuid.uuid4())
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
-        
+
         # Initial logging
         if not is_arp_supported():
             self.log.warning(
@@ -90,13 +91,13 @@ class SubnetScanner(JobStatsMixin):
     def terminate(self):
         """
         Terminate the scan operation.
-        
+
         Attempts a graceful shutdown of all scan operations and waits for running
         tasks to complete. Raises an exception if termination takes too long.
-        
+
         Returns:
             bool: True if terminated successfully
-            
+
         Raises:
             SubnetScanTerminationFailure: If the scan cannot be terminated within the timeout
         """
@@ -112,9 +113,9 @@ class SubnetScanner(JobStatsMixin):
     def calc_percent_complete(self) -> int:  # 0 - 100
         """
         Calculate the percentage completion of the scan.
-        
+
         Uses scan statistics and job timing information to estimate progress.
-        
+
         Returns:
             int: Completion percentage (0-100)
         """
@@ -255,10 +256,11 @@ class SubnetScanner(JobStatsMixin):
 class ScannerResults:
     """
     Stores and manages the results of a subnet scan.
-    
+
     Tracks devices found, scan statistics, and provides export functionality
     for scan results. Also handles runtime calculation and progress tracking.
     """
+
     def __init__(self, scan: SubnetScanner):
         # Parent reference and identifiers
         self.scan = scan
@@ -293,7 +295,7 @@ class ScannerResults:
     def get_runtime(self):
         """
         Calculate the runtime of the scan in seconds.
-        
+
         Returns:
             int: Runtime in seconds
         """
@@ -304,10 +306,10 @@ class ScannerResults:
     def export(self, out_type=dict) -> Union[str, dict]:
         """
         Export scan results in the specified format.
-        
+
         Args:
             out_type: The output type (dict or str)
-            
+
         Returns:
             Union[str, dict]: Scan results in the specified format
         """
@@ -372,10 +374,10 @@ class ScanManager:
     def new_scan(self, config: ScanConfig) -> SubnetScanner:
         """
         Create and start a new scan with the given configuration.
-        
+
         Args:
             config: The scan configuration
-            
+
         Returns:
             SubnetScanner: The newly created scan instance
         """
@@ -412,10 +414,10 @@ class ScanManager:
     def _start(self, scan: SubnetScanner):
         """
         Start a scan in a separate thread.
-        
+
         Args:
             scan: The scan to start
-            
+
         Returns:
             Thread: The thread running the scan
         """

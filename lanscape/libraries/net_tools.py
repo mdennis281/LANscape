@@ -104,7 +104,8 @@ class IPAlive(JobStatsMixin):
                             "-w", str(int(cfg.timeout * 1000)), ip
                         ]
                     else:
-                        cmd = ["ping", "-c", str(cfg.ping_count), "-W", str(cfg.timeout), ip]
+                        cmd = ["ping", "-c",
+                               str(cfg.ping_count), "-W", str(cfg.timeout), ip]
 
                     result = subprocess.run(
                         cmd, stdout=subprocess.PIPE,
@@ -283,7 +284,7 @@ def get_ip_address(interface: str):
     # Call the appropriate function based on the platform
     if psutil.WINDOWS:
         return windows()
-    
+
     # Linux, macOS, and other Unix-like systems
     return unix_like()
 
@@ -318,7 +319,7 @@ def get_netmask(interface: str):
 
     if psutil.WINDOWS:
         return windows()
-    
+
     # Linux, macOS, and other Unix-like systems
     return unix_like()
 
@@ -335,7 +336,8 @@ def get_cidr_from_netmask(netmask: str):
 def _find_interface_by_default_gateway_windows():
     """Find the network interface with the default gateway on Windows."""
     try:
-        output = subprocess.check_output("route print 0.0.0.0", shell=True, text=True)
+        output = subprocess.check_output(
+            "route print 0.0.0.0", shell=True, text=True)
         lines = output.strip().split('\n')
         for line in lines:
             if '0.0.0.0' in line and 'Gateway' not in line:  # Skip header
@@ -376,21 +378,22 @@ def _get_candidate_interfaces():
         stats = psutil.net_if_stats().get(interface)
         if not stats or not stats.isup:
             continue
-            
+
         ipv4_addrs = [addr for addr in addrs if addr.family == socket.AF_INET]
         if not ipv4_addrs:
             continue
-            
+
         # Skip loopback and common virtual interfaces
-        is_loopback = any(addr.address.startswith('127.') for addr in ipv4_addrs)
+        is_loopback = any(addr.address.startswith('127.')
+                          for addr in ipv4_addrs)
         if is_loopback:
             continue
-            
+
         virtual_names = ['loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth']
         is_virtual = any(name in interface.lower() for name in virtual_names)
         if is_virtual:
             continue
-            
+
         candidates.append(interface)
     return candidates
 
@@ -486,15 +489,15 @@ def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
     """
     if not snicaddr.address or not snicaddr.netmask:
         return None
-        
+
     if snicaddr.family == socket.AF_INET:
         addr = f"{snicaddr.address}/{get_cidr_from_netmask(snicaddr.netmask)}"
         return get_host_ip_mask(addr)
-        
+
     if snicaddr.family == socket.AF_INET6:
         addr = f"{snicaddr.address}/{snicaddr.netmask}"
         return get_host_ip_mask(addr)
-        
+
     return f"{snicaddr.address}"
 
 

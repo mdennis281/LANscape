@@ -18,9 +18,12 @@ class JobStats:
     """
     Tracks statistics for job execution, including running, finished, and timing data.
     """
-    running: DefaultDict[str, int] = field(default_factory=lambda: defaultdict(int))
-    finished: DefaultDict[str, int] = field(default_factory=lambda: defaultdict(int))
-    timing: DefaultDict[str, float] = field(default_factory=lambda: defaultdict(float))
+    running: DefaultDict[str, int] = field(
+        default_factory=lambda: defaultdict(int))
+    finished: DefaultDict[str, int] = field(
+        default_factory=lambda: defaultdict(int))
+    timing: DefaultDict[str, float] = field(
+        default_factory=lambda: defaultdict(float))
 
     def __str__(self):
         """Return a formatted string representation of the job statistics."""

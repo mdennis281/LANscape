@@ -39,7 +39,7 @@ def list_subnet():
         return jsonify(get_all_network_subnets())
     except BaseException:
         return jsonify({'error': traceback.format_exc()})
-    
+
 
 @api_bp.route('/api/tools/config/defaults')
 def get_default_configs():

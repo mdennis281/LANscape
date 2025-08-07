@@ -111,7 +111,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         task_scan_ports=True,
         task_scan_port_services=False,
         lookup_type=ScanType.BOTH,
-        arp_config= ArpConfig(
+        arp_config=ArpConfig(
             attempts=3,
             timeout=2.5
         ),

@@ -137,15 +137,15 @@ class ArpCacheLookup():
             raise NotImplementedError("Unsupported platform")
 
     @classmethod
-    def _extract_mac_address(cls, arp_resp: str) -> str | None:
+    def _extract_mac_address(cls, arp_resp: str) -> List[str]:
         """
-        Extract the MAC address from a line of ARP output.
+        Extract MAC addresses from ARP output.
 
         Args:
-            arp_line (str): A line from the ARP command output.
+            arp_resp (str): The ARP command output.
 
         Returns:
-            str | None: The extracted MAC address, or None if not found.
+            List[str]: A list of extracted MAC addresses (may be empty).
         """
         arp_resp = arp_resp.replace('-', ':')
         return re.findall(r'..:..:..:..:..:..', arp_resp)

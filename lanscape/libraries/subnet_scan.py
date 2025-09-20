@@ -52,11 +52,6 @@ class SubnetScanner():
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
 
-        # Initial logging
-        if not is_arp_supported():
-            self.log.warning(
-                'ARP is not supported with the active runtime context. '
-                'Device discovery will be limited to ping responses.')
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(
             f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')

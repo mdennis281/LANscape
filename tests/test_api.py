@@ -173,7 +173,8 @@ class ApiTestCase(unittest.TestCase):
         # Create a new scan
         new_scan = {
             'subnet': right_size_subnet(get_network_subnet()),
-            'port_list': 'small'
+            'port_list': 'small',
+            'lookup_type': ['POKE_THEN_ARP']
         }
         response = self.app.post('/api/scan', json=new_scan)
         self.assertEqual(response.status_code, 200)

@@ -39,7 +39,7 @@ class LibraryTestCase(unittest.TestCase):
         cfg.task_scan_ports = do_port_scan
         cfg.ping_config.attempts = ping_attempts
         cfg.arp_config.timeout = arp_timeout
-        cfg.lookup_type = ScanType.PING
+        cfg.lookup_type = [ScanType.POKE_THEN_ARP]
 
         data = cfg.to_dict()
         self.assertTrue(isinstance(data['ping_config'], dict))
@@ -53,7 +53,7 @@ class LibraryTestCase(unittest.TestCase):
         self.assertEqual(cfg2.task_scan_ports, do_port_scan)
         self.assertEqual(cfg2.ping_config.attempts, ping_attempts)
         self.assertEqual(cfg2.arp_config.timeout, arp_timeout)
-        self.assertEqual(cfg2.lookup_type, ScanType.PING)
+        self.assertEqual(cfg2.lookup_type, [ScanType.POKE_THEN_ARP])
 
     def test_scan(self):
         """

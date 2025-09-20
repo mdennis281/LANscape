@@ -7,6 +7,7 @@ import socket
 import subprocess
 import time
 import random
+from typing import List
 import psutil
 
 from scapy.sendrecv import srp
@@ -14,7 +15,10 @@ from scapy.layers.l2 import ARP, Ether
 from icmplib import ping
 
 from lanscape.libraries.net_tools import Device
-from lanscape.libraries.scan_config import ScanConfig, ScanType, PingConfig, ArpConfig, PokeConfig, ArpCacheConfig
+from lanscape.libraries.scan_config import (
+    ScanConfig, ScanType, PingConfig, 
+    ArpConfig, PokeConfig, ArpCacheConfig
+)
 from lanscape.libraries.decorators import timeout_enforcer, job_tracker
 
 
@@ -116,7 +120,7 @@ class ArpCacheLookup():
         return device.alive is True
 
     @classmethod
-    def _get_platform_arp_command(cls) -> list[str]:
+    def _get_platform_arp_command(cls) -> List[str]:
         """
         Get the ARP command to execute based on the platform.
 

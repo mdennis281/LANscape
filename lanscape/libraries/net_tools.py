@@ -484,6 +484,7 @@ class ArpSupportChecker:
             cls._supported = False
         return cls._supported
 
+
 def is_arp_supported():
     """
     Check if ARP requests are supported on the current system.

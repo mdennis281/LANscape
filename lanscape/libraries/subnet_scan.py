@@ -282,7 +282,7 @@ class ScannerResults:
         # Logging
         self.log = logging.getLogger('ScannerResults')
         self.log.debug(f'Instantiated Logger For Scan: {self.scan.uid}')
-        
+
     @property
     def devices_alive(self):
         return len(self.devices)

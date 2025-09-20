@@ -24,16 +24,16 @@ class JobStats:
         default_factory=lambda: defaultdict(int))
     timing: DefaultDict[str, float] = field(
         default_factory=lambda: defaultdict(float))
-    
+
     _instance = None
-    
+
     def __init__(self):
         # Only initialize once
         if not hasattr(self, "running"):
             self.running = defaultdict(int)
             self.finished = defaultdict(int)
             self.timing = defaultdict(float)
-    
+
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(JobStats, cls).__new__(cls)

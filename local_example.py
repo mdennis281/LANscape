@@ -4,7 +4,6 @@ Example script to run a network scan using lanscape library.
 from lanscape import ScanManager, ScanConfig, net_tools, ScanType, PokeConfig
 
 
-
 sm = ScanManager()
 
 cfg = ScanConfig(

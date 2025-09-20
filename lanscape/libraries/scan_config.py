@@ -160,13 +160,13 @@ class ScanType(Enum):
 
     PING: Uses ICMP echo requests to determine if hosts are alive
     ARP: Uses Address Resolution Protocol to discover hosts on the local network
-    
+
     """
     ICMP = 'ICMP'
     ARP_LOOKUP = 'ARP_LOOKUP'
     POKE_THEN_ARP = 'POKE_THEN_ARP'
     ICMP_THEN_ARP = 'ICMP_THEN_ARP'
-    
+
 
 class ScanConfig(BaseModel):
     """
@@ -260,7 +260,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_isalive=64,
         task_scan_ports=True,
         task_scan_port_services=False,
-        lookup_type=[ScanType.ICMP_THEN_ARP,ScanType.ARP_LOOKUP],
+        lookup_type=[ScanType.ICMP_THEN_ARP, ScanType.ARP_LOOKUP],
         arp_config=ArpConfig(
             attempts=3,
             timeout=2.5

@@ -47,6 +47,7 @@ def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
 
     return device.alive is True
 
+
 class IcmpLookup():
     """Class to handle ICMP ping lookups for device presence.
 
@@ -83,7 +84,6 @@ class IcmpLookup():
         return device.alive is True
 
 
-
 class ArpCacheLookup():
     """
     Class to handle ARP cache lookups for device presence.
@@ -103,7 +103,7 @@ class ArpCacheLookup():
         """
 
         command = cls._get_platform_arp_command() + [device.ip]
-        
+
         for _ in range(cfg.attempts):
             time.sleep(cfg.wait_before)
             output = subprocess.check_output(command).decode()
@@ -112,7 +112,7 @@ class ArpCacheLookup():
                 device.macs = macs
                 device.alive = True
                 break
-            
+
         return device.alive is True
 
     @classmethod
@@ -145,16 +145,17 @@ class ArpCacheLookup():
         """
         arp_resp = arp_resp.replace('-', ':')
         return re.findall(r'..:..:..:..:..:..', arp_resp)
-        
+
+
 class ArpLookup():
     """
     Class to handle ARP lookups for device presence.
     NOTE: This lookup method requires elevated privileges to access the ARP cache.
-    
-    
+
+
     [Arp Lookup Requirements](/support/arp-issues.md)
     """
-    
+
     @classmethod
     @job_tracker
     def execute(cls, device: Device, cfg: ArpConfig) -> bool:
@@ -168,6 +169,7 @@ class ArpLookup():
             bool: True if the device is found via ARP, False otherwise.
         """
         enforcer_timeout = cfg.timeout * 2
+
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
         def do_arp_lookup():
             arp_request = ARP(pdst=device.ip)
@@ -187,6 +189,7 @@ class ArpLookup():
             device.macs = macs
 
         return device.alive is True
+
 
 class Poker():
     """
@@ -208,12 +211,13 @@ class Poker():
             None: used to populate the arp cache
         """
         enforcer_timeout = cfg.timeout * cfg.attempts * 2
+
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
         def do_poke():
             for _ in range(cfg.attempts):
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(cfg.timeout)
-                sock.connect_ex((device.ip, random.randint(1024, 65535))) # port shouldn't matter
+                sock.connect_ex((device.ip, random.randint(1024, 65535)))  # port shouldn't matter
                 sock.close()
 
         do_poke()

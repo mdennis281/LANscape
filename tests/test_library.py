@@ -33,7 +33,6 @@ class LibraryTestCase(unittest.TestCase):
         cfg = ScanConfig(
             subnet=subnet_val,
             port_list='small',
-            lookup_type=[ScanType.POKE_THEN_ARP]
         )
         self.assertEqual(len(cfg.parse_subnet()), 254)
 
@@ -66,7 +65,8 @@ class LibraryTestCase(unittest.TestCase):
         cfg = ScanConfig(
             subnet=right_size_subnet(subnet),
             t_multiplier=1.0,
-            port_list='small'
+            port_list='small',
+            lookup_type=[ScanType.POKE_THEN_ARP]
         )
         scan = sm.new_scan(cfg)
         self.assertTrue(scan.running)

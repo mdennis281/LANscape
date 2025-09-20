@@ -16,7 +16,7 @@ from icmplib import ping
 
 from lanscape.libraries.net_tools import Device
 from lanscape.libraries.scan_config import (
-    ScanConfig, ScanType, PingConfig, 
+    ScanConfig, ScanType, PingConfig,
     ArpConfig, PokeConfig, ArpCacheConfig
 )
 from lanscape.libraries.decorators import timeout_enforcer, job_tracker
@@ -129,12 +129,12 @@ class ArpCacheLookup():
         """
         if psutil.WINDOWS:
             return ['arp', '-a']
-        elif psutil.LINUX:
+        if psutil.LINUX:
             return ['arp', '-n']
-        elif psutil.MACOS:
+        if psutil.MACOS:
             return ['arp', '-n']
-        else:
-            raise NotImplementedError("Unsupported platform")
+
+        raise NotImplementedError("Unsupported platform")
 
     @classmethod
     def _extract_mac_address(cls, arp_resp: str) -> List[str]:

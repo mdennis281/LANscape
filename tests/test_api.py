@@ -85,8 +85,11 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Create a new scan, wait for completion
-        new_scan = {'subnet': right_size_subnet(
-            get_network_subnet()), 'port_list': 'test_port_list_scan'}
+        new_scan = {
+            'subnet': right_size_subnet(get_network_subnet()),
+            'port_list': 'test_port_list_scan',
+            'lookup_type': ['POKE_THEN_ARP']
+        }
         response = self.app.post('/api/scan/async', json=new_scan)
         self.assertEqual(response.status_code, 200)
         scan_info = json.loads(response.data)

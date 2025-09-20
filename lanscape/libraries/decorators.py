@@ -24,6 +24,20 @@ class JobStats:
         default_factory=lambda: defaultdict(int))
     timing: DefaultDict[str, float] = field(
         default_factory=lambda: defaultdict(float))
+    
+    _instance = None
+    
+    def __init__(self):
+        # Only initialize once
+        if not hasattr(self, "running"):
+            self.running = defaultdict(int)
+            self.finished = defaultdict(int)
+            self.timing = defaultdict(float)
+    
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(JobStats, cls).__new__(cls)
+        return cls._instance
 
     def __str__(self):
         """Return a formatted string representation of the job statistics."""
@@ -53,9 +67,7 @@ class JobStatsMixin:  # pylint: disable=too-few-public-methods
     @property
     def job_stats(self):
         """Return the shared JobStats instance."""
-        if JobStatsMixin._job_stats is None:
-            JobStatsMixin._job_stats = JobStats()
-        return JobStatsMixin._job_stats
+        return JobStats()
 
 
 def job_tracker(func):
@@ -81,7 +93,7 @@ def job_tracker(func):
     def wrapper(*args, **kwargs):
         """Wrap the function to update job statistics before and after execution."""
         class_instance = args[0]
-        job_stats = class_instance.job_stats
+        job_stats = JobStats()
         fxn = get_fxn_src_name(
             func,
             class_instance

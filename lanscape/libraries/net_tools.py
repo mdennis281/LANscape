@@ -4,13 +4,11 @@ import logging
 import ipaddress
 import traceback
 import subprocess
-from time import sleep
 from typing import List, Dict
 import socket
 import struct
 import re
 import psutil
-from icmplib import ping
 
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
@@ -20,8 +18,7 @@ from lanscape.libraries.service_scan import scan_service
 from lanscape.libraries.mac_lookup import MacLookup, get_macs
 from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
 from lanscape.libraries.errors import DeviceError
-from lanscape.libraries.decorators import job_tracker, JobStatsMixin, timeout_enforcer
-from lanscape.libraries.scan_config import ScanType, PingConfig, ArpConfig
+from lanscape.libraries.decorators import job_tracker
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()

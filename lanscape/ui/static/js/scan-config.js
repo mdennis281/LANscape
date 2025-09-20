@@ -157,7 +157,7 @@ function updateVisibility() {
     const showPing = types.has('ICMP') || types.has('ICMP_THEN_ARP');
     toggleSection('#section-ping', showPing);
 
-    // ARP active lookup (srp) only when ARP_LOOKUP is selected
+    // ARP active lookup (scapy) only when ARP_LOOKUP is selected
     const showArp = types.has('ARP_LOOKUP');
     toggleSection('#section-arp', showArp);
 

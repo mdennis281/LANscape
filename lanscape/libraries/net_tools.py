@@ -467,7 +467,7 @@ class ArpSupportChecker:
     Singleton class to check if ARP requests are supported on the current system.
     The check is only performed once.
     """
-    _supported = False
+    _supported = None
 
     @classmethod
     def is_supported(cls):

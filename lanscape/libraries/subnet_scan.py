@@ -21,8 +21,8 @@ from tabulate import tabulate
 
 # Local imports
 from lanscape.libraries.scan_config import ScanConfig
-from lanscape.libraries.decorators import job_tracker, terminator, JobStatsMixin, JobStats
-from lanscape.libraries.net_tools import Device, is_arp_supported
+from lanscape.libraries.decorators import job_tracker, terminator, JobStats
+from lanscape.libraries.net_tools import Device
 from lanscape.libraries.errors import SubnetScanTerminationFailure
 from lanscape.libraries.device_alive import is_device_alive
 

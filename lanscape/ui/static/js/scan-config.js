@@ -13,6 +13,9 @@ $(document).ready(function() {
     
     $('#t_cnt_port_scan, #t_cnt_port_test').on('input', updatePortTotals);
     $('#ping_attempts, #ping_ping_count').on('input', updatePingTotals);
+
+    // Lookup type toggles
+    $('.lookup-type-input').on('change', onLookupTypeChanged);
 });
 
 function getScanDefaults(callback=null) {
@@ -39,7 +42,9 @@ function setScanConfig(configName) {
     $('#t_cnt_isalive').val(config.t_cnt_isalive);
     $('#task_scan_ports').prop('checked', config.task_scan_ports);
     $('#task_scan_port_services').prop('checked', config.task_scan_port_services);
-    $('#lookup_type').val(config.lookup_type);
+
+    // lookup type (array of enum values as strings)
+    setLookupTypeUI(config.lookup_type || []);
 
     // ping config
     $('#ping_attempts').val(config.ping_config.attempts);
@@ -51,8 +56,21 @@ function setScanConfig(configName) {
     $('#arp_attempts').val(config.arp_config.attempts);
     $('#arp_timeout').val(config.arp_config.timeout);
 
+    // arp cache config
+    if (config.arp_cache_config) {
+        $('#arp_cache_attempts').val(config.arp_cache_config.attempts);
+        $('#arp_cache_wait_before').val(config.arp_cache_config.wait_before);
+    }
+
+    // poke config
+    if (config.poke_config) {
+        $('#poke_attempts').val(config.poke_config.attempts);
+        $('#poke_timeout').val(config.poke_config.timeout);
+    }
+
     updatePortTotals();
     updatePingTotals();
+    updateVisibility();
 }
 
 function getScanConfig() {
@@ -63,7 +81,7 @@ function getScanConfig() {
         t_cnt_isalive: parseInt($('#t_cnt_isalive').val()),
         task_scan_ports: $('#task_scan_ports').is(':checked'),
         task_scan_port_services: $('#task_scan_port_services').is(':checked'),
-        lookup_type: $('#lookup_type').val(),
+        lookup_type: getSelectedLookupTypes(),
         ping_config: {
             attempts: parseInt($('#ping_attempts').val()),
             ping_count: parseInt($('#ping_ping_count').val()),
@@ -73,6 +91,14 @@ function getScanConfig() {
         arp_config: {
             attempts: parseInt($('#arp_attempts').val()),
             timeout: parseFloat($('#arp_timeout').val())
+        },
+        arp_cache_config: {
+            attempts: parseInt($('#arp_cache_attempts').val()),
+            wait_before: parseFloat($('#arp_cache_wait_before').val())
+        },
+        poke_config: {
+            attempts: parseInt($('#poke_attempts').val()),
+            timeout: parseFloat($('#poke_timeout').val())
         }
     };
 }
@@ -100,6 +126,54 @@ function updatePingTotals() {
     const attempts = parseInt($('#ping_attempts').val()) || 0;
     const count = parseInt($('#ping_ping_count').val()) || 0;
     $('#total-ping-attempts').val(attempts * count);
+}
+
+// Lookup type helpers
+function setLookupTypeUI(values) {
+    const set = new Set(values || []);
+    $('.lookup-type-input').each(function() {
+        const val = $(this).val();
+        $(this).prop('checked', set.has(val));
+    });
+    updateVisibility();
+}
+
+function getSelectedLookupTypes() {
+    const selected = [];
+    $('.lookup-type-input:checked').each(function() {
+        selected.push($(this).val());
+    });
+    return selected;
+}
+
+function onLookupTypeChanged() {
+    updateVisibility();
+}
+
+function updateVisibility() {
+    const types = new Set(getSelectedLookupTypes());
+
+    // Show ping if ICMP is used directly or as part of ICMP_THEN_ARP
+    const showPing = types.has('ICMP') || types.has('ICMP_THEN_ARP');
+    toggleSection('#section-ping', showPing);
+
+    // ARP active lookup (srp) only when ARP_LOOKUP is selected
+    const showArp = types.has('ARP_LOOKUP');
+    toggleSection('#section-arp', showArp);
+
+    // ARP cache is used when we do a staged lookup that relies on cache
+    const showArpCache = types.has('ICMP_THEN_ARP') || types.has('POKE_THEN_ARP');
+    toggleSection('#section-arp-cache', showArpCache);
+
+    // Poke section only when POKE_THEN_ARP is selected
+    const showPoke = types.has('POKE_THEN_ARP');
+    toggleSection('#section-poke', showPoke);
+}
+
+function toggleSection(selector, show) {
+    const $el = $(selector);
+    if (show) $el.removeClass('div-hide');
+    else $el.addClass('div-hide');
 }
 
 // expose functions globally

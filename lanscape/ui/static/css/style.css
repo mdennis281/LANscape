@@ -159,24 +159,21 @@ details {
     margin-bottom: 0;
 }
 #scan-form input {
+    margin: 0 -1px; /* sneak borders around buttons */
     z-index: 2;
     transition: all .2s ease-in-out;
     border-radius: 5px !important; /* override bootstrap stuff */
-    padding-right: 34px;
-    margin-right: -34px;
-    margin-left: -41px;
-    padding-left: calc(41px + 5px);
+    padding-left: calc(30px + 5px);
 }
+
 
 
 #scan-form .input-group button {
     background-color: var(--primary-bg-accent);
     border: 0;
-    
     transition: all .2s ease-in-out;
     height: 40px;
     margin-top: 1px;
-    transform: translateX(.5px);
     z-index: 3;
     margin-left: 0;
 }
@@ -187,13 +184,19 @@ details {
     background-color: var(--primary-accent);
 }
 #scan-form .input-group button.start {
+    position: absolute;
+    left: 0;
     border-radius: 5px 0 0 5px;
+    padding: 0;
     border-right: 1px var(--border-color) solid;
-    width: 40px; /* added because it looks gross on icon load */
+    width: 30px; /* added because it looks gross on icon load */
 }
 #scan-form .input-group button.end {
     border-radius: 0 5px 5px 0;
     border-left: 1px var(--border-color) solid;
+    position: absolute;
+    width: 30px;
+    right: 0;
 }
 
 .label-container {
@@ -333,6 +336,31 @@ details {
     padding: 5px;
 }
 
+#advanced-modal #lookup-type-group {
+    gap: 12px;
+}
+
+#advanced-modal .modal-body {
+    height: calc(100vh - 200px);
+    overflow-y: scroll;
+}
+
+#advanced-modal #lookup-type-group .form-check {
+    margin-right: 8px;
+    margin-bottom: 6px;
+}
+
+#advanced-modal .arp-help-ico {
+    font-size: 1em;
+    vertical-align: middle;
+    margin-left: 3px;
+    color: var(--text-color);
+    cursor: pointer;
+    opacity: 1;
+}
+#advanced-modal .arp-help-ico:hover {
+    color: var(--text-accent-color);
+}
 
 /* Card Styles */
 .card {
@@ -758,19 +786,6 @@ html {
     background-color: var(--warning-accent);
 }
 
-#arp-error {
-    width: calc(100% + 40px);
-    position: relative;
-    display: flex;
-    justify-content: center;
-    background-color: var(--danger-accent-transparent);
-    color: var(--text-color);
-    transform: translate3d(-20px, -20px, 0);
-    font-size: small;
-}
-#arp-error span {
-    text-align: center;
-}
 
 @media screen and (max-width: 681px) {
     #power-button {
@@ -782,10 +797,6 @@ html {
     .container-fluid {
         width:98%;
         padding: 8px;
-    }
-    #arp-error {
-        width: calc(100% + 16px);
-        transform: translate3d(-8px, -8px, 0);
     }
 }
 

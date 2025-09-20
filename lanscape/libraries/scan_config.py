@@ -4,6 +4,7 @@ Provides classes and utilities to configure different types of network scans
 including ping scans, ARP scans, and port scanning.
 """
 
+import os
 from typing import List, Dict
 import ipaddress
 from enum import Enum
@@ -90,18 +91,82 @@ class ArpConfig(BaseModel):
         return f'ArpCfg(timeout={self.timeout}, attempts={self.attempts})'
 
 
+class ArpCacheConfig(BaseModel):
+    """Config for fetching from ARP cache"""
+    attempts: int = 1
+    wait_before: float = 0.2
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'ArpCacheConfig':
+        """
+        Create an ArpCacheConfig instance from a dictionary.
+
+        Args:
+            data: Dictionary containing ArpCacheConfig parameters
+
+        Returns:
+            A new ArpCacheConfig instance with the provided settings
+        """
+        return cls.model_validate(data)
+
+    def to_dict(self) -> dict:
+        """
+        Convert the ArpCacheConfig instance to a dictionary.
+
+        Returns:
+            Dictionary representation of the ArpCacheConfig
+        """
+        return self.model_dump()
+
+    def __str__(self):
+        return f'ArpCacheCfg(wait_before={self.wait_before}, attempts={self.attempts})'
+
+
+class PokeConfig(BaseModel):
+    """
+    Poking essentially involves sending a TCP packet to a specific port on a device
+    to elicit a response. Not so much expecting a response, but it should at least
+    trigger an ARP request.
+    """
+    attempts: int = 1
+    timeout: float = 2.0
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'PokeConfig':
+        """
+        Create a PokeConfig instance from a dictionary.
+
+        Args:
+            data: Dictionary containing PokeConfig parameters
+
+        Returns:
+            A new PokeConfig instance with the provided settings
+        """
+        return cls.model_validate(data)
+
+    def to_dict(self) -> dict:
+        """
+        Convert the PokeConfig instance to a dictionary.
+
+        Returns:
+            Dictionary representation of the PokeConfig
+        """
+        return self.model_dump()
+
+
 class ScanType(Enum):
     """
     Enumeration of supported network scan types.
 
     PING: Uses ICMP echo requests to determine if hosts are alive
     ARP: Uses Address Resolution Protocol to discover hosts on the local network
-    BOTH: Uses both PING and ARP methods for maximum coverage
+    
     """
-    PING = 'ping'
-    ARP = 'arp'
-    BOTH = 'both'
-
+    ICMP = 'ICMP'
+    ARP_LOOKUP = 'ARP_LOOKUP'
+    POKE_THEN_ARP = 'POKE_THEN_ARP'
+    ICMP_THEN_ARP = 'ICMP_THEN_ARP'
+    
 
 class ScanConfig(BaseModel):
     """
@@ -113,18 +178,20 @@ class ScanConfig(BaseModel):
     subnet: str
     port_list: str
     t_multiplier: float = 1.0
-    t_cnt_port_scan: int = 10
-    t_cnt_port_test: int = 128
-    t_cnt_isalive: int = 256
+    t_cnt_port_scan: int = os.cpu_count()
+    t_cnt_port_test: int = os.cpu_count() * 4
+    t_cnt_isalive: int = os.cpu_count() * 6
 
     task_scan_ports: bool = True
     # below wont run if above false
     task_scan_port_services: bool = False  # disabling until more stable
 
-    lookup_type: ScanType = ScanType.BOTH
+    lookup_type: List[ScanType] = [ScanType.ICMP_THEN_ARP]
 
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
+    poke_config: PokeConfig = Field(default_factory=PokeConfig)
+    arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
 
     def t_cnt(self, thread_id: str) -> int:
         """
@@ -143,32 +210,20 @@ class ScanConfig(BaseModel):
         """
         Create a ScanConfig instance from a dictionary.
 
-        Handles special cases like converting string enum values to proper Enum types.
-
         Args:
             data: Dictionary containing ScanConfig parameters
 
         Returns:
             A new ScanConfig instance with the provided settings
         """
-        # Handle special cases before validation
-        if isinstance(data.get('lookup_type'), str):
-            data['lookup_type'] = ScanType[data['lookup_type'].upper()]
 
         return cls.model_validate(data)
 
     def to_dict(self) -> dict:
         """
-        Convert the ScanConfig instance to a dictionary.
-
-        Handles special cases like converting Enum values to strings.
-
-        Returns:
-            Dictionary representation of the ScanConfig
+        Convert the ScanConfig instance to a json-serializable dictionary.
         """
-        dump = self.model_dump()
-        dump['lookup_type'] = self.lookup_type.value
-        return dump
+        return self.model_dump(mode="json")
 
     def get_ports(self) -> List[int]:
         """
@@ -191,7 +246,7 @@ class ScanConfig(BaseModel):
     def __str__(self):
         a = f'subnet={self.subnet}'
         b = f'ports={self.port_list}'
-        c = f'scan_type={self.lookup_type.value}'
+        c = f'scan_type={[st.value for st in self.lookup_type]}'
         return f'ScanConfig({a}, {b}, {c})'
 
 
@@ -205,7 +260,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_isalive=64,
         task_scan_ports=True,
         task_scan_port_services=False,
-        lookup_type=ScanType.BOTH,
+        lookup_type=[ScanType.ICMP_THEN_ARP,ScanType.ARP_LOOKUP],
         arp_config=ArpConfig(
             attempts=3,
             timeout=2.5
@@ -215,6 +270,10 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
             ping_count=2,
             timeout=1.5,
             retry_delay=0.5
+        ),
+        arp_cache_config=ArpCacheConfig(
+            attempts=2,
+            wait_before=0.3
         )
     ),
     'fast': ScanConfig(
@@ -225,7 +284,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_isalive=512,
         task_scan_ports=True,
         task_scan_port_services=False,
-        lookup_type=ScanType.BOTH,
+        lookup_type=[ScanType.POKE_THEN_ARP],
         arp_config=ArpConfig(
             attempts=1,
             timeout=1.0

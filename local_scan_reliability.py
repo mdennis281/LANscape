@@ -47,7 +47,7 @@ def main():
                             f'{len(results.devices)}/{results.devices_scanned}/'
                             f'{results.devices_total} scanned'
                         )
-                        status_line += f' found/scanned/total: {found_scanned_total}'
+                        status_line += f', Found/Scanned/Total: {found_scanned_total}'
 
                     status_text += status_line + '\n'
 

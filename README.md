@@ -3,8 +3,15 @@ A python based local network scanner.
 
 
 PyPi Stats: ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
+
 Latest release: ![Releases](https://img.shields.io/github/v/tag/mdennis281/LANscape?sort=date&filter=releases%2F*)
-Tests: [pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest ) [packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) [pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
+
+Tests: 
+![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest ) 
+![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) 
+![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
+
+
 ![screenshot](https://github.com/user-attachments/assets/62d597b2-7b46-46b5-acdf-990b775a5791)
 
 ## Local Run

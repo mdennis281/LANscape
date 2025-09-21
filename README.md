@@ -57,6 +57,7 @@ Recommendations:
 
   - Adjust scan configuration
   - Configure ARP lookup [ARP lookup setup](./support/arp-issues.md)
+  - Create a bug
 
 
 ### Something else

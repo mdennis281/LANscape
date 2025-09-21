@@ -178,9 +178,9 @@ class ScanConfig(BaseModel):
     subnet: str
     port_list: str
     t_multiplier: float = 1.0
-    t_cnt_port_scan: int = os.cpu_count()
-    t_cnt_port_test: int = os.cpu_count() * 4
-    t_cnt_isalive: int = os.cpu_count() * 6
+    t_cnt_port_scan: int = os.cpu_count() or 4
+    t_cnt_port_test: int = (os.cpu_count() or 4) * 4
+    t_cnt_isalive: int = (os.cpu_count() or 4) * 6
 
     task_scan_ports: bool = True
     # below wont run if above false

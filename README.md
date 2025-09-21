@@ -15,7 +15,7 @@ Latest release:
 ![Beta](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*b*&label=Beta)
 ![Alpha](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*a*&label=Alpha)
 
-Tests: 
+Health: 
 
 ![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest) 
 ![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) 

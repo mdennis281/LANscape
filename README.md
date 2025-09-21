@@ -10,7 +10,9 @@ PyPi Stats:
 
 Latest release: 
 
-![Releases](https://img.shields.io/github/v/tag/mdennis281/LANscape?sort=date&filter=releases%2F*)
+![Stable](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=releases%2F*&label=Stable)
+![Beta](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*b*&label=Beta)
+![Alpha](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*a*&label=Alpha)
 
 Tests: 
 

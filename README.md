@@ -6,6 +6,7 @@ A python based local network scanner.
 
 PyPi Stats: 
 
+![Version](https://img.shields.io/pypi/v/lanscape)
 ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
 
 Latest release: 

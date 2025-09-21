@@ -6,7 +6,6 @@ import re
 import socket
 import subprocess
 import time
-import random
 from typing import List
 import psutil
 

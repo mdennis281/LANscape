@@ -280,6 +280,7 @@ class ScannerResults:
 
     @property
     def devices_alive(self):
+        """number of alive devices found in the scan"""
         return len(self.devices)
 
     def scanned(self):

@@ -22,7 +22,7 @@ Tests:
 ![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 
 
-## Local Run
+## Installation
 ```sh
 pip install lanscape
 python -m lanscape
@@ -50,16 +50,13 @@ The program does an ARP lookup to determine the MAC address. This lookup
 can sometimes require admin-level permissions to retrieve accurate results.
 *Try elevating your shell before execution.*
 
-### Message "WARNING: No libpcap provider available ! pcap won't be used"
-This is a missing dependency related to the ARP lookup. This is handled in the code, but you would get marginally faster/better results with this installed: [npcap download](https://npcap.com/#download)
-
 ### The accuracy of the devices found is low
-I use a combination of ARP and Ping to determine if a device is online. This method drops in stability when used in many threads. 
+I use a combination of ARP, ICMP & port testing to determine if a device is online. Sometimes the scan settings can use some tuning to maximize both speed and accuracy.
+
 Recommendations:
 
-  - Drop parallelism value (advanced dropdown)
-  - Use python > 3.10 im noticing threadpool improvements after this version
-  - Create a bug - I'm curious
+  - Adjust scan configuration
+  - Configure ARP lookup [ARP lookup setup](./support/arp-issues.md)
 
 
 ### Something else

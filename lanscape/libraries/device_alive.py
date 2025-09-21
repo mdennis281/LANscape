@@ -218,10 +218,13 @@ class Poker():
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
         def do_poke():
-            for _ in range(cfg.attempts):
+            # Use a small set of common ports likely to be filtered but still trigger ARP
+            common_ports = [80, 443, 22]
+            for i in range(cfg.attempts):
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(cfg.timeout)
-                sock.connect_ex((device.ip, random.randint(1024, 65535)))  # port shouldn't matter
+                port = common_ports[i % len(common_ports)]
+                sock.connect_ex((device.ip, port))
                 sock.close()
 
         do_poke()

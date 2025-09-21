@@ -17,6 +17,7 @@
         "DGRAM",
         "gethostbyaddr",
         "hwid",
+        "hwsrc",
         "icmplib",
         "isup",
         "jsonify",

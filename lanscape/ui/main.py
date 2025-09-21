@@ -12,7 +12,6 @@ import requests
 from lanscape.libraries.logger import configure_logging
 from lanscape.libraries.runtime_args import parse_args
 from lanscape.libraries.web_browser import open_webapp
-from lanscape.libraries.net_tools import is_arp_supported
 from lanscape.libraries.version_manager import get_installed_version, is_update_available
 from lanscape.ui.app import start_webserver_daemon, start_webserver
 # do this so any logs generated on import are displayed
@@ -48,14 +47,6 @@ def _main():
         log.info('Flask reloaded app.')
 
     args.port = get_valid_port(args.port)
-
-    if not is_arp_supported():
-        warn = (
-            'ARP is not supported, device discovery is degraded. ',
-            'For more information, see the help guide: ',
-            'https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md'
-        )
-        log.warning(''.join(warn))
 
     try:
         start_webserver_ui()

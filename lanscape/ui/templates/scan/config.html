@@ -32,14 +32,46 @@
             <h6>Device Detection</h6>
             <div class="row mt-2">
                 <div class="col">
-                    <label for="lookup_type">Lookup Type</label>
-                    <div class="port-list-wrapper">
-                        <select id="lookup_type" class="port-list">
-                            <option value="both">ARP + Ping</option>
-                            <option value="arp">ARP Only</option>
-                            <option value="ping">Ping Only</option>
-                        </select>
+                    <label class="mb-1">Lookup Type</label>
+                    <div id="lookup-type-group" class="d-flex flex-wrap gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input lookup-type-input" type="checkbox" id="lookup_icmp" value="ICMP">
+                            <label class="form-check-label" for="lookup_icmp">ICMP</label>
+                        </div>
+                        <div class="form-check">
+                            <!-- ARP lookup does not always work. Depends on host system -->
+                            <input 
+                            class="form-check-input lookup-type-input" 
+                            type="checkbox" 
+                            id="lookup_arp_lookup" 
+                            value="ARP_LOOKUP" 
+                            {{ '' if is_arp_supported else 'disabled' }}
+                            />
+                            <label class="form-check-label" for="lookup_arp_lookup">
+                                ARP Lookup
+                            </label>
+                            {% if not is_arp_supported %}
+                                <span 
+                                    class="material-symbols-outlined arp-help-ico" 
+                                    data-bs-toggle="tooltip" 
+                                    data-bs-placement="top" 
+                                    title="ARP lookup is not supported on this system, click for more info"
+                                    onclick="window.open('https://github.com/mdennis281/LANscape/blob/main/support/arp-issues.md', '_blank')"
+                                >
+                                    help
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input lookup-type-input" type="checkbox" id="lookup_icmp_then_arp" value="ICMP_THEN_ARP">
+                            <label class="form-check-label" for="lookup_icmp_then_arp">ICMP then ARP Cache</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input lookup-type-input" type="checkbox" id="lookup_poke_then_arp" value="POKE_THEN_ARP">
+                            <label class="form-check-label" for="lookup_poke_then_arp">Poke then ARP Cache</label>
+                        </div>
                     </div>
+                    
                 </div>
                 <div class="col">
                     <label for="t_cnt_isalive">Device Lookup Threads</label>
@@ -49,7 +81,7 @@
         </div>
 
         <hr>
-        <div class="form-group mt-2">
+        <div id="section-ping" class="form-group mt-2">
             <h6>Device Detection <span class=text-color>/</span> Ping Settings</h6>
             <div class="row">
                 <div class="col-3">
@@ -80,8 +112,7 @@
         </div>
 
         <hr>
-
-        <div class="form-group mt-2">
+        <div id="section-arp" class="form-group mt-2">
             <h6>Device Detection <span class=text-color>/</span> ARP Settings</h6>
             <div class="row">
                 <div class="col">
@@ -91,6 +122,36 @@
                 <div class="col">
                     <label for="arp_timeout" class="form-label">Timeout</label>
                     <input type="number" step="0.1" id="arp_timeout" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+        <div id="section-arp-cache" class="form-group mt-2 div-hide">
+            <h6>Device Detection <span class=text-color>/</span> ARP Cache Settings</h6>
+            <div class="row">
+                <div class="col">
+                    <label for="arp_cache_attempts" class="form-label">Attempts</label>
+                    <input type="number" id="arp_cache_attempts" class="form-control">
+                </div>
+                <div class="col">
+                    <label for="arp_cache_wait_before" class="form-label">Wait Before (sec)</label>
+                    <input type="number" step="0.1" id="arp_cache_wait_before" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+        <div id="section-poke" class="form-group mt-2 div-hide">
+            <h6>Device Detection <span class=text-color>/</span> Poke Settings</h6>
+            <div class="row">
+                <div class="col">
+                    <label for="poke_attempts" class="form-label">Attempts</label>
+                    <input type="number" id="poke_attempts" class="form-control">
+                </div>
+                <div class="col">
+                    <label for="poke_timeout" class="form-label">Timeout (sec)</label>
+                    <input type="number" step="0.1" id="poke_timeout" class="form-control">
                 </div>
             </div>
         </div>

@@ -21,12 +21,13 @@ from tabulate import tabulate
 
 # Local imports
 from lanscape.libraries.scan_config import ScanConfig
-from lanscape.libraries.decorators import job_tracker, terminator, JobStatsMixin
-from lanscape.libraries.net_tools import Device, is_arp_supported
+from lanscape.libraries.decorators import job_tracker, terminator, JobStats
+from lanscape.libraries.net_tools import Device
 from lanscape.libraries.errors import SubnetScanTerminationFailure
+from lanscape.libraries.device_alive import is_device_alive
 
 
-class SubnetScanner(JobStatsMixin):
+class SubnetScanner():
     """
     Scans a subnet for devices and open ports.
 
@@ -43,6 +44,7 @@ class SubnetScanner(JobStatsMixin):
         self.subnet = config.parse_subnet()
         self.ports: List[int] = config.get_ports()
         self.subnet_str = config.subnet
+        self.job_stats = JobStats()
 
         # Status properties
         self.running = False
@@ -50,11 +52,6 @@ class SubnetScanner(JobStatsMixin):
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
 
-        # Initial logging
-        if not is_arp_supported():
-            self.log.warning(
-                'ARP is not supported with the active runtime context. '
-                'Device discovery will be limited to ping responses.')
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(
             f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
@@ -175,6 +172,7 @@ class SubnetScanner(JobStatsMixin):
             t_remain = int((100 - percent) * (t_elapsed / percent)
                            ) if percent else '∞'
             buffer = f'{self.uid} - {self.subnet_str}\n'
+            buffer += f'Config: {self.cfg}\n'
             buffer += f'Elapsed: {int(t_elapsed)} sec - Remain: {t_remain} sec\n'
             buffer += f'Scanned: {self.results.devices_scanned}/{self.results.devices_total}'
             buffer += f' - {percent}%\n'
@@ -239,12 +237,7 @@ class SubnetScanner(JobStatsMixin):
         """
         Ping the given host and return True if it's reachable, False otherwise.
         """
-        return host.is_alive(
-            host.ip,
-            scan_type=self.cfg.lookup_type,
-            ping_config=self.cfg.ping_config,
-            arp_config=self.cfg.arp_config
-        )
+        return is_device_alive(host, self.cfg)
 
     def _set_stage(self, stage):
         self.log.debug(f'[{self.uid}] Moving to Stage: {stage}')
@@ -272,7 +265,6 @@ class ScannerResults:
         self.devices_total: int = len(list(scan.subnet))
         self.devices_scanned: int = 0
         self.devices: List[Device] = []
-        self.devices_alive = 0
 
         # Status tracking
         self.errors: List[str] = []
@@ -285,6 +277,11 @@ class ScannerResults:
         # Logging
         self.log = logging.getLogger('ScannerResults')
         self.log.debug(f'Instantiated Logger For Scan: {self.scan.uid}')
+
+    @property
+    def devices_alive(self):
+        """number of alive devices found in the scan"""
+        return len(self.devices)
 
     def scanned(self):
         """
@@ -315,7 +312,6 @@ class ScannerResults:
         """
         self.running = self.scan.running
         self.run_time = int(round(time() - self.start_time, 0))
-        self.devices_alive = len(self.devices)
 
         out = vars(self).copy()
         out.pop('scan')
@@ -348,6 +344,7 @@ class ScannerResults:
 
         # Format and return the complete buffer with table output
         buffer = f"Scan Results - {self.scan.subnet_str} - {self.uid}\n"
+        buffer += f'Found/Scanned: {self.devices_alive}/{self.devices_scanned}\n'
         buffer += "---------------------------------------------\n\n"
         buffer += table
         return buffer

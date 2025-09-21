@@ -4,13 +4,11 @@ import logging
 import ipaddress
 import traceback
 import subprocess
-from time import sleep
 from typing import List, Dict
 import socket
 import struct
 import re
 import psutil
-from icmplib import ping
 
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
@@ -20,116 +18,13 @@ from lanscape.libraries.service_scan import scan_service
 from lanscape.libraries.mac_lookup import MacLookup, get_macs
 from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
 from lanscape.libraries.errors import DeviceError
-from lanscape.libraries.decorators import job_tracker, JobStatsMixin, timeout_enforcer
-from lanscape.libraries.scan_config import ScanType, PingConfig, ArpConfig
+from lanscape.libraries.decorators import job_tracker
 
 log = logging.getLogger('NetTools')
+mac_lookup = MacLookup()
 
 
-class IPAlive(JobStatsMixin):
-    """Class to check if a device is alive using ARP and/or ping scans."""
-    caught_errors: List[DeviceError] = []
-    _icmp_alive: bool = False
-    _arp_alive: bool = False
-
-    @job_tracker
-    def is_alive(
-        self,
-        ip: str,
-        scan_type: ScanType = ScanType.BOTH,
-        arp_config: ArpConfig = ArpConfig(),
-        ping_config: PingConfig = PingConfig()
-    ) -> bool:
-        """
-        Check if a device is alive by performing ARP and/or ping scans.
-        """
-        if scan_type == ScanType.ARP:
-            return self._arp_lookup(ip, arp_config)
-        if scan_type == ScanType.PING:
-            return self._ping_lookup(ip, ping_config)
-        return self._ping_lookup(ip, ping_config) or self._arp_lookup(ip, arp_config)
-
-    @job_tracker
-    def _arp_lookup(
-        self, ip: str,
-        cfg: ArpConfig = ArpConfig()
-    ) -> bool:
-        """Perform an ARP lookup to check if the device is alive."""
-        enforcer_timeout = cfg.timeout * 1.3
-
-        @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
-        def do_arp_lookup():
-            arp_request = ARP(pdst=ip)
-            broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-            packet = broadcast / arp_request
-
-            answered, _ = srp(packet, timeout=cfg.timeout, verbose=False)
-            self._arp_alive = any(resp.psrc == ip for _, resp in answered)
-            return self._arp_alive
-
-        try:
-            for _ in range(cfg.attempts):
-                if do_arp_lookup():
-                    return True
-        except Exception as e:
-            self.caught_errors.append(DeviceError(e))
-        return False
-
-    @job_tracker
-    def _ping_lookup(
-        self, ip: str,
-        cfg: PingConfig = PingConfig()
-    ) -> bool:
-        """Perform a ping lookup to check if the device is alive using icmplib."""
-        enforcer_timeout = cfg.timeout * cfg.ping_count * 1.3
-
-        @timeout_enforcer(enforcer_timeout, raise_on_timeout=False)
-        def do_icmp_ping():
-            try:
-                result = ping(
-                    ip,
-                    count=cfg.ping_count,
-                    interval=cfg.retry_delay,
-                    timeout=cfg.timeout,
-                    privileged=psutil.WINDOWS  # Use privileged mode on Windows
-                )
-                return result.is_alive
-            except Exception as e:
-                self.caught_errors.append(DeviceError(e))
-                # Fallback to system ping command
-                try:
-                    if psutil.WINDOWS:
-                        cmd = [
-                            "ping", "-n", str(cfg.ping_count),
-                            "-w", str(int(cfg.timeout * 1000)), ip
-                        ]
-                    else:
-                        cmd = ["ping", "-c",
-                               str(cfg.ping_count), "-W", str(cfg.timeout), ip]
-
-                    result = subprocess.run(
-                        cmd, stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True, check=False
-                    )
-                    return result.returncode == 0
-                except subprocess.CalledProcessError as fallback_error:
-                    self.caught_errors.append(DeviceError(fallback_error))
-                    return False
-
-        try:
-            for _ in range(cfg.attempts):
-                if do_icmp_ping():
-                    self._icmp_alive = True
-                    return True
-                sleep(cfg.retry_delay)
-        except Exception as e:
-            self.caught_errors.append(DeviceError(e))
-        self._icmp_alive = False
-        return False
-
-
-class Device(IPAlive):
+class Device:
     """Represents a network device with metadata and scanning capabilities."""
 
     def __init__(self, ip: str):
@@ -144,13 +39,12 @@ class Device(IPAlive):
         self.services: Dict[str, List[int]] = {}
         self.caught_errors: List[DeviceError] = []
         self.log = logging.getLogger('Device')
-        self._mac_lookup = MacLookup()
 
     def get_metadata(self):
         """Retrieve metadata such as hostname and MAC addresses."""
         if self.alive:
             self.hostname = self._get_hostname()
-            self.macs = self._get_mac_addresses()
+            self._get_mac_addresses()
 
     def dict(self) -> dict:
         """Convert the device object to a dictionary."""
@@ -191,9 +85,12 @@ class Device(IPAlive):
     @job_tracker
     def _get_mac_addresses(self):
         """Get the possible MAC addresses of a network device given its IP address."""
-        macs = get_macs(self.ip)
-        mac_selector.import_macs(macs)
-        return macs
+        # job may already be done depending on
+        # the strat from isalive
+        if not self.macs:
+            self.macs = get_macs(self.ip)
+        mac_selector.import_macs(self.macs)
+        return self.macs
 
     @job_tracker
     def _get_hostname(self):
@@ -208,7 +105,7 @@ class Device(IPAlive):
     @job_tracker
     def _get_manufacturer(self, mac_addr=None):
         """Get the manufacturer of a network device given its MAC address."""
-        return self._mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
+        return mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
 
 
 class MacSelector:
@@ -562,19 +459,32 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
     return selected.get("subnet", "")
 
 
+class ArpSupportChecker:
+    """
+    Singleton class to check if ARP requests are supported on the current system.
+    The check is only performed once.
+    """
+    _supported = None
+
+    @classmethod
+    def is_supported(cls):
+        """one time check if ARP requests are supported on this system"""
+        if cls._supported is not None:
+            return cls._supported
+        try:
+            arp_request = ARP(pdst='0.0.0.0')
+            broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
+            packet = broadcast / arp_request
+            srp(packet, timeout=0, verbose=False)
+            cls._supported = True
+        except (Scapy_Exception, PermissionError, RuntimeError):
+            cls._supported = False
+        return cls._supported
+
+
 def is_arp_supported():
     """
-    Check if ARP requests are supported on the current platform.
+    Check if ARP requests are supported on the current system.
+    Only runs the check once.
     """
-    try:
-        arp_request = ARP(pdst='0.0.0.0')
-        broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-        packet = broadcast / arp_request
-
-        srp(packet, timeout=0, verbose=False)
-        return True
-    # Scapy_Exception = MacOS
-    # PermissionError = Linux
-    # RuntimeError = Windows
-    except (Scapy_Exception, PermissionError, RuntimeError):
-        return False
+    return ArpSupportChecker.is_supported()

@@ -163,6 +163,7 @@ class ApiTestCase(unittest.TestCase):
             f'/?scan_id={scanid}',
             f'/scan/{scanid}/overview',
             f'/scan/{scanid}/table',
+            f'/scan/{scanid}/table?filter=test',
             f'/export/{scanid}'
         ]
         for uri in uris:

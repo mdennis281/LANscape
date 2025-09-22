@@ -5,7 +5,7 @@ API endpoints for subnet testing and listing.
 import traceback
 from flask import request, jsonify
 from lanscape.ui.blueprints.api import api_bp
-from lanscape.libraries.net_tools import get_all_network_subnets
+from lanscape.libraries.net_tools import get_all_network_subnets, is_arp_supported
 from lanscape.libraries.ip_parser import parse_ip_input
 from lanscape.libraries.errors import SubnetTooLargeError
 from lanscape.libraries.scan_config import DEFAULT_CONFIGS
@@ -46,7 +46,26 @@ def list_subnet():
 def get_default_configs():
     """
     Get default scan configurations.
+
+    When active ARP lookups are not supported on the host system, adjust any
+    presets that rely on ``ARP_LOOKUP`` to use the ``POKE_THEN_ARP`` fallback
+    instead. This keeps presets such as ``accurate`` usable without requiring
+    frontend overrides.
     """
-    return jsonify(
-        {key: config.to_dict() for key, config in DEFAULT_CONFIGS.items()}
-    )
+    arp_supported = is_arp_supported()
+
+    configs = {}
+    for key, config in DEFAULT_CONFIGS.items():
+        config_dict = config.to_dict()
+
+        if not arp_supported:
+            lookup_types = list(config_dict.get('lookup_type') or [])
+            if 'ARP_LOOKUP' in lookup_types:
+                lookup_types = [lt for lt in lookup_types if lt != 'ARP_LOOKUP']
+                if 'POKE_THEN_ARP' not in lookup_types:
+                    lookup_types.append('POKE_THEN_ARP')
+                config_dict['lookup_type'] = lookup_types
+
+        configs[key] = config_dict
+
+    return jsonify(configs)

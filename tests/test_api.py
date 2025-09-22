@@ -104,7 +104,12 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(scan_data['errors'], [])
         self.assertEqual(scan_data['stage'], 'complete')
 
-        self._render_scan_ui(scanid)
+        devices = scan_data.get('devices', [])
+        self.assertGreater(len(devices), 0)
+        filter_text = devices[0].get('ip') or devices[0].get('hostname')
+        self.assertTrue(filter_text)
+
+        self._render_scan_ui(scanid, filter_text)
 
         # Delete the new port list
         response = self.app.delete('/api/port/list/test_port_list_scan')
@@ -157,7 +162,7 @@ class ApiTestCase(unittest.TestCase):
             if count == -1:
                 self.assertFalse(data.get('valid'))
 
-    def _render_scan_ui(self, scanid):
+    def _render_scan_ui(self, scanid, filter_text=None):
         uris = [
             '/info',
             f'/?scan_id={scanid}',
@@ -167,6 +172,13 @@ class ApiTestCase(unittest.TestCase):
         ]
         for uri in uris:
             response = self.app.get(uri)
+            self.assertEqual(response.status_code, 200)
+
+        if filter_text:
+            response = self.app.get(
+                f'/scan/{scanid}/table',
+                query_string={'filter': filter_text}
+            )
             self.assertEqual(response.status_code, 200)
 
     def test_scan_api(self):

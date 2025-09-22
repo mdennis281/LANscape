@@ -5,6 +5,7 @@ Tests REST API endpoints for port management, subnet validation, and scan operat
 import json
 import time
 import unittest
+from unittest.mock import patch
 
 from lanscape.ui.app import app
 from lanscape.libraries.net_tools import get_network_subnet
@@ -156,6 +157,29 @@ class ApiTestCase(unittest.TestCase):
             self.assertIsNotNone(data.get('msg'))
             if count == -1:
                 self.assertFalse(data.get('valid'))
+
+    def test_default_scan_configs_adjust_for_arp_support(self):
+        """Accurate preset should fall back when ARP lookup is unavailable."""
+        with patch('lanscape.ui.blueprints.api.tools.is_arp_supported', return_value=False):
+            response = self.app.get('/api/tools/config/defaults')
+
+        self.assertEqual(response.status_code, 200)
+        configs = json.loads(response.data)
+
+        accurate_lookup = configs['accurate']['lookup_type']
+        self.assertNotIn('ARP_LOOKUP', accurate_lookup)
+        self.assertIn('POKE_THEN_ARP', accurate_lookup)
+
+    def test_default_scan_configs_keep_arp_when_supported(self):
+        """Accurate preset should retain ARP lookup when supported."""
+        with patch('lanscape.ui.blueprints.api.tools.is_arp_supported', return_value=True):
+            response = self.app.get('/api/tools/config/defaults')
+
+        self.assertEqual(response.status_code, 200)
+        configs = json.loads(response.data)
+
+        accurate_lookup = configs['accurate']['lookup_type']
+        self.assertIn('ARP_LOOKUP', accurate_lookup)
 
     def _render_scan_ui(self, scanid):
         uris = [

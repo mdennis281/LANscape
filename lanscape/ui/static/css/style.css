@@ -115,6 +115,14 @@ hr {
     border-color: var(--border-color);
     margin: 20px 0;
 }
+
+.config-sections > .config-section {
+    border-top: 1px solid var(--border-color);
+    margin-top: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
 h1.title{
     cursor: pointer;
     margin: 0;

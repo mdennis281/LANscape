@@ -120,13 +120,9 @@ hr {
     border-top: 1px solid var(--border-color);
     margin-top: 20px;
     padding-top: 20px;
+    padding-bottom: 20px;
 }
 
-.config-sections > .config-section:first-child {
-    border-top: none;
-    margin-top: 0;
-    padding-top: 0;
-}
 h1.title{
     cursor: pointer;
     margin: 0;

@@ -11,8 +11,8 @@ from random import randint
 
 import requests
 
-from .app_scope import is_local_run
-from .decorators import run_once
+from libraries.app_scope import is_local_run
+from libraries.decorators import run_once
 
 log = logging.getLogger('VersionManager')
 
@@ -63,7 +63,7 @@ def lookup_latest_version(package=PACKAGE):
     no_cache = f'?cachebust={randint(0, 6969)}'
     url = f"https://pypi.org/pypi/{package}/json{no_cache}"
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=3)
         response.raise_for_status()  # Raise an exception for HTTP errors
         latest_version = response.json()['info']['version']
         log.debug(f'Latest pypi version: {latest_version}')

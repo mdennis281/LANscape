@@ -1,7 +1,5 @@
 
-"""
-Decorators and job tracking utilities for Lanscape.
-"""
+"""Decorators and job tracking utilities for Lanscape."""
 
 from time import time
 from dataclasses import dataclass, field
@@ -10,7 +8,35 @@ from collections import defaultdict
 import inspect
 import functools
 import concurrent.futures
+import logging
 from tabulate import tabulate
+
+
+log = logging.getLogger(__name__)
+
+
+def run_once(func):
+    """Ensure a function executes only once and cache the result."""
+
+    cache_attr = "_run_once_cache"
+    ran_attr = "_run_once_ran"
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if getattr(wrapper, ran_attr, False):
+            return getattr(wrapper, cache_attr)
+
+        start = time()
+        result = func(*args, **kwargs)
+        elapsed = time() - start
+
+        setattr(wrapper, cache_attr, result)
+        setattr(wrapper, ran_attr, True)
+
+        log.debug("run_once executed %s in %.4fs", func.__qualname__, elapsed)
+        return result
+
+    return wrapper
 
 
 @dataclass

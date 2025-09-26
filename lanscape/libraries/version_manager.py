@@ -12,15 +12,12 @@ from random import randint
 import requests
 
 from .app_scope import is_local_run
+from .decorators import run_once
 
 log = logging.getLogger('VersionManager')
 
 PACKAGE = 'lanscape'
 LOCAL_VERSION = '0.0.0'
-
-# Used to cache PyPI version during runtime
-LATEST_VERSION = None
-
 
 def is_update_available(package=PACKAGE) -> bool:
     """
@@ -49,6 +46,7 @@ def is_update_available(package=PACKAGE) -> bool:
     return installed != available
 
 
+@run_once
 def lookup_latest_version(package=PACKAGE):
     """
     Retrieve the latest version of the package from PyPI.
@@ -62,19 +60,18 @@ def lookup_latest_version(package=PACKAGE):
         The latest version string from PyPI or None if retrieval fails
     """
     # Fetch the latest version from PyPI
-    global LATEST_VERSION  # pylint: disable=global-statement
-    if not LATEST_VERSION:
-        no_cache = f'?cachebust={randint(0, 6969)}'
-        url = f"https://pypi.org/pypi/{package}/json{no_cache}"
-        try:
-            response = requests.get(url, timeout=5)
-            response.raise_for_status()  # Raise an exception for HTTP errors
-            LATEST_VERSION = response.json()['info']['version']
-            log.debug(f'Latest pypi version: {LATEST_VERSION}')
-        except BaseException:
-            log.debug(traceback.format_exc())
-            log.warning('Unable to fetch package version from PyPi')
-    return LATEST_VERSION
+    no_cache = f'?cachebust={randint(0, 6969)}'
+    url = f"https://pypi.org/pypi/{package}/json{no_cache}"
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        latest_version = response.json()['info']['version']
+        log.debug(f'Latest pypi version: {latest_version}')
+        return latest_version
+    except BaseException:
+        log.debug(traceback.format_exc())
+        log.warning('Unable to fetch package version from PyPi')
+        return None
 
 
 def get_installed_version(package=PACKAGE):

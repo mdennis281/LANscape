@@ -18,7 +18,7 @@ from lanscape.libraries.service_scan import scan_service
 from lanscape.libraries.mac_lookup import MacLookup, get_macs
 from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
 from lanscape.libraries.errors import DeviceError
-from lanscape.libraries.decorators import job_tracker
+from lanscape.libraries.decorators import job_tracker, run_once
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -459,32 +459,17 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
     return selected.get("subnet", "")
 
 
-class ArpSupportChecker:
-    """
-    Singleton class to check if ARP requests are supported on the current system.
-    The check is only performed once.
-    """
-    _supported = None
-
-    @classmethod
-    def is_supported(cls):
-        """one time check if ARP requests are supported on this system"""
-        if cls._supported is not None:
-            return cls._supported
-        try:
-            arp_request = ARP(pdst='0.0.0.0')
-            broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-            packet = broadcast / arp_request
-            srp(packet, timeout=0, verbose=False)
-            cls._supported = True
-        except (Scapy_Exception, PermissionError, RuntimeError):
-            cls._supported = False
-        return cls._supported
-
-
+@run_once
 def is_arp_supported():
     """
     Check if ARP requests are supported on the current system.
     Only runs the check once.
     """
-    return ArpSupportChecker.is_supported()
+    try:
+        arp_request = ARP(pdst='0.0.0.0')
+        broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
+        packet = broadcast / arp_request
+        srp(packet, timeout=0, verbose=False)
+        return True
+    except (Scapy_Exception, PermissionError, RuntimeError):
+        return False

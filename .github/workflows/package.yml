@@ -1,4 +1,4 @@
-name: PyPi Package and Publish
+name: Release Trigger - Tag Push
 
 on:
   push:

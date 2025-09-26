@@ -5,40 +5,45 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   tag:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
+      tag_name: ${{ steps.create_tag.outputs.tag_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get the latest commit message
-        id: get_commit
+      - name: Extract version from commit message
+        id: extract_version
         run: |
-            echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B | head -n1)" >> $GITHUB_ENV
-
-      - name: Validate commit message
-        id: validate
-        run: |
-          COMMIT_MSG="${{ env.COMMIT_MESSAGE }}"
-          # Extract the version part (before the first space)
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
           VERSION_PART=$(echo "$COMMIT_MSG" | cut -d' ' -f1)
-          # Check if it has two dots and starts with a digit
           if echo "$VERSION_PART" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
-            echo "VALID=true" >> $GITHUB_ENV
-            MAJOR=$(echo "$VERSION_PART" | cut -d. -f1)
-            MINOR=$(echo "$VERSION_PART" | cut -d. -f2)
-            MINISCULE=$(echo "$VERSION_PART" | cut -d. -f3)
-            echo "MAJOR=$MAJOR" >> $GITHUB_ENV
-            echo "MINOR=$MINOR" >> $GITHUB_ENV
-            echo "MINISCULE=$MINISCULE" >> $GITHUB_ENV
+            echo "version=$VERSION_PART" >> "$GITHUB_OUTPUT"
           else
-            echo "VALID=false" >> $GITHUB_ENV
+            echo "Commit message does not start with a semantic version. Skipping tag creation."
           fi
 
       - name: Create tag
-        if: ${{ env.VALID == 'true' }}
+        if: ${{ steps.extract_version.outputs.version != '' }}
+        id: create_tag
         run: |
-          TAG_NAME="releases/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          TAG_NAME="releases/${VERSION}"
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: tag
+    if: ${{ needs.tag.outputs.version != '' }}
+    uses: ./.github/workflows/pypi-publish.yml
+    with:
+      branch: ${{ github.ref_name }}
+      version: ${{ needs.tag.outputs.version }}
+    secrets: inherit

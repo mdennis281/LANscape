@@ -5,54 +5,11 @@ on:
     tags:
       - 'releases/*'
       - 'pre-releases/*'
-    
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install build twine
-          python -m pip install -r requirements.txt
-          
-      - name: Clean dist directory
-        run: |
-          rm -rf dist
-          rm -rf ./**/*.egg-info
-
-      - name: Extract tag version
-        id: get_tag
-        run: |
-          TAG_VERSION=${GITHUB_REF#refs/tags/}
-          TAG_VERSION=${TAG_VERSION##*/}
-          echo "tag_version=$TAG_VERSION" >> $GITHUB_ENV
-
-      - name: Update version in pyproject.toml
-        run: |
-          sed -i 's/^version = ".*"/version = "'"${{ env.tag_version }}"'"/' pyproject.toml
-
-      - name: Build package
-        run: |
-          python -m build
-
-      - name: Check package
-        run: |
-          python -m twine check dist/*
-
-      - name: Upload to PyPI
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-          TWINE_REPOSITORY: pypi
-        run: |
-          python -m twine upload --repository pypi dist/*
-
+  publish:
+    uses: ./.github/workflows/pypi-publish.yml
+    with:
+      branch: ${{ github.ref_name }}
+      version: ${{ replace(replace(github.ref_name, 'releases/', ''), 'pre-releases/', '') }}
+    secrets: inherit

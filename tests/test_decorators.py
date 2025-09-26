@@ -27,4 +27,3 @@ def test_run_once_caches_result_and_logs_once(caplog):
     messages = [record.message for record in caplog.records]
     assert any("run_once executed" in record and "sample_function" in record for record in messages)
     assert sum("run_once executed" in record for record in messages) == 1
-

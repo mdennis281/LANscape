@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'lanscape/**.py'
+      - 'tests/**.py'
   schedule:
     - cron: '0 0 * * *'  # Runs at 00:00 UTC every day
 concurrency:

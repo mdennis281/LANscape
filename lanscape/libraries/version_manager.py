@@ -11,8 +11,8 @@ from random import randint
 
 import requests
 
-from libraries.app_scope import is_local_run
-from libraries.decorators import run_once
+from lanscape.libraries.app_scope import is_local_run
+from lanscape.libraries.decorators import run_once
 
 log = logging.getLogger('VersionManager')
 

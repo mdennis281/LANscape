@@ -1,4 +1,4 @@
-name: Tag New Release
+name: Tag and Publish Release
 
 on:
   push:
@@ -6,39 +6,82 @@ on:
       - main
 
 jobs:
-  tag:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Get the latest commit message
-        id: get_commit
         run: |
-            echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B | head -n1)" >> $GITHUB_ENV
+          echo "COMMIT_MESSAGE=$(git log -1 --pretty=%B | head -n1)" >> $GITHUB_ENV
 
       - name: Validate commit message
-        id: validate
         run: |
           COMMIT_MSG="${{ env.COMMIT_MESSAGE }}"
-          # Extract the version part (before the first space)
           VERSION_PART=$(echo "$COMMIT_MSG" | cut -d' ' -f1)
-          # Check if it has two dots and starts with a digit
           if echo "$VERSION_PART" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
             echo "VALID=true" >> $GITHUB_ENV
-            MAJOR=$(echo "$VERSION_PART" | cut -d. -f1)
-            MINOR=$(echo "$VERSION_PART" | cut -d. -f2)
-            MINISCULE=$(echo "$VERSION_PART" | cut -d. -f3)
-            echo "MAJOR=$MAJOR" >> $GITHUB_ENV
-            echo "MINOR=$MINOR" >> $GITHUB_ENV
-            echo "MINISCULE=$MINISCULE" >> $GITHUB_ENV
+            echo "RELEASE_VERSION=$VERSION_PART" >> $GITHUB_ENV
+            echo "MAJOR=$(echo "$VERSION_PART" | cut -d. -f1)" >> $GITHUB_ENV
+            echo "MINOR=$(echo "$VERSION_PART" | cut -d. -f2)" >> $GITHUB_ENV
+            echo "MINISCULE=$(echo "$VERSION_PART" | cut -d. -f3)" >> $GITHUB_ENV
           else
             echo "VALID=false" >> $GITHUB_ENV
           fi
 
-      - name: Create tag
-        if: ${{ env.VALID == 'true' }}
+      - name: Create release tag
+        if: env.VALID == 'true'
+        env:
+          PUSH_TOKEN: ${{ secrets.TAG_PUSH_TOKEN }}
         run: |
-          TAG_NAME="releases/${{ env.MAJOR }}.${{ env.MINOR }}.${{ env.MINISCULE }}"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          TAG_NAME="releases/${{ env.RELEASE_VERSION }}"
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag "$TAG_NAME"
+          git push "https://${PUSH_TOKEN}@github.com/${{ github.repository }}" "$TAG_NAME"
+
+      - name: Set up Python
+        if: env.VALID == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        if: env.VALID == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m pip install -r requirements.txt
+
+      - name: Clean dist directory
+        if: env.VALID == 'true'
+        run: |
+          rm -rf dist
+          rm -rf ./**/*.egg-info
+
+      - name: Update version in pyproject.toml
+        if: env.VALID == 'true'
+        run: |
+          sed -i 's/^version = ".*"/version = "'"${{ env.RELEASE_VERSION }}"'"/' pyproject.toml
+
+      - name: Build package
+        if: env.VALID == 'true'
+        run: |
+          python -m build
+
+      - name: Check package
+        if: env.VALID == 'true'
+        run: |
+          python -m twine check dist/*
+
+      - name: Upload to PyPI
+        if: env.VALID == 'true'
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          TWINE_REPOSITORY: pypi
+        run: |
+          python -m twine upload --repository pypi dist/*

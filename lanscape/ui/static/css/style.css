@@ -836,3 +836,82 @@ html {
 }
 
 /* END overview container */
+
+/* Device Modal Styles */
+#device-modal {
+    --bs-modal-width: 750px;
+}
+#device-modal .modal-content {
+    background-color: var(--primary-bg);
+}
+#device-modal h6 {
+    color: var(--primary-accent);
+}
+
+/* Key/Value grid for overview */
+#device-modal .kv-grid {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: center;
+}
+#device-modal .kv-label {
+    color: var(--text-placeholder);
+    text-align: right;
+}
+#device-modal .kv-value {
+    color: var(--text-color);
+}
+
+/* Port/service chips */
+#device-modal .chip-group { margin-top: 4px; }
+#device-modal .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    margin: 2px;
+    font-size: .85rem;
+    background-color: var(--primary-bg-accent);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-color);
+}
+#device-modal .chip .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* Services layout */
+#device-modal .service-list { width: 100%; }
+#device-modal .service-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border-color);
+}
+#device-modal .service-row:last-child {
+    border-bottom: none;
+}
+#device-modal .service-name {
+    min-width: 140px;
+    color: var(--text-accent-color);
+    font-weight: 600;
+}
+#device-modal .service-ports { flex: 1; }
+
+/* Errors */
+#device-modal .error-list li {
+    margin-bottom: 4px;
+}
+
+/* Responsive tweaks */
+@media screen and (max-width: 576px) {
+    #device-modal .kv-grid {
+        grid-template-columns: 130px 1fr;
+    }
+    #device-modal .service-name {
+        min-width: 110px;
+    }
+}

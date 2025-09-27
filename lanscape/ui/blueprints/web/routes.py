@@ -80,6 +80,30 @@ def view_errors(scan_id):
     log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
     return redirect('/')
 
+@web_bp.route('/device/<scan_id>/<device_ip>')
+def view_device(scan_id, device_ip):
+    """
+    Display detailed information about a specific device from a scan.
+
+    Args:
+        scan_id: Unique identifier for the scan
+        device_ip: IP address of the device to view
+
+    Returns:
+        Rendered device detail template or redirect to home if scan not found
+    """
+    if scanner := scan_manager.get_scan(scan_id):
+        devices = scanner.results.devices
+        device_info = next((device for device in devices if getattr(device, 'ip', None) == device_ip), None)
+        
+        if device_info:
+            return render_template('scan/device-detail.html', device=device_info, scan_id=scan_id)
+        else:
+            log.debug(f'Device {device_ip} not found in scan {scan_id}')
+            return redirect(f'/scan/{scan_id}')
+    log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
+    return redirect('/')
+
 
 @web_bp.route('/export/<scan_id>')
 def export_scan(scan_id):

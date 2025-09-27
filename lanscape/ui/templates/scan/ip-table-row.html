@@ -1,5 +1,11 @@
 <tr>
     <td>
+        <span 
+        class="material-symbols-outlined align-middle" 
+        (click)="openDeviceDetail('{{ device.ip }}')" 
+        >info</span>
+    </td>
+    <td>
         <div>{{ device.ip }}</div>
         {% if device.hostname %} 
             <div><span class=alt>{{device.hostname}}</span></div>

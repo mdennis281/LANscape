@@ -184,7 +184,7 @@ class ScanConfig(BaseModel):
 
     task_scan_ports: bool = True
     # below wont run if above false
-    task_scan_port_services: bool = False  # disabling until more stable
+    task_scan_port_services: bool = True  # disabling until more stable
 
     lookup_type: List[ScanType] = [ScanType.ICMP_THEN_ARP]
 
@@ -259,7 +259,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_port_test=64,
         t_cnt_isalive=64,
         task_scan_ports=True,
-        task_scan_port_services=False,
+        task_scan_port_services=True,
         lookup_type=[ScanType.ICMP_THEN_ARP, ScanType.ARP_LOOKUP],
         arp_config=ArpConfig(
             attempts=3,
@@ -283,7 +283,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_port_test=256,
         t_cnt_isalive=512,
         task_scan_ports=True,
-        task_scan_port_services=False,
+        task_scan_port_services=True,
         lookup_type=[ScanType.POKE_THEN_ARP],
         arp_config=ArpConfig(
             attempts=1,

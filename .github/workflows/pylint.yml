@@ -1,14 +1,21 @@
 
-name: Pylint
+name: Code Quality - Pylint
 
 on:
   push:
     branches:
       - main
+    paths:
+      - '**.py'
   pull_request:
     branches:
       - main
+    paths:
+      - '**.py'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest

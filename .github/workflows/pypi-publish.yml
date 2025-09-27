@@ -1,4 +1,4 @@
-name: Reusable PyPI Publish
+name: Release - PyPI Publish
 
 on:
   workflow_call:

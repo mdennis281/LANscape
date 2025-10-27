@@ -92,7 +92,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
         print(f"Error generating description with OpenAI: {e}", file=sys.stderr)
         # Return fallback description
         return f"""
-## Release v{version.split('/')[-1]}
+## Release v{version}
 
 This release includes the following changes:
 
@@ -108,7 +108,7 @@ def main():
         print("Usage: python generate_release_notes.py <version> [from_tag]", file=sys.stderr)
         sys.exit(1)
     
-    version = sys.argv[1]
+    version = sys.argv[1].split('/')[-1]  # Extract version number from tag
     from_tag = sys.argv[2] if len(sys.argv) > 2 else None
     
     # Get API key from environment

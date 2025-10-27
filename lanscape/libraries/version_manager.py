@@ -19,6 +19,7 @@ log = logging.getLogger('VersionManager')
 PACKAGE = 'lanscape'
 LOCAL_VERSION = '0.0.0'
 
+
 def is_update_available(package=PACKAGE) -> bool:
     """
     Check if an update is available for the package.

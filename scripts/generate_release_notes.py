@@ -1,6 +1,4 @@
-#!/usr/bin/# Configuration
-MAX_LINES_PER_FILE = None  # No limit - let the model handle it
-MAX_TOTAL_DIFF_SIZE = None  # No limit - use model's full context window python3
+#!/usr/bin/env python3
 """
 Generate release notes using OpenAI API based on git commit history.
 """

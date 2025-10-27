@@ -123,7 +123,7 @@ class Device(BaseModel):
                     data['manufacturer'] = self._get_manufacturer(mac_addr) if mac_addr else None
                 return data
 
-    def test_port(self, port: int, port_config: PortScanConfig = None) -> bool:
+    def test_port(self, port: int, port_config: Optional[PortScanConfig] = None) -> bool:
         """Test if a specific port is open on the device."""
         if port_config is None:
             port_config = PortScanConfig()  # Use defaults

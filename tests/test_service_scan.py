@@ -136,48 +136,43 @@ class ServiceScanTestCase(unittest.TestCase):
 
     def test_try_probe_success(self):
         """Test _try_probe with successful connection."""
-        @patch('asyncio.open_connection')
-        async def run_test(mock_open_connection):
-            # Mock successful connection
-            mock_reader = AsyncMock()
-            mock_writer = MagicMock()
-            
-            # Set up reader mock
-            mock_reader.read.return_value = b"HTTP/1.1 200 OK\r\n"
-            
-            # Set up writer mock - these methods should be regular mocks, not async
-            mock_writer.write = MagicMock()
-            mock_writer.drain = AsyncMock()
-            mock_writer.close = MagicMock()
-            mock_writer.wait_closed = AsyncMock()
+        async def run_test():
+            with patch('asyncio.open_connection') as mock_open_connection:
+                # Create simplified mocks
+                mock_reader = AsyncMock()
+                mock_reader.read.return_value = b"HTTP/1.1 200 OK\r\n"
+                
+                mock_writer = MagicMock()
+                mock_writer.drain = AsyncMock()
+                mock_writer.wait_closed = AsyncMock()
+                
+                mock_open_connection.return_value = (mock_reader, mock_writer)
 
-            mock_open_connection.return_value = (mock_reader, mock_writer)
-
-            result = await _try_probe("127.0.0.1", 80, "GET / HTTP/1.0\r\n\r\n")
-            self.assertIsInstance(result, str)
-            self.assertIn("HTTP", result)
+                result = await _try_probe("127.0.0.1", 80, "GET / HTTP/1.0\r\n\r\n")
+                self.assertIsInstance(result, str)
+                self.assertIn("HTTP", result)
 
         asyncio.run(run_test())
 
     def test_try_probe_connection_refused(self):
         """Test _try_probe with connection refused."""
-        @patch('asyncio.open_connection')
-        async def run_test(mock_open_connection):
-            mock_open_connection.side_effect = ConnectionRefusedError()
+        async def run_test():
+            with patch('asyncio.open_connection') as mock_open_connection:
+                mock_open_connection.side_effect = ConnectionRefusedError()
 
-            result = await _try_probe("127.0.0.1", 54325)
-            self.assertIsNone(result)
+                result = await _try_probe("127.0.0.1", 54325)
+                self.assertIsNone(result)
 
         asyncio.run(run_test())
 
     def test_try_probe_timeout(self):
         """Test _try_probe with timeout."""
-        @patch('asyncio.open_connection')
-        async def run_test(mock_open_connection):
-            mock_open_connection.side_effect = asyncio.TimeoutError()
+        async def run_test():
+            with patch('asyncio.open_connection') as mock_open_connection:
+                mock_open_connection.side_effect = asyncio.TimeoutError()
 
-            result = await _try_probe("127.0.0.1", 80, connect_timeout=0.1)
-            self.assertIsNone(result)
+                result = await _try_probe("127.0.0.1", 80, connect_timeout=0.1)
+                self.assertIsNone(result)
 
         asyncio.run(run_test())
 

@@ -4,13 +4,11 @@ retry logic and timeout enforcement.
 """
 
 import unittest
-import socket
 from unittest.mock import patch, MagicMock
 from time import time
 
 from lanscape.libraries.net_tools import Device
 from lanscape.libraries.scan_config import PortScanConfig
-from lanscape.libraries.decorators import timeout_enforcer
 
 
 class PortScanTestCase(unittest.TestCase):

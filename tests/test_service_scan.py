@@ -140,8 +140,14 @@ class ServiceScanTestCase(unittest.TestCase):
         async def run_test(mock_open_connection):
             # Mock successful connection
             mock_reader = AsyncMock()
-            mock_writer = AsyncMock()
+            mock_writer = MagicMock()
+            
+            # Set up reader mock
             mock_reader.read.return_value = b"HTTP/1.1 200 OK\r\n"
+            
+            # Set up writer mock - these methods should be regular mocks, not async
+            mock_writer.write = MagicMock()
+            mock_writer.drain = AsyncMock()
             mock_writer.close = MagicMock()
             mock_writer.wait_closed = AsyncMock()
 

@@ -11,17 +11,37 @@ from typing import Optional
 
 
 def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
-    """Get git log between two tags/commits."""
+    """Get git log with full diff between two tags/commits."""
     try:
         if from_tag:
-            # Get commits between from_tag and to_tag
-            cmd = ["git", "log", "--oneline", "--pretty=format:- %s (%an)", f"{from_tag}..{to_tag}"]
+            # Get commits and diffs between from_tag and to_tag
+            cmd = ["git", "log", "--stat", "--pretty=format:### %s (%an)%n", f"{from_tag}..{to_tag}"]
         else:
-            # Get all commits up to to_tag (for first release)
-            cmd = ["git", "log", "--oneline", "--pretty=format:- %s (%an)", to_tag]
+            # Get all commits and diffs up to to_tag (for first release)
+            cmd = ["git", "log", "--stat", "--pretty=format:### %s (%an)%n", to_tag]
         
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return result.stdout.strip()
+        git_output = result.stdout.strip()
+        
+        # If we want even more detail, get the actual diff
+        try:
+            if from_tag:
+                diff_cmd = ["git", "diff", "--name-status", f"{from_tag}..{to_tag}"]
+            else:
+                # For first release, show all files
+                diff_cmd = ["git", "ls-tree", "-r", "--name-only", to_tag]
+            
+            diff_result = subprocess.run(diff_cmd, capture_output=True, text=True, check=True)
+            file_changes = diff_result.stdout.strip()
+            
+            if file_changes:
+                git_output += f"\n\n**Files Changed:**\n```\n{file_changes}\n```"
+                
+        except subprocess.CalledProcessError:
+            # If diff fails, just continue with the log
+            pass
+            
+        return git_output
     except subprocess.CalledProcessError as e:
         print(f"Error getting git log: {e}", file=sys.stderr)
         return ""
@@ -34,19 +54,25 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
     prompt = f"""
     Please create a concise and professional release description for version {version} of the "lanscape" Python network scanning tool.
     
-    Based on the following git commits, summarize the key changes, improvements, and new features:
+    Based on the following git commits and file changes, summarize the key changes, improvements, and new features:
     
     {git_log}
     
+    The above includes both commit messages and file statistics showing what was modified. Use this information to understand the scope and nature of changes.
+    
     Format the response as:
-    - A brief introductory paragraph
-    - Bullet points for major changes/features
-    - Any breaking changes (if applicable)
-    - Installation/upgrade notes if relevant
+    - A brief introductory paragraph summarizing the release
+    - ## What's New (bullet points for major new features)
+    - ## Improvements (bullet points for enhancements)
+    - ## Bug Fixes (if applicable)
+    - ## Breaking Changes (if applicable)
+    - ## Technical Details (if there are significant internal changes worth mentioning)
     
-    Keep it professional and user-focused. Don't mention internal commits like "fix typos" or "update dependencies" unless they're significant.
+    Focus on user-facing changes and improvements. Use the file change statistics to understand which areas of the codebase were modified (UI, core libraries, tests, etc.) and mention these areas in context.
     
-    Ensure you make full use of markdown formatting for readability.
+    Keep it professional and user-focused. Don't mention trivial commits like "fix typos" unless they're part of larger improvements.
+    
+    Use full markdown formatting for readability including headers, lists, and code formatting where appropriate.
     """
     
     try:

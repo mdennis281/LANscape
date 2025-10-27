@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_create_release: ${{ steps.check_conditions.outputs.should_create_release }}
+      should_publish: ${{ steps.check_conditions.outputs.should_publish }}
       clean_version: ${{ steps.extract_version.outputs.clean_version }}
       is_prerelease: ${{ steps.check_conditions.outputs.is_prerelease }}
     steps:
@@ -47,6 +48,11 @@ jobs:
           elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"b"* ]]; then
             echo "✓ Beta release detected"
             echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          # Check if it's an alpha release (pre-releases/* with 'a' in version)
+          elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"a"* ]]; then
+            echo "✓ Alpha release detected - publish only, no GitHub release"
+            echo "should_create_release=false" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "✗ Conditions not met for release creation"

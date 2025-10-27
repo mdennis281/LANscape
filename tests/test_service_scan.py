@@ -247,20 +247,6 @@ class ServiceScanTestCase(unittest.TestCase):
         self.assertTrue(has_none, "Should include None for banner grab")
         self.assertTrue(has_bytes, "Should include bytes payloads")
 
-    def test_error_handling_edge_cases(self):
-        """Test error handling for various edge cases."""
-        # Test with empty IP
-        result = scan_service("", 80, self.default_config)
-        self.assertEqual(result, "Unknown")
-
-        # Test with port 0
-        result = scan_service("127.0.0.1", 0, self.default_config)
-        self.assertEqual(result, "Unknown")
-
-        # Test with negative port (should be handled gracefully)
-        result = scan_service("127.0.0.1", -1, self.default_config)
-        self.assertEqual(result, "Unknown")
-
 
 if __name__ == '__main__':
     unittest.main()

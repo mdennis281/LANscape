@@ -48,6 +48,10 @@
             "approve": true,
             "matchCommandLine": true
         },
+        ".\\.env\\Scripts\\python.exe -m": {
+            "approve": true,
+            "matchCommandLine": true
+        },
         "pytest tests/": {
             "approve": true,
             "matchCommandLine": false

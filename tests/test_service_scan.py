@@ -3,10 +3,11 @@ Dedicated tests for service scanning functionality.
 Tests the service_scan module including async probing, service identification,
 and configuration handling.
 """
-import logging
 import asyncio
-import pytest
+import logging
 from unittest.mock import patch, AsyncMock, MagicMock
+
+import pytest
 
 from lanscape.core.service_scan import (
     scan_service,
@@ -50,6 +51,7 @@ def aggressive_config():
 # Strategy and Probe Generation Tests
 ####################################
 
+
 def test_service_scan_strategy_enum():
     """Test ServiceScanStrategy enum values."""
     assert ServiceScanStrategy.LAZY.value == 'LAZY'
@@ -72,6 +74,7 @@ def test_get_port_probes_lazy_strategy():
     # Should include HTTP probes for web-related ports
     http_probes = [p for p in probes if p and b"HTTP" in p]
     assert len(http_probes) > 0
+
 
 @pytest.mark.parametrize("port", [22, 80, 443])
 def test_get_port_probes_basic_strategy(port):
@@ -152,7 +155,7 @@ def test_concurrent_probe_limits():
     assert isinstance(result2, str)
 
 
-# Async Probe Tests 
+# Async Probe Tests
 ##################
 
 def test_try_probe_success():
@@ -280,4 +283,3 @@ def test_probe_payload_types():
 
     assert has_none, "Should include None for banner grab"
     assert has_bytes, "Should include bytes payloads"
-

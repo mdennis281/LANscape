@@ -56,6 +56,7 @@ def test_scan_config():
     assert cfg2.arp_config.timeout == arp_timeout
     assert cfg2.lookup_type == [ScanType.POKE_THEN_ARP]
 
+
 @pytest.mark.integration
 @pytest.mark.slow
 def test_scan(scan_manager):
@@ -65,7 +66,7 @@ def test_scan(scan_manager):
     """
     subnet = smart_select_primary_subnet()
     assert subnet is not None
-    
+
     cfg = ScanConfig(
         subnet=right_size_subnet(subnet),
         t_multiplier=1.0,

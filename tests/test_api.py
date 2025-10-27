@@ -4,8 +4,9 @@ Tests REST API endpoints for port management, subnet validation, and scan operat
 """
 import json
 import time
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from lanscape.ui.app import app
 from lanscape.core.net_tools import get_network_subnet
@@ -43,13 +44,14 @@ def test_scan_config():
 # API Port Management Tests
 ###########################
 
+
 def test_port_lifecycle(api_client, sample_port_list, updated_port_list):
     """
     Test the complete lifecycle of port list management through the API.
     Creates, retrieves, updates, and deletes a port list through API endpoints.
     """
     test_list_name = 'test_port_list_lifecycle'
-    
+
     # Delete the new port list if it exists
     api_client.delete(f'/api/port/list/{test_list_name}')
 
@@ -94,6 +96,7 @@ def test_port_lifecycle(api_client, sample_port_list, updated_port_list):
 # API Scan Tests
 ################
 
+
 @pytest.mark.integration
 def test_scan(api_client, sample_port_list, test_scan_config):
     """
@@ -101,7 +104,7 @@ def test_scan(api_client, sample_port_list, test_scan_config):
     Verifies scan creation, status retrieval, and UI rendering for scan results.
     """
     test_list_name = 'test_port_list_scan'
-    
+
     # Delete the new port list if it exists
     api_client.delete(f'/api/port/list/{test_list_name}')
 
@@ -136,11 +139,12 @@ def _render_scan_ui_if_available(api_client, scanid):
     """Helper function to render scan UI if the method is available."""
     try:
         # This would be the equivalent of the original _render_scan_ui method
-        response = api_client.get(f"/scan/{scanid}")
+        _ = api_client.get(f"/scan/{scanid}")
         # We don't assert here since this is an optional UI test
     except Exception:
         # Silently pass if UI rendering is not available
         pass
+
 
 def test_subnet_detection(api_client):
     """
@@ -155,8 +159,9 @@ def test_subnet_detection(api_client):
     subnet: dict = subnets[0]
     assert subnet.get('address_cnt') is not None
 
-# Subnet Validation Tests  
+# Subnet Validation Tests
 ##########################
+
 
 @pytest.mark.parametrize("subnet,expected_count", [
     # Valid subnets
@@ -185,9 +190,10 @@ def test_subnet_validation(api_client, subnet, expected_count):
     data: dict = json.loads(response.data)
     assert data.get('count') == expected_count
     assert data.get('msg') is not None
-    
+
     if expected_count == -1:
         assert not data.get('valid')
+
 
 @pytest.mark.parametrize("arp_supported,expected_in,expected_not_in", [
     (False, 'POKE_THEN_ARP', 'ARP_LOOKUP'),
@@ -201,12 +207,14 @@ def test_default_scan_configs_arp_handling(api_client, arp_supported, expected_i
     assert response.status_code == 200
     configs = json.loads(response.data)
     accurate_lookup = configs['accurate']['lookup_type']
-    
+
     assert expected_in in accurate_lookup
     if expected_not_in:
         assert expected_not_in not in accurate_lookup
 
 # UI Rendering Helper
+
+
 def _render_scan_ui_comprehensive(api_client, scanid):
     """Test comprehensive UI rendering for a scan."""
     uris = [
@@ -221,8 +229,9 @@ def _render_scan_ui_comprehensive(api_client, scanid):
         response = api_client.get(uri)
         assert response.status_code == 200
 
+
 @pytest.mark.integration
-@pytest.mark.slow  
+@pytest.mark.slow
 def test_scan_api_async(api_client, test_scan_config):
     """
     Test the full scan API lifecycle with progress monitoring
@@ -230,8 +239,8 @@ def test_scan_api_async(api_client, test_scan_config):
     # Create the port list first (since test_scan_config references it)
     sample_port_list = {'80': 'http', '443': 'https'}
     api_client.post('/api/port/list/test_port_list_scan', json=sample_port_list)
-    
-    # Create a new scan 
+
+    # Create a new scan
     response = api_client.post('/api/scan', json=test_scan_config)
     assert response.status_code == 200
     scan_info = json.loads(response.data)
@@ -243,20 +252,20 @@ def test_scan_api_async(api_client, test_scan_config):
     percent_complete = 0
     max_iterations = 30  # Safety limit
     iteration = 0
-    
+
     while percent_complete < 100 and iteration < max_iterations:
         # Get scan summary
         response = api_client.get(f'/api/scan/{scan_id}/summary')
         assert response.status_code == 200
         summary = json.loads(response.data)
         assert summary['running'] or summary['stage'] == 'complete'
-        
+
         percent_complete = summary['percent_complete']
         assert 0 <= percent_complete <= 100
-        
+
         # Test UI rendering during scan
         _render_scan_ui_if_available(api_client, scan_id)
-        
+
         if percent_complete < 100:
             time.sleep(2)
         iteration += 1
@@ -270,5 +279,3 @@ def test_scan_api_async(api_client, test_scan_config):
     devices = summary['devices']
     assert devices['scanned'] == devices['total']
     assert devices['alive'] > 0
-
-

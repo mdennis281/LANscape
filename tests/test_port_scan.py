@@ -3,9 +3,10 @@ Tests for port scanning functionality including the new PortScanConfig
 retry logic and timeout enforcement.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 from time import time
+from unittest.mock import patch, MagicMock
+
+import pytest
 
 from lanscape.core.net_tools import Device
 from lanscape.core.scan_config import PortScanConfig
@@ -34,6 +35,7 @@ def retry_port_config():
 
 # PortScanConfig Tests
 ######################
+
 
 def test_port_scan_config_defaults():
     """Test PortScanConfig default values."""
@@ -80,6 +82,7 @@ def test_port_scan_config_serialization():
 # Device Port Testing
 ####################
 
+
 def test_device_test_port_with_default_config(test_device, default_port_config):
     """Test Device.test_port with default PortScanConfig."""
     # Test with a port that should be closed
@@ -97,6 +100,7 @@ def test_device_test_port_without_config(test_device):
     result = test_device.test_port(54322)
     assert isinstance(result, bool)
     assert test_device.ports_scanned == initial_count + 1
+
 
 @patch('socket.socket')
 def test_device_test_port_with_retries(mock_socket_class, test_device):
@@ -167,6 +171,7 @@ def test_device_test_port_exception_handling(mock_socket_class, test_device):
 # Timeout and Configuration Tests
 ##################################
 
+
 @pytest.mark.parametrize("timeout,retries,expected_enforcer_timeout", [
     (1.0, 0, 1.5),      # 1.0 * (0 + 1) * 1.5 = 1.5
     (2.0, 2, 9.0),      # 2.0 * (2 + 1) * 1.5 = 9.0
@@ -176,10 +181,11 @@ def test_device_test_port_exception_handling(mock_socket_class, test_device):
 def test_timeout_enforcer_calculation(timeout, retries, expected_enforcer_timeout):
     """Test that timeout enforcer uses correct formula."""
     config = PortScanConfig(timeout=timeout, retries=retries, retry_delay=0.1)
-    
+
     # Formula: timeout * (retries + 1) * 1.5
     calculated_timeout = config.timeout * (config.retries + 1) * 1.5
     assert calculated_timeout == expected_enforcer_timeout
+
 
 def test_device_ports_scanned_counter(test_device, default_port_config):
     """Test that ports_scanned counter is properly incremented."""

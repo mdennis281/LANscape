@@ -3,8 +3,9 @@
 import logging
 import threading
 import time
-import pytest
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pytest
 
 from lanscape.core.decorators import run_once, job_tracker, JobStats
 
@@ -311,15 +312,15 @@ def test_job_tracker_multiple_different_functions():
 ])
 def test_job_tracker_parametrized_function_calls(function_name, expected_calls):
     """Test parametrized validation of function call counts."""
-    
+
     @job_tracker
     def function_a():
         return "a"
-        
-    @job_tracker 
+
+    @job_tracker
     def function_b():
         return "b"
-        
+
     # Execute functions based on expected calls
     if function_name == "function_a":
         for _ in range(expected_calls):
@@ -327,6 +328,6 @@ def test_job_tracker_parametrized_function_calls(function_name, expected_calls):
     elif function_name == "function_b":
         for _ in range(expected_calls):
             function_b()
-    
+
     stats = JobStats()
     assert stats.finished[function_name] == expected_calls

@@ -3,9 +3,10 @@ Shared pytest fixtures and configuration for LANscape test suite.
 Provides common test utilities, mock objects, and test data.
 """
 
-import pytest
 import ipaddress
 from unittest.mock import MagicMock, patch
+
+import pytest
 from lanscape.core.port_manager import PortManager
 from lanscape.core.scan_config import ScanConfig
 from lanscape.core.net_tools import get_network_subnet
@@ -16,7 +17,7 @@ from ._helpers import right_size_subnet
 def port_manager():
     """
     Create a PortManager instance without filesystem dependencies.
-    
+
     Returns:
         PortManager: Instance with mocked filesystem operations
     """
@@ -29,7 +30,7 @@ def port_manager():
 def sample_ip_addresses():
     """
     Provide a collection of sample IP addresses for testing.
-    
+
     Returns:
         list: Collection of IPv4Address objects for testing
     """
@@ -45,13 +46,13 @@ def sample_ip_addresses():
 def valid_port_data():
     """
     Provide valid port data for testing.
-    
+
     Returns:
         dict: Valid port-to-service mapping
     """
     return {
         "22": "ssh",
-        "80": "http", 
+        "80": "http",
         "443": "https",
         "8080": "http-proxy",
         "3389": "rdp"
@@ -62,7 +63,7 @@ def valid_port_data():
 def invalid_port_data():
     """
     Provide various invalid port data cases for testing.
-    
+
     Returns:
         list: Collection of invalid port data dictionaries
     """
@@ -80,7 +81,7 @@ def invalid_port_data():
 def scan_config():
     """
     Create a default ScanConfig for testing.
-    
+
     Returns:
         ScanConfig: Default configuration instance
     """
@@ -91,7 +92,7 @@ def scan_config():
 def mock_socket():
     """
     Create a mock socket for network testing.
-    
+
     Returns:
         MagicMock: Mocked socket object
     """
@@ -103,7 +104,7 @@ def mock_socket():
 def temp_subnet():
     """
     Provide a small test subnet that won't trigger size limits.
-    
+
     Returns:
         str: CIDR notation for a small test subnet
     """
@@ -114,7 +115,7 @@ def temp_subnet():
 def ip_test_cases():
     """
     Provide comprehensive IP parsing test cases.
-    
+
     Returns:
         dict: Test cases with inputs and expected outputs
     """
@@ -124,7 +125,7 @@ def ip_test_cases():
             'expected': ['192.168.0.1', '192.168.0.2']
         },
         'range': {
-            'input': '10.0.0.1-10.0.0.3', 
+            'input': '10.0.0.1-10.0.0.3',
             'expected': ['10.0.0.1', '10.0.0.2', '10.0.0.3']
         },
         'shorthand': {
@@ -134,18 +135,18 @@ def ip_test_cases():
         'mixed': {
             'input': "10.0.0.1/30, 10.0.0.10-10.0.0.12, 10.0.0.20-22, 10.0.0.50",
             'expected': [
-                "10.0.0.1", "10.0.0.2", "10.0.0.10", "10.0.0.11", 
+                "10.0.0.1", "10.0.0.2", "10.0.0.10", "10.0.0.11",
                 "10.0.0.12", "10.0.0.20", "10.0.0.21", "10.0.0.22", "10.0.0.50"
             ]
         }
     }
 
 
-@pytest.fixture 
+@pytest.fixture
 def mock_successful_socket():
     """
     Create a mock socket that simulates successful connections.
-    
+
     Returns:
         MagicMock: Mocked socket that always succeeds
     """
@@ -160,7 +161,7 @@ def mock_successful_socket():
 def mock_failed_socket():
     """
     Create a mock socket that simulates failed connections.
-    
+
     Returns:
         MagicMock: Mocked socket that always fails
     """

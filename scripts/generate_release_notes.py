@@ -107,6 +107,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python generate_release_notes.py <version> [from_tag]", file=sys.stderr)
         sys.exit(1)
+        
     
     version = sys.argv[1].split('/')[-1]  # Extract version number from tag
     from_tag = sys.argv[2] if len(sys.argv) > 2 else None
@@ -122,11 +123,18 @@ def main():
     if not git_log:
         print("No commits found for release notes", file=sys.stderr)
         sys.exit(1)
+        
+    # Show context (git log) then a divider before the generated description
+    print("\n" + "=" * 80)
+    print("Context (git log):\n")
+    print(git_log)
     
     # Generate description
     description = generate_release_description(git_log, version, api_key)
     
-    # Output the description
+    
+    print("\n" + "=" * 80)
+    print("Release Description:\n")
     print(description)
 
 

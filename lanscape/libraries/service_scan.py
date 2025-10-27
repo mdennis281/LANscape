@@ -133,20 +133,20 @@ def get_port_probes(port: int, strategy: ServiceScanStrategy):
 
     if strategy == ServiceScanStrategy.LAZY:
         return probes
-    
+
     if strategy == ServiceScanStrategy.BASIC:
         for _, detail in SERVICES.items():
             if port in detail.get("ports", []):
                 if probe := detail.get("probe", ''):
                     probes.append(probe)
         return probes
-    
+
     if strategy == ServiceScanStrategy.AGGRESSIVE:
         for _, detail in SERVICES.items():
             if probe := detail.get("probe", ''):
                 probes.append(probe)
         return probes
-    
+
     return [None]  # Default to banner grab only
 
 

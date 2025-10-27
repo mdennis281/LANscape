@@ -11,10 +11,23 @@ from time import sleep
 from typing import List, Dict, Optional
 
 import psutil
-from pydantic import BaseModel, PrivateAttr
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
 from scapy.error import Scapy_Exception
+
+from pydantic import BaseModel, PrivateAttr
+try:
+    from pydantic import ConfigDict, computed_field, model_serializer  # pydantic v2
+    _PYD_V2 = True
+except Exception:  # pragma: no cover
+    CONFIG_DICT = None  # type: ignore  # pylint: disable=invalid-name
+    COMPUTED_FIELD = None  # type: ignore  # pylint: disable=invalid-name
+    MODEL_SERIALIZER = None  # type: ignore  # pylint: disable=invalid-name
+    _PYD_V2 = False
+else:
+    CONFIG_DICT = ConfigDict  # pylint: disable=invalid-name
+    COMPUTED_FIELD = computed_field  # pylint: disable=invalid-name
+    MODEL_SERIALIZER = model_serializer  # pylint: disable=invalid-name
 
 from lanscape.libraries.service_scan import scan_service
 from lanscape.libraries.mac_lookup import MacLookup, get_macs
@@ -22,15 +35,6 @@ from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
 from lanscape.libraries.errors import DeviceError
 from lanscape.libraries.decorators import job_tracker, run_once, timeout_enforcer
 from lanscape.libraries.scan_config import ServiceScanConfig, PortScanConfig
-
-try:
-    from pydantic import ConfigDict, computed_field, model_serializer  # pydantic v2
-    _PYD_V2 = True
-except Exception:  # pragma: no cover
-    ConfigDict = None  # type: ignore
-    computed_field = None  # type: ignore
-    model_serializer = None  # type: ignore
-    _PYD_V2 = False
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -53,10 +57,10 @@ class Device(BaseModel):
 
     _log: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger('Device'))
     # Support pydantic v1 and v2 configs
-    if _PYD_V2 and ConfigDict:
-        model_config = ConfigDict(arbitrary_types_allowed=True)  # type: ignore[assignment]
+    if _PYD_V2 and CONFIG_DICT:
+        model_config = CONFIG_DICT(arbitrary_types_allowed=True)  # type: ignore[assignment]
     else:  # pragma: no cover
-        class Config:
+        class Config:  # pylint: disable=too-few-public-methods
             """Pydantic v1 configuration."""
             arbitrary_types_allowed = True
             extra = 'allow'
@@ -67,14 +71,14 @@ class Device(BaseModel):
         return self._log
 
     # Computed fields for pydantic v2 (included in model_dump)
-    if _PYD_V2 and computed_field:
-        @computed_field(return_type=str)  # type: ignore[misc]
+    if _PYD_V2 and COMPUTED_FIELD:
+        @COMPUTED_FIELD(return_type=str)  # type: ignore[misc]
         @property
         def mac_addr(self) -> str:
             """Get the primary MAC address for this device."""
             return self.get_mac() or ""
 
-        @model_serializer(mode='wrap')  # type: ignore[misc]
+        @MODEL_SERIALIZER(mode='wrap')  # type: ignore[misc]
         def _serialize(self, serializer):
             """Serialize device data for output."""
             data = serializer(self)

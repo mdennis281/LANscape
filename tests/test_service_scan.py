@@ -3,7 +3,7 @@ Dedicated tests for service scanning functionality.
 Tests the service_scan module including async probing, service identification,
 and configuration handling.
 """
-
+import logging
 import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -188,11 +188,11 @@ class ServiceScanTestCase(unittest.TestCase):
 
     def test_asyncio_logger_suppression(self):
         """Test that asyncio logger suppression works."""
+
         # This should not raise any exceptions
         asyncio_logger_suppression()
 
         # Verify that asyncio logger level was changed
-        import logging
         asyncio_logger = logging.getLogger("asyncio")
         self.assertGreaterEqual(asyncio_logger.level, logging.WARNING)
 

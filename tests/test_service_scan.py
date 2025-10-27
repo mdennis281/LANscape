@@ -192,7 +192,7 @@ class ServiceScanTestCase(unittest.TestCase):
         asyncio_logger_suppression()
 
         # Verify that asyncio logger level was changed
-        import logging  # pylint: disable=import-outside-toplevel
+        import logging
         asyncio_logger = logging.getLogger("asyncio")
         self.assertGreaterEqual(asyncio_logger.level, logging.WARNING)
 

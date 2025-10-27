@@ -57,10 +57,11 @@
             }
         },
         {
-            "name": "Python: Unit Tests",
+            "name": "Python: Pytest Tests",
             "type": "debugpy",
             "request": "launch",
-            "module": "unittest",
+            "module": "pytest",
+            "args": ["tests", "-v"],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {

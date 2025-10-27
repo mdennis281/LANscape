@@ -71,11 +71,11 @@ foreach ($version in $pythonVersions) {
         Write-Output "⚠️  No requirements.txt found."
     }
 
-    # Run test.py
-    Write-Output "Running test.py with Python $exactVersion..."
+    # Run tests
+    Write-Output "Running tests with Python $exactVersion..."
     # Set PYTHONPATH inline to ensure it is available for this command
     $env:PYTHONPATH = "$projectDir/src"
-    python -m unittest
+    python -m pytest tests/ -v
     if ($LASTEXITCODE -eq 0) {
         Write-Output "✅  Python $exactVersion : Test succeeded."
         # Clean up by removing the virtual environment

@@ -4,11 +4,12 @@ import logging
 import ipaddress
 import traceback
 import subprocess
-from typing import List, Dict
+from typing import List, Dict, Optional
 import socket
 import struct
 import re
 import psutil
+from time import sleep
 
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
@@ -18,27 +19,69 @@ from lanscape.libraries.service_scan import scan_service
 from lanscape.libraries.mac_lookup import MacLookup, get_macs
 from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
 from lanscape.libraries.errors import DeviceError
-from lanscape.libraries.decorators import job_tracker, run_once
+from lanscape.libraries.decorators import job_tracker, run_once, timeout_enforcer
+from pydantic import BaseModel, PrivateAttr
+from lanscape.libraries.scan_config import ServiceScanConfig, PortScanConfig
+try:
+    from pydantic import ConfigDict, computed_field, model_serializer  # pydantic v2
+    _PYD_V2 = True
+except Exception:  # pragma: no cover
+    ConfigDict = None  # type: ignore
+    computed_field = None  # type: ignore
+    model_serializer = None  # type: ignore
+    _PYD_V2 = False
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
 
 
-class Device:
+class Device(BaseModel):
     """Represents a network device with metadata and scanning capabilities."""
 
-    def __init__(self, ip: str):
-        super().__init__()
-        self.ip: str = ip
-        self.alive: bool = None
-        self.hostname: str = None
-        self.macs: List[str] = []
-        self.manufacturer: str = None
-        self.ports: List[int] = []
-        self.stage: str = 'found'
-        self.services: Dict[str, List[int]] = {}
-        self.caught_errors: List[DeviceError] = []
-        self.log = logging.getLogger('Device')
+    ip: str
+    alive: Optional[bool] = None
+    hostname: Optional[str] = None
+    macs: List[str] = []
+    manufacturer: Optional[str] = None
+    ports: List[int] = []
+    stage: str = 'found'
+    ports_scanned: int = 0
+    services: Dict[str, List[int]] = {}
+    caught_errors: List[DeviceError] = []
+    job_stats: Optional[Dict] = None
+
+    _log: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger('Device'))
+    # Support pydantic v1 and v2 configs
+    if _PYD_V2 and ConfigDict:
+        model_config = ConfigDict(arbitrary_types_allowed=True)  # type: ignore[assignment]
+    else:  # pragma: no cover
+        class Config:
+            arbitrary_types_allowed = True
+            extra = 'allow'
+
+    @property
+    def log(self) -> logging.Logger:
+        return self._log
+
+    # Computed fields for pydantic v2 (included in model_dump)
+    if _PYD_V2 and computed_field:
+        @computed_field(return_type=str)  # type: ignore[misc]
+        @property
+        def mac_addr(self) -> str:
+            return self.get_mac() or ""
+
+        @model_serializer(mode='wrap')  # type: ignore[misc]
+        def _serialize(self, serializer):
+            data = serializer(self)
+            # Remove internals
+            data.pop('job_stats', None)
+            # Ensure mac_addr present (computed_field already adds it)
+            data['mac_addr'] = data.get('mac_addr') or (self.get_mac() or '')
+            # Ensure manufacturer present; prefer explicit model value
+            manuf = data.get('manufacturer')
+            if not manuf:
+                data['manufacturer'] = self._get_manufacturer(data['mac_addr']) if data['mac_addr'] else None
+            return data
 
     def get_metadata(self):
         """Retrieve metadata such as hostname and MAC addresses."""
@@ -46,32 +89,69 @@ class Device:
             self.hostname = self._get_hostname()
             self._get_mac_addresses()
 
-    def dict(self) -> dict:
-        """Convert the device object to a dictionary."""
-        obj = vars(self).copy()
-        obj.pop('log')
-        obj.pop('job_stats', None)  # Remove job_stats if it exists
-        primary_mac = self.get_mac()
-        obj['mac_addr'] = primary_mac
-        obj['manufacturer'] = self._get_manufacturer(primary_mac)
+    # Fallback for pydantic v1: use dict() and enrich output
+    if not _PYD_V2:
+        def dict(self, *args, **kwargs) -> dict:  # type: ignore[override]
+            data = super().dict(*args, **kwargs)
+            data.pop('job_stats', None)
+            mac_addr = self.get_mac() or ''
+            data['mac_addr'] = mac_addr
+            if not data.get('manufacturer'):
+                data['manufacturer'] = self._get_manufacturer(mac_addr) if mac_addr else None
+            return data
+    else:
+        # In v2, route dict() to model_dump() so callers get the serialized enrichment
+        def dict(self, *args, **kwargs) -> dict:  # type: ignore[override]
+            try:
+                return self.model_dump(*args, **kwargs)  # type: ignore[attr-defined]
+            except Exception:
+                # Safety fallback (shouldn't normally hit)
+                data = self.__dict__.copy()
+                data.pop('_log', None)
+                data.pop('job_stats', None)
+                mac_addr = self.get_mac() or ''
+                data['mac_addr'] = mac_addr
+                if not data.get('manufacturer'):
+                    data['manufacturer'] = self._get_manufacturer(mac_addr) if mac_addr else None
+                return data
 
-        return obj
-
-    def test_port(self, port: int) -> bool:
+    def test_port(self, port: int, port_config: PortScanConfig = None) -> bool:
         """Test if a specific port is open on the device."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        result = sock.connect_ex((self.ip, port))
-        sock.close()
-        if result == 0:
-            self.ports.append(port)
-            return True
-        return False
+        if port_config is None:
+            port_config = PortScanConfig()  # Use defaults
+        
+        # Calculate timeout enforcer: (timeout * (retries+1) * 1.5)
+        enforcer_timeout = port_config.timeout * (port_config.retries + 1) * 1.5
+        
+        @timeout_enforcer(enforcer_timeout, False)
+        def do_test():
+            for attempt in range(port_config.retries + 1):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(port_config.timeout)
+                try:
+                    result = sock.connect_ex((self.ip, port))
+                    if result == 0:
+                        self.ports.append(port)
+                        return True
+                except Exception:
+                    pass  # Connection failed, try again if retries remain
+                finally:
+                    sock.close()
+                
+                # Wait before retry (except on last attempt)
+                if attempt < port_config.retries:
+                    sleep(port_config.retry_delay)
+            
+            return False
+        
+        ans = do_test() or False
+        self.ports_scanned += 1
+        return ans
 
     @job_tracker
-    def scan_service(self, port: int):
+    def scan_service(self, port: int, cfg: ServiceScanConfig):
         """Scan a specific port for services."""
-        service = scan_service(self.ip, port)
+        service = scan_service(self.ip, port, cfg)
         service_ports = self.services.get(service, [])
         service_ports.append(port)
         self.services[service] = service_ports

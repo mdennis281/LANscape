@@ -13,12 +13,12 @@ from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
 from icmplib import ping
 
-from lanscape.libraries.net_tools import Device
-from lanscape.libraries.scan_config import (
+from lanscape.core.net_tools import Device
+from lanscape.core.scan_config import (
     ScanConfig, ScanType, PingConfig,
     ArpConfig, PokeConfig, ArpCacheConfig
 )
-from lanscape.libraries.decorators import timeout_enforcer, job_tracker
+from lanscape.core.decorators import timeout_enforcer, job_tracker
 
 
 def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
@@ -156,7 +156,7 @@ class ArpLookup():
     NOTE: This lookup method requires elevated privileges to access the ARP cache.
 
 
-    [Arp Lookup Requirements](/support/arp-issues.md)
+    [Arp Lookup Requirements](/docs/arp-issues.md)
     """
 
     @classmethod

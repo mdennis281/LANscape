@@ -9,7 +9,7 @@ import traceback
 from flask import request, jsonify
 
 from lanscape.ui.blueprints.api import api_bp
-from lanscape.libraries.subnet_scan import ScanConfig
+from lanscape.core.subnet_scan import ScanConfig
 from lanscape.ui.blueprints import scan_manager
 
 # Subnet Scanner API

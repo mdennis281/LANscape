@@ -10,7 +10,6 @@ from typing import Optional
 import openai
 
 
-
 def _get_commit_log(from_tag: Optional[str], to_tag: str) -> str:
     """Get git commit log with statistics."""
     if from_tag:
@@ -141,29 +140,29 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
 
     FORMAT YOUR RESPONSE AS:
 
-    **Brief summary paragraph** highlighting the most significant changes and overall impact.
+    **Brief summary paragraph** highlighting the most significant changes and overall impact. You're not trying to sell what changed. Youre just relaying the facts.
 
     ## 🆕 What's New
     - Major new features and capabilities (be specific about functionality)
 
-    ## ⚡ Improvements
+    ## ⚡ High-level Improvements
     - Enhancements to existing features
     - Performance optimizations
     - User experience improvements
-
-    ## 🐛 Bug Fixes
-    - Specific issues resolved (if applicable)
 
     ## 🔧 Technical Changes
     - Infrastructure improvements
     - Code quality enhancements
     - Build/deployment changes
 
+    ## 🐛 Bug Fixes
+    - Specific issues resolved (if applicable)
+
     ## ⚠️ Breaking Changes
     - Any changes that might affect existing users (if applicable)
 
-    Be technically accurate but translate code changes into user benefits where possible.
-    Use emojis and clear formatting for readability.
+    Be accurate, concise, and professional. You're not trying to sell what changed. Youre just relaying the facts.
+    If no significant changes are found, state that clearly.
     """
 
     # Try GPT-4o first, fallback to other models if needed
@@ -251,7 +250,38 @@ def main():
     # Generate description
     description = generate_release_description(git_log, version, api_key)
 
-    print(description)
+    # Append installation/upgrade instructions
+    installation_instructions = f"""
+
+## 📦 Installation & Upgrade
+
+### Fresh Installation
+```bash
+pip install lanscape
+```
+
+### Upgrade from Previous Version
+```bash
+pip install --upgrade lanscape=={version}
+```
+
+### Run LANscape
+```bash
+python -m lanscape
+# or simply (experimental):
+lanscape
+```
+
+### Verify Installation
+```bash
+python -m lanscape --version
+```
+
+For more details and troubleshooting, see the [README](https://github.com/mdennis281/LANscape/blob/main/README.md).
+"""
+
+    # Print the complete release notes
+    print(description + installation_instructions)
 
 
 if __name__ == "__main__":

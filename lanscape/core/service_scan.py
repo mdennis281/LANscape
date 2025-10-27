@@ -2,13 +2,15 @@
 """
 
 from typing import Optional, Union
-import sys
 import asyncio
 import logging
 import traceback
 
-from lanscape.libraries.app_scope import ResourceManager
-from lanscape.libraries.scan_config import ServiceScanConfig, ServiceScanStrategy
+from lanscape.core.app_scope import ResourceManager
+from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
+
+# asyncio complains more than it needs to
+logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 log = logging.getLogger('ServiceScan')
 SERVICES = ResourceManager('services').get_jsonc('definitions.jsonc')
@@ -183,22 +185,3 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
 
     # Use asyncio.run to execute the asynchronous logic synchronously
     return asyncio.run(_async_scan_service(ip, port, cfg=cfg))
-
-
-def asyncio_logger_suppression():
-    """Suppress the noisy asyncio transport errors since they are expected in service scanning."""
-
-    # Reduce noisy asyncio transport errors on Windows by switching to Selector policy
-    if sys.platform.startswith("win"):
-        try:
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        except Exception:
-            pass
-    # Also tone down asyncio logger noise from transport callbacks
-    try:
-        logging.getLogger("asyncio").setLevel(logging.WARNING)
-    except Exception:
-        pass
-
-
-asyncio_logger_suppression()

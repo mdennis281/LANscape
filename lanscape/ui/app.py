@@ -8,12 +8,12 @@ import logging
 from flask import Flask, render_template
 from lanscape.ui.blueprints.web import web_bp, routes  # pylint: disable=unused-import
 from lanscape.ui.blueprints.api import api_bp, tools, port, scan  # pylint: disable=unused-import
-from lanscape.libraries.runtime_args import RuntimeArgs, parse_args
-from lanscape.libraries.version_manager import (
+from lanscape.core.runtime_args import RuntimeArgs, parse_args
+from lanscape.core.version_manager import (
     is_update_available, get_installed_version, lookup_latest_version
 )
-from lanscape.libraries.app_scope import is_local_run
-from lanscape.libraries.net_tools import is_arp_supported
+from lanscape.core.app_scope import is_local_run
+from lanscape.core.net_tools import is_arp_supported
 from lanscape.ui.shutdown_handler import FlaskShutdownHandler
 
 app = Flask(
@@ -51,6 +51,18 @@ app.jinja_env.filters['is_substring_in_values'] = is_substring_in_values
 ################################
 
 
+def get_runtime_args_safe():
+    """
+    Safely get runtime args, returning empty dict if parsing fails.
+    This prevents conflicts when the module is imported during testing.
+    """
+    try:
+        return vars(parse_args())
+    except SystemExit:
+        # This happens when pytest tries to import the module
+        return {}
+
+
 def set_global_safe(key: str, value):
     """ Safely set global vars without worrying about an exception """
     app_globals = app.jinja_env.globals
@@ -73,7 +85,7 @@ def set_global_safe(key: str, value):
 set_global_safe('app_version', get_installed_version)
 set_global_safe('update_available', is_update_available)
 set_global_safe('latest_version', lookup_latest_version)
-set_global_safe('runtime_args', vars(parse_args()))
+set_global_safe('runtime_args', get_runtime_args_safe)
 set_global_safe('is_local', is_local_run)
 set_global_safe('is_arp_supported', is_arp_supported)
 

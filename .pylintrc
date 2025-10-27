@@ -93,7 +93,7 @@ prefer-stubs=no
 
 # Minimum Python version to use for version dependent checks. Will default to
 # the version used to run pylint.
-py-version=3.12
+py-version=3.10
 
 # Discover python modules and packages in the file system subtree.
 recursive=no
@@ -441,7 +441,8 @@ disable=raw-checker-failed,
         logging-fstring-interpolation,
         broad-exception-caught,
         logging-not-lazy,
-        too-many-instance-attributes
+        too-many-instance-attributes,
+        redefined-outer-name
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

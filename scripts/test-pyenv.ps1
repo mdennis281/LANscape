@@ -1,7 +1,7 @@
 # note, emojis only display on PS7
 
 # Define the Python versions you want to test
-$pythonVersions = @(8..13 | ForEach-Object { "3.$_" })
+$pythonVersions = @(10..14 | ForEach-Object { "3.$_" })
 
 # Define the project directory
 $projectDir = (Get-Location).Path
@@ -71,11 +71,11 @@ foreach ($version in $pythonVersions) {
         Write-Output "⚠️  No requirements.txt found."
     }
 
-    # Run test.py
-    Write-Output "Running test.py with Python $exactVersion..."
+    # Run tests
+    Write-Output "Running tests with Python $exactVersion..."
     # Set PYTHONPATH inline to ensure it is available for this command
     $env:PYTHONPATH = "$projectDir/src"
-    python -m unittest
+    python -m pytest tests/ -v
     if ($LASTEXITCODE -eq 0) {
         Write-Output "✅  Python $exactVersion : Test succeeded."
         # Clean up by removing the virtual environment

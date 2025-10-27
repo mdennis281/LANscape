@@ -119,15 +119,59 @@
                 }
             }
         },
+
         {
-            "label": "Run Unit Tests",
+            "label": "Tests (Pytest)",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
                 "-m",
-                "unittest"
+                "pytest",
+                "tests/",
+                "-v"
             ],
-            "problemMatcher": [],
+            "problemMatcher": ["$python"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
+        },
+        {
+            "label": "Run Pytest with Coverage",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "pytest",
+                "tests/",
+                "--cov=lanscape",
+                "--cov-report=html",
+                "--cov-report=term-missing",
+                "-v"
+            ],
+            "problemMatcher": ["$python"],
             "group": "test",
             "presentation": {
                 "reveal": "always",

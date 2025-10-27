@@ -5,7 +5,7 @@ import os
 from flask import request
 
 
-from lanscape.libraries.runtime_args import parse_args
+from lanscape.core.runtime_args import parse_args
 
 
 log = logging.getLogger('shutdown_handler')

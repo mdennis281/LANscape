@@ -5,10 +5,10 @@ API endpoints for subnet testing and listing.
 import traceback
 from flask import request, jsonify
 from lanscape.ui.blueprints.api import api_bp
-from lanscape.libraries.net_tools import get_all_network_subnets, is_arp_supported
-from lanscape.libraries.ip_parser import parse_ip_input
-from lanscape.libraries.errors import SubnetTooLargeError
-from lanscape.libraries.scan_config import DEFAULT_CONFIGS
+from lanscape.core.net_tools import get_all_network_subnets, is_arp_supported
+from lanscape.core.ip_parser import parse_ip_input
+from lanscape.core.errors import SubnetTooLargeError
+from lanscape.core.scan_config import DEFAULT_CONFIGS
 
 
 @api_bp.route('/api/tools/subnet/test')

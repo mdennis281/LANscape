@@ -56,7 +56,7 @@ I use a combination of ARP, ICMP & port testing to determine if a device is onli
 Recommendations:
 
   - Adjust scan configuration
-  - Configure ARP lookup [ARP lookup setup](./support/arp-issues.md)
+  - Configure ARP lookup [ARP lookup setup](./docs/arp-issues.md)
   - Create a bug
 
 

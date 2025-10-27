@@ -11,8 +11,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from lanscape.libraries.port_manager import PortManager
-from lanscape.libraries.ip_parser import parse_ip_input
+from lanscape.core.port_manager import PortManager
+from lanscape.core.ip_parser import parse_ip_input
 
 
 class PingConfig(BaseModel):

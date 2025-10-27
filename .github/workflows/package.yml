@@ -6,6 +6,10 @@ on:
       - 'releases/*'
       - 'pre-releases/*'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   publish:
     uses: ./.github/workflows/pypi-publish.yml

@@ -181,6 +181,49 @@
                         </div>
                     </div>
                 </div>
+                <div class="row mt-2">
+                    <div class="col">
+                        <label for="port_scan_timeout" class="form-label">Port Timeout (sec)</label>
+                        <input type="number" step="0.1" id="port_scan_timeout" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label for="port_scan_retries" class="form-label">Retries</label>
+                        <input type="number" id="port_scan_retries" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label for="port_scan_retry_delay" class="form-label">Retry Delay (sec)</label>
+                        <input type="number" step="0.1" id="port_scan_retry_delay" class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <div id="section-service-scan" class="form-group mt-2 config-section div-hide">
+                <h6>Service Scanning</h6>
+                <div class="row">
+                    <div class="col">
+                        <label for="service_lookup_type" class="form-label">Strategy</label>
+                        <div class="service-strategy-wrapper">
+                            <select id="service_lookup_type" class="service-strategy">
+                                <option value="LAZY">Lazy (few probes)</option>
+                                <option value="BASIC">Basic (common probes)</option>
+                                <option value="AGGRESSIVE">Aggressive (all probes)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <label for="service_timeout" class="form-label">Timeout (sec)</label>
+                        <input type="number" step="0.1" id="service_timeout" class="form-control">
+                    </div>
+                    <div class="col">
+                        <label for="service_max_concurrent_probes" class="form-label">Max Concurrent Probes</label>
+                        <input type="number" id="service_max_concurrent_probes" class="form-control">
+                    </div>
+                </div>
+                <div class="row mt-1">
+                    <div class="col">
+                        <small class="text-secondary">Attempts service identification on open ports using selected strategy.</small>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group mt-2 config-section">

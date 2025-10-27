@@ -3,6 +3,7 @@ Local network scanner
 """
 from lanscape.libraries.subnet_scan import (
     SubnetScanner,
+    ScannerResults,
     ScanManager
 )
 
@@ -12,6 +13,9 @@ from lanscape.libraries.scan_config import (
     PingConfig,
     PokeConfig,
     ArpCacheConfig,
+    PortScanConfig,
+    ServiceScanConfig,
+    ServiceScanStrategy,
     ScanType
 )
 

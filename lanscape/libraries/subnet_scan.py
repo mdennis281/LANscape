@@ -62,7 +62,10 @@ class SubnetScanner():
         """
         self._set_stage('scanning devices')
         self.running = True
-        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('isalive')) as executor:
+        with ThreadPoolExecutor(
+                max_workers=self.cfg.t_cnt('isalive'),
+                thread_name_prefix="DeviceAlive") as executor:
+
             futures = {executor.submit(self._get_host_details, str(
                 ip)): str(ip) for ip in self.subnet}
             for future in as_completed(futures):
@@ -187,7 +190,7 @@ class SubnetScanner():
         """
         Get the MAC address and open ports of the given host.
         """
-        device = Device(host)
+        device = Device(ip=host)
         device.alive = self._ping(device)
         self.results.scanned()
         if not device.alive:
@@ -199,7 +202,8 @@ class SubnetScanner():
 
     @terminator
     def _scan_network_ports(self):
-        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_scan')) as executor:
+        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_scan'),
+                                thread_name_prefix="DevicePortScanParent") as executor:
             futures = {executor.submit(
                 self._scan_ports, device): device for device in self.results.devices}
             for future in futures:
@@ -210,7 +214,9 @@ class SubnetScanner():
     def _scan_ports(self, device: Device):
         self.log.debug(f'[{device.ip}] Initiating port scan')
         device.stage = 'scanning'
-        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_test')) as executor:
+        with ThreadPoolExecutor(
+                max_workers=self.cfg.t_cnt('port_test'),
+                thread_name_prefix=f"{device.ip}-PortScan") as executor:
             futures = {executor.submit(self._test_port, device, int(
                 port)): port for port in self.ports}
             for future in futures:
@@ -226,9 +232,9 @@ class SubnetScanner():
         If port open, determine service.
         Device class handles tracking open ports.
         """
-        is_alive = host.test_port(port)
+        is_alive = host.test_port(port, self.cfg.port_scan_config)
         if is_alive and self.cfg.task_scan_port_services:
-            host.scan_service(port)
+            host.scan_service(port, self.cfg.service_scan_config)
         return is_alive
 
     @terminator
@@ -264,6 +270,7 @@ class ScannerResults:
         # Scan statistics
         self.devices_total: int = len(list(scan.subnet))
         self.devices_scanned: int = 0
+        self.port_list_length: int = len(scan.ports)
         self.devices: List[Device] = []
 
         # Status tracking

@@ -179,7 +179,9 @@ def timeout_enforcer(timeout: int, raise_on_timeout: bool = True):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             """Wrap the function to enforce a timeout on its execution."""
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=1,
+                    thread_name_prefix="TimeoutEnforcer") as executor:
                 future = executor.submit(func, *args, **kwargs)
                 try:
                     return future.result(

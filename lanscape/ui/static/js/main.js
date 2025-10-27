@@ -1,5 +1,3 @@
-
-
 $(document).ready(function() {
     // Load port lists into the dropdown
     const scanId = getActiveScanId();
@@ -216,6 +214,36 @@ function setUrlParam(param, value) {
 $(window).on('resize', function() {
     resizeIframe($('#ip-table-frame')[0]);
 });
+
+function openDeviceDetail(deviceIp) {
+    try {
+        const scanId = getActiveScanId();
+        if (!scanId || !deviceIp) return;
+
+        const safeIp = encodeURIComponent(deviceIp.trim());
+
+        // Remove any existing modal instance to avoid duplicates
+        $('#device-modal').remove();
+
+        $.get(`/device/${scanId}/${safeIp}`, function(html) {
+            // Append modal HTML to the document
+            $('body').append(html);
+
+            // Show the modal
+            const $modal = $('#device-modal');
+            $modal.modal('show');
+
+            // Clean up after closing
+            $modal.on('hidden.bs.modal', function() {
+                $(this).remove();
+            });
+        }).fail(function() {
+            console.error('Failed to load device details');
+        });
+    } catch (e) {
+        console.error('Error opening device detail modal:', e);
+    }
+}
 
 
 

@@ -1,0 +1,111 @@
+<div class="modal fade" id="device-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-secondary">
+        {% set ip = device.ip|default('Unknown IP') %}
+        {% set hostname = device.hostname|default('') %}
+        {% set manufacturer = device.manufacturer|default('') %}
+        {% set mac = device.mac_addr|default('') %}
+        {% set stage = device.stage|default('unknown') %}
+        {% set ports = device.ports|default([]) %}
+        {% set services = device.services|default({}) %}
+        {% set errors = device.caught_errors|default([]) %}
+        {% set stage_lower = (stage|string|lower) %}
+        {% set stage_badge_class = 'badge-success' if stage_lower == 'complete' else 'badge-warning' if stage_lower in ['running', 'in_progress'] else 'badge-secondary' %}
+        <h5 class="modal-title" id="device-modalLabel">
+          Device Details
+          <span class="text-secondary small ms-2">IP: {{ ip }}</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="config-sections">
+          <div class="form-group mt-2 config-section">
+            <h6>Overview</h6>
+            <div class="kv-grid mt-1">
+              <div class="kv-label">IP Address</div>
+              <div class="kv-value">{{ ip }}</div>
+
+              <div class="kv-label">Hostname</div>
+              <div class="kv-value">{{ hostname|trim if hostname|default('')|trim else 'Unknown Hostname' }}</div>
+
+              <div class="kv-label">MAC Address</div>
+              <div class="kv-value">{{ mac|trim if mac|default('')|trim else 'Unknown MAC' }}</div>
+
+              <div class="kv-label">Manufacturer</div>
+              <div class="kv-value">{{ manufacturer|trim if manufacturer|default('')|trim else 'Unknown Manufacturer' }}</div>
+
+              <div class="kv-label">Stage</div>
+              <div class="kv-value">
+                <span class="badge {{ stage_badge_class }}">{{ stage|default('unknown')|capitalize }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group mt-2 config-section">
+            <h6>Open Ports</h6>
+            {% if ports and ports|length > 0 %}
+              <div class="chip-group mt-1">
+                {% for p in ports %}
+                  <span class="chip" title="Port {{ p }}">
+                    <span class="material-symbols-outlined">lan</span>{{ p }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-secondary">No open ports detected.</div>
+            {% endif %}
+          </div>
+
+          <div class="form-group mt-2 config-section">
+            <h6>Services</h6>
+            {% if services and services|length > 0 %}
+              <div class="service-list mt-1">
+                {% for svc, svc_ports in services|dictsort %}
+                  <div class="service-row">
+                    <div class="service-name">
+                      <span class="material-symbols-outlined align-middle me-1">dns</span>{{ svc|default('Unknown') }}
+                    </div>
+                    <div class="service-ports">
+                      {% set s_ports = svc_ports|default([]) %}
+                      {% if s_ports and s_ports|length > 0 %}
+                        {% for sp in s_ports %}
+                          <span class="chip" title="{{ svc }} on {{ ip }}:{{ sp }}">{{ sp }}</span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="text-secondary">No ports</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-secondary">No service information available.</div>
+            {% endif %}
+          </div>
+
+          <div class="form-group mt-2 config-section">
+            <h6>Errors</h6>
+            {% if errors and errors|length > 0 %}
+              <ul class="list-unstyled error-list mt-1">
+                {% for err in errors %}
+                  <li class="text-danger">
+                    <span class="material-symbols-outlined align-middle me-1">error</span>
+                    {{ err }}
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="text-secondary">No errors captured.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -33,5 +33,39 @@
         "veth",
         "vmnet",
         "wlan"
-    ]
+    ],
+    "chat.tools.terminal.autoApprove": {
+        "python -m pylint --score=yes scripts/ lanscape/ tests/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        ".env/Scripts/activate": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "source .env/bin/activate": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "python -m unittest": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "python.exe -m pytest tests/*.py -v": {
+            "approve": true,
+            "matchCommandLine": false
+        },
+        "python -m pytest tests/*.py -v": {
+            "approve": true,
+            "matchCommandLine": false
+        },
+        "pytest tests/*.py -v": {
+            "approve": true,
+            "matchCommandLine": false
+        },
+        "pytest": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

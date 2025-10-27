@@ -4,16 +4,76 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "LANscape: Run Module (Debug Mode)",
             "type": "debugpy",
             "request": "launch",
-            "program": "localrun.py",
+            "module": "lanscape",
             "console": "integratedTerminal",
             "args": [
-                "${command:pickArgs}"
-            ]
+                "--debug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "LANscape: Run Module (Production)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lanscape",
+            "console": "integratedTerminal",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "LANscape: Run with Custom Args",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lanscape",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:customArgs}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "LANscape: Test Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Python: Unit Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "customArgs",
+            "description": "Enter custom arguments for LANscape",
+            "default": "--help",
+            "type": "promptString"
         }
     ]
 }

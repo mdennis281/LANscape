@@ -1,456 +1,632 @@
 {
     // ----------------------- Web Services -----------------------
-    "HTTP": [
-        "HTTP", 
-        "Apache", 
-        "Nginx", 
-        "IIS", 
-        "lighttpd", 
-        "Caddy", 
-        "OpenResty",
-        "GWS",  // Google Web Server
-        "LiteSpeed",
-        "Gunicorn",  // Often in X-Powered-By
-        "OpenLiteSpeed",
-        "Cloudflare"
-    ],
-    "HTTPS": [
-        "HTTPS", 
-        "SSL", 
-        "TLS"
-        // Possibly you'd see "443" in a banner or SNI reference, 
-        // but typically "SSL" or "TLS" coverage is sufficient
-    ],
+    "HTTP": {
+        "hints": [
+            "HTTP",
+            "Apache",
+            "Nginx",
+            "IIS",
+            "lighttpd",
+            "Caddy",
+            "OpenResty",
+            "GWS",
+            "LiteSpeed",
+            "Gunicorn",
+            "OpenLiteSpeed",
+            "Cloudflare"
+        ],
+        "ports": [80, 8080, 8000, 8888],
+        "scheme": "http",
+        "label": "HTTP",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "HTTPS": {
+        "hints": ["HTTPS", "SSL", "TLS"],
+        "ports": [443, 8443],
+        "scheme": "https",
+        "label": "HTTPS",
+        "probe": "TLS ClientHello"
+    },
 
     // ------------------ Remote Shell / Admin --------------------
-    "SSH": [
-        "SSH", 
-        "OpenSSH", 
-        "Dropbear",
-        "libssh"
-    ],
-    "Telnet": [
-        "Telnet",
-        "BusyBox on telnetd"
-    ],
+    "SSH": {
+        "hints": ["SSH", "OpenSSH", "Dropbear", "libssh"],
+        "ports": [22],
+        "scheme": "ssh",
+        "label": "SSH",
+        "probe": ""
+    },
+    "Telnet": {
+        "hints": ["Telnet", "BusyBox on telnetd"],
+        "ports": [23],
+        "scheme": "telnet",
+        "label": "Telnet",
+        "probe": "\r\n"
+    },
 
     // ------------------ File Transfer Protocols -----------------
-    "FTP": [
-        "FTP", 
-        "FileZilla", 
-        "ProFTPD", 
-        "vsftpd", 
-        "Pure-FTPd",
-        "WS_FTP",
-        "Microsoft ftpd"
-    ],
-    "SFTP": [
-        "SFTP"
-        // SFTP typically is an SSH subsystem, so you'd often see an SSH banner anyway
-    ],
-    "TFTP": [
-        "TFTP"
-    ],
+    "FTP": {
+        "hints": ["FTP", "FileZilla", "ProFTPD", "vsftpd", "Pure-FTPd", "WS_FTP", "Microsoft ftpd"],
+        "ports": [21],
+        "scheme": "ftp",
+        "label": "FTP",
+        "probe": ""
+    },
+    "SFTP": {
+        "hints": ["SFTP"],
+        "ports": [22],
+        "scheme": "sftp",
+        "label": "SFTP",
+        "probe": ""
+    },
+    "TFTP": {
+        "hints": ["TFTP"],
+        "ports": [69],
+        "scheme": "tftp",
+        "label": "TFTP",
+        "probe": "RRQ (UDP)"
+    },
 
     // -------------------- Email / Messaging ----------------------
-    "SMTP": [
-        "SMTP", 
-        "Postfix", 
-        "Exim", 
-        "Sendmail", 
-        "Qmail", 
-        "Exchange"
-    ],
-    "SMTPS": [
-        "SMTPS", 
-        "465 secure", 
-        "587 secure"
-        // Some servers might mention "TLS wrapper" or similar
-    ],
-    "POP3": [
-        "POP3",
-        "Dovecot",
-        "Courier",
-        "POP3 (Internet Mail)"
-    ],
-    "POP3S": [
-        "POP3S",
-        "SSL POP3",
-        "Dovecot",
-        "Courier"
-    ],
-    "IMAP": [
-        "IMAP",
-        "Dovecot",
-        "Courier",
-        "Cyrus",
-        "IMAP4"
-    ],
-    "IMAPS": [
-        "IMAPS",
-        "SSL IMAP",
-        "Dovecot",
-        "Courier",
-        "Cyrus"
-    ],
+    "SMTP": { "hints": ["SMTP", "Postfix", "Exim", "Sendmail", "Qmail", "Exchange"], "ports": [25], "label": "SMTP", "probe": "EHLO scanner\r\n" },
+    "SMTPS": { "hints": ["SMTPS", "465 secure", "587 secure"], "ports": [465, 587], "label": "SMTPS", "probe": "TLS ClientHello" },
+    "POP3": { "hints": ["POP3", "Dovecot", "Courier", "POP3 (Internet Mail)"], "ports": [110], "label": "POP3", "probe": "" },
+    "POP3S": { "hints": ["POP3S", "SSL POP3", "Dovecot", "Courier"], "ports": [995], "label": "POP3S", "probe": "TLS ClientHello" },
+    "IMAP": { "hints": ["IMAP", "Dovecot", "Courier", "Cyrus", "IMAP4"], "ports": [143], "label": "IMAP", "probe": "" },
+    "IMAPS": { "hints": ["IMAPS", "SSL IMAP", "Dovecot", "Courier", "Cyrus"], "ports": [993], "label": "IMAPS", "probe": "TLS ClientHello" },
 
     // ---------------- Domain / Directory Services ---------------
-    "DNS": [
-        "DNS", 
-        "Bind", 
-        "DNSMasq", 
-        "PowerDNS",
-        "Unbound",
-        "Microsoft DNS",
-        "Knot DNS"
-    ],
-    "LDAP": [
-        "LDAP"
-    ],
-    "Active Directory": [
-        "Active Directory", 
-        "Kerberos", 
-        "MSAD", 
-        "LDAP for AD", 
-        "LDAP Service (AD)"
-    ],
+    "DNS": { "hints": ["DNS", "Bind", "DNSMasq", "PowerDNS", "Unbound", "Microsoft DNS", "Knot DNS"], "ports": [53], "label": "DNS", "probe": "A? example.com (UDP)" },
+    "LDAP": { "hints": ["LDAP"], "ports": [389], "label": "LDAP", "probe": "RootDSE search" },
+    "Active Directory": { "hints": ["Active Directory", "Kerberos", "MSAD", "LDAP for AD", "LDAP Service (AD)"], "ports": [88, 389, 636], "label": "Active Directory", "probe": "RootDSE search" },
 
     // -------------------- Database Services ----------------------
-    "MySQL": [
-        "MySQL", 
-        "MariaDB", 
-        "Percona"
-    ],
-    "PostgreSQL": [
-        "PostgreSQL",
-        "Postgres"
-    ],
-    "Microsoft SQL Server": [
-        "MSSQL", 
-        "Microsoft SQL Server", 
-        "TDS",
-        "SQL Server",
-        "MS-SQL"
-    ],
-    "Oracle Database": [
-        "Oracle", 
-        "TNS", 
-        "Oracle Net"
-    ],
-    "MongoDB": [
-        "MongoDB"
-    ],
-    "Redis": [
-        "Redis"
-    ],
-    "Cassandra": [
-        "Cassandra"
-    ],
-    "Memcached": [
-        "Memcached"
-    ],
+    "MySQL": { "hints": ["MySQL", "MariaDB", "Percona"], "ports": [3306], "scheme": "mysql", "label": "MySQL", "probe": "" },
+    "PostgreSQL": { "hints": ["PostgreSQL", "Postgres"], "ports": [5432], "scheme": "postgresql", "label": "PostgreSQL", "probe": "SSLRequest" },
+    "MSSQL": { "hints": ["MSSQL", "Microsoft SQL Server", "TDS", "SQL Server", "MS-SQL"], "ports": [1433], "scheme": "mssql", "label": "MSSQL", "probe": "TDS Prelogin" },
+    "Oracle": { "hints": ["Oracle", "TNS", "Oracle Net"], "ports": [1521], "scheme": "oracle", "label": "Oracle", "probe": "TNS Connect" },
+    "MongoDB": { "hints": ["MongoDB"], "ports": [27017], "scheme": "mongodb", "label": "MongoDB", "probe": "hello/isMaster" },
+    "Redis": { "hints": ["Redis"], "ports": [6379], "scheme": "redis", "label": "Redis", "probe": "*1\r\n$4\r\nPING\r\n" },
+    "Cassandra": { "hints": ["Cassandra"], "ports": [9042], "label": "Cassandra", "probe": "OPTIONS" },
+    "Memcached": { "hints": ["Memcached"], "ports": [11211], "scheme": "memcached", "label": "Memcached", "probe": "stats\r\n" },
 
     // ----------------- Caching / Indexing / Logging -------------
-    "Elasticsearch": [
-        "Elasticsearch"
-    ],
-    "Logstash": [
-        "Logstash"
-    ],
+    "Elasticsearch": {
+        "hints": ["Elasticsearch"],
+        "ports": [9200, 9300],
+        "scheme": "http",
+        "label": "Elasticsearch",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Logstash": {
+        "hints": ["Logstash"],
+        "ports": [5044],
+        "scheme": "http",
+        "label": "Logstash",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // --------------- Message Brokers & Streaming ----------------
-    "Kafka": [
-        "Kafka"
-    ],
-    "RabbitMQ": [
-        "RabbitMQ", 
-        "AMQP"
-    ],
-    "ActiveMQ": [
-        "ActiveMQ"
-    ],
-    "Mosquitto": [
-        "Mosquitto", 
-        "MQTT"
-    ],
+    "Kafka": {
+        "hints": ["Kafka"],
+        "ports": [9092],
+        "scheme": "kafka",
+        "label": "Kafka",
+        "probe": "ApiVersions"
+    },
+    "RabbitMQ": {
+        "hints": ["RabbitMQ", "AMQP"],
+        "ports": [5672, 15672],
+        "scheme": "amqp",
+        "label": "RabbitMQ",
+        "probe": "AMQP protocol header"
+    },
+    "ActiveMQ": {
+        "hints": ["ActiveMQ"],
+        "ports": [61616],
+        "scheme": "activemq",
+        "label": "ActiveMQ",
+        "probe": "STOMP CONNECT\n\n"
+    },
+    "Mosquitto": {
+        "hints": ["Mosquitto", "MQTT"],
+        "ports": [1883, 8883],
+        "scheme": "mqtt",
+        "label": "Mosquitto",
+        "probe": "MQTT CONNECT"
+    },
 
     // -------------------- Microsoft Services ---------------------
-    "RDP": [
-        "RDP", 
-        "Terminal Services", 
-        "Remote Desktop",
-        "MSTerminal"
-    ],
-    "SMB": [
-        "SMB", 
-        "NetBIOS", 
-        "Samba"
-    ],
-    "WMI": [
-        "WMI"
-    ],
-    "WinRM": [
-        "WinRM"
-    ],
+    "RDP": { "hints": ["RDP", "Terminal Services", "Remote Desktop", "MSTerminal"], "ports": [3389], "scheme": "rdp", "label": "RDP", "probe": "TLS ClientHello" },
+    "SMB": { "hints": ["SMB", "NetBIOS", "Samba"], "ports": [445], "scheme": "smb", "label": "SMB", "probe": "SMB negotiate" },
+    "WMI": {
+        "hints": ["WMI"],
+        "ports": [135, 445],
+        "scheme": "http",
+        "label": "WMI",
+        "probe": "RPC connect"
+    },
+    "WinRM": {
+        "hints": ["WinRM"],
+        "ports": [5985, 5986],
+        "scheme": "http",
+        "label": "WinRM",
+        "probe": "HEAD /wsman HTTP/1.1\r\nHost: {host_hdr}\r\nConnection: close\r\n\r\n"
+    },
 
     // ---------------- Collaboration / Chat -----------------------
-    "IRC": [
-        "IRC"
-    ],
-    "XMPP": [
-        "XMPP", 
-        "Jabber"
-    ],
-    "Matrix": [
-        "Matrix"
-    ],
+    "IRC": {
+        "hints": ["IRC"],
+        "ports": [6667, 6697],
+        "scheme": "irc",
+        "label": "IRC",
+        "probe": "\r\n"
+    },
+    "XMPP": {
+        "hints": ["XMPP", "Jabber"],
+        "ports": [5222, 5223],
+        "scheme": "xmpp",
+        "label": "XMPP",
+        "probe": "<stream:stream to='{host_hdr}' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>"
+    },
+    "Matrix": {
+        "hints": ["Matrix"],
+        "ports": [8448],
+        "scheme": "http",
+        "label": "Matrix",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // ------------- Virtualization / Container Services ----------
-    "Docker API": [
-        "Docker"
-    ],
-    "Kubernetes API": [
-        "Kubernetes",
-        "K8s",
-        "kube-apiserver"
-    ],
-    "VMware ESXi": [
-        "VMware ESXi", 
-        "ESX"
-    ],
-    "Proxmox": [
-        "Proxmox"
-    ],
+    "Docker API": {
+        "hints": ["Docker"],
+        "ports": [2375, 2376],
+        "scheme": "http",
+        "label": "Docker API",
+        "probe": "GET /_ping HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Kubernetes API": {
+        "hints": ["Kubernetes", "K8s", "kube-apiserver"],
+        "ports": [6443],
+        "scheme": "http",
+        "label": "Kubernetes API",
+        "probe": "GET /version HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "VMware ESXi": {
+        "hints": ["VMware ESXi", "ESX"],
+        "ports": [443],
+        "scheme": "https",
+        "label": "VMware ESXi",
+        "probe": "TLS ClientHello"
+    },
+    "Proxmox": {
+        "hints": ["Proxmox"],
+        "ports": [8006],
+        "scheme": "https",
+        "label": "Proxmox",
+        "probe": "TLS ClientHello"
+    },
 
     // ----------------- Remote Desktop / Control -----------------
-    "VNC": [
-        "VNC", 
-        "RFB"
-    ],
-    "TeamViewer": [
-        "TeamViewer"
-    ],
-    "AnyDesk": [
-        "AnyDesk"
-    ],
+    "VNC": { "hints": ["VNC", "RFB"], "ports": [5900], "scheme": "vnc", "label": "VNC", "probe": "" },
+    "TeamViewer": {
+        "hints": ["TeamViewer"],
+        "ports": [5938],
+        "scheme": "http",
+        "label": "TeamViewer",
+        "probe": "TLS ClientHello"
+    },
+    "AnyDesk": {
+        "hints": ["AnyDesk"],
+        "ports": [7070],
+        "scheme": "http",
+        "label": "AnyDesk",
+        "probe": "TLS ClientHello"
+    },
 
     // --------------------- Voice over IP ------------------------
-    "SIP": [
-        "SIP", 
-        "Asterisk", 
-        "FreeSWITCH"
-    ],
-    "H.323": [
-        "H.323"
-    ],
+    "SIP": { "hints": ["SIP", "Asterisk", "FreeSWITCH"], "ports": [5060, 5061], "label": "SIP", "probe": "OPTIONS sip:{host_hdr} SIP/2.0\r\n\r\n" },
+    "H.323": {
+        "hints": ["H.323"],
+        "ports": [1720],
+        "scheme": "http",
+        "label": "H.323",
+        "probe": "H.225 Q.931"
+    },
 
     // ----------- Time, Network Config, and Infrastructure -------
-    "NTP": [
-        "NTP"
-    ],
-    "DHCP": [
-        "DHCP"
-    ],
+    "NTP": { "hints": ["NTP"], "ports": [123], "label": "NTP", "probe": "NTP query (UDP)" },
+    "DHCP": { "hints": ["DHCP"], "ports": [67, 68], "label": "DHCP", "probe": "DHCP Discover (UDP)" },
 
     // ------------------ VPN / Tunneling / Security --------------
-    "OpenVPN": [
-        "OpenVPN"
-    ],
-    "IPSec": [
-        "IPSec", 
-        "IKE"
-    ],
-    "WireGuard": [
-        "WireGuard"
-    ],
+    "OpenVPN": {
+        "hints": ["OpenVPN"],
+        "ports": [1194],
+        "scheme": "udp",
+        "label": "OpenVPN",
+        "probe": "OpenVPN hard reset (UDP)"
+    },
+    "IPSec": {
+        "hints": ["IPSec", "IKE"],
+        "ports": [500, 4500],
+        "scheme": "ipsec",
+        "label": "IPSec",
+        "probe": "IKE_SA_INIT (UDP)"
+    },
+    "WireGuard": {
+        "hints": ["WireGuard"],
+        "ports": [51820],
+        "scheme": "wireguard",
+        "label": "WireGuard",
+        "probe": "Initiation (UDP)"
+    },
 
     // ---------------------- Other Protocols ----------------------
-    "SNMP": [
-        "SNMP"
-    ],
-    "SNMP Trap": [
-        "Trap", 
-        "SNMPTRAP"
-    ],
-    "Syslog": [
-        "Syslog"
-    ],
+    "SNMP": { "hints": ["SNMP"], "ports": [161], "label": "SNMP", "probe": "SNMP GET (UDP)" },
+    "SNMP Trap": {
+        "hints": ["Trap", "SNMPTRAP"],
+        "ports": [162],
+        "label": "SNMP Trap",
+        "probe": "(UDP)"
+    },
+    "Syslog": {
+        "hints": ["Syslog"],
+        "ports": [514],
+        "scheme": "udp",
+        "label": "Syslog",
+        "probe": "(UDP)"
+    },
 
     // -------------------- Cloud Services / APIs -----------------
-    "AWS S3": [
-        "AmazonS3", 
-        "S3"
-    ],
-    "AWS RDS": [
-        "AWS RDS", 
-        "amazon-rds"
-    ],
-    "Azure DevOps": [
-        "Azure DevOps", 
-        "VSTS"
-    ],
-    "GCP Services": [
-        "GCP", 
-        "googleapis.com"
-    ],
+    "AWS S3": {
+        "hints": ["AmazonS3", "S3"],
+        "ports": [443],
+        "scheme": "https",
+        "label": "AWS S3",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "AWS RDS": {
+        "hints": ["AWS RDS", "amazon-rds"],
+        "ports": [3306, 5432],
+        "scheme": "mysql",
+        "label": "AWS RDS",
+        "probe": ""
+    },
+    "Azure DevOps": {
+        "hints": ["Azure DevOps", "VSTS"],
+        "ports": [443],
+        "scheme": "https",
+        "label": "Azure DevOps",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "GCP Services": {
+        "hints": ["GCP", "googleapis.com"],
+        "ports": [443],
+        "scheme": "https",
+        "label": "GCP Services",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // -------------------- Repo / Code Hosting --------------------
-    "Git": [
-        "git-daemon"
-    ],
-    "SVN": [
-        "SVN", 
-        "Subversion"
-    ],
+    "Git": {
+        "hints": ["git-daemon"],
+        "ports": [9418],
+        "scheme": "git",
+        "label": "Git",
+        "probe": ""
+    },
+    "SVN": {
+        "hints": ["SVN", "Subversion"],
+        "ports": [3690],
+        "scheme": "svn",
+        "label": "SVN",
+        "probe": "SVN handshake"
+    },
 
     // -------------- HPC / Cluster Management / HPC --------------
-    "Slurm": [
-        "Slurm"
-    ],
+    "Slurm": {
+        "hints": ["Slurm"],
+        "ports": [6817, 6818],
+        "scheme": "http",
+        "label": "Slurm",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // --------------------- Misc / Exotic ------------------------
-    "Tor": [
-        "Tor", 
-        "obfs"
-    ],
-    "ZeroTier": [
-        "ZeroTier"
-    ],
-    "Mumble": [
-        "Mumble", 
-        "Murmur"
-    ],
-    "Spice": [
-        "SPICE protocol"
-    ],
-    "FusionDirectory": [
-        "FusionDirectory"
-    ],
-    "Jenkins": [
-        "Jenkins"
-    ],
-    "GitLab": [
-        "GitLab"
-    ],
-    "GitHub": [
-        "GitHub", 
-        "github.com"
-    ],
-    "Bitbucket": [
-        "Bitbucket"
-    ],
+    "Tor": {
+        "hints": ["Tor", "obfs"],
+        "ports": [9050, 9150],
+        "scheme": "http",
+        "label": "Tor",
+        "probe": "SOCKS5 greeting"
+    },
+    "ZeroTier": {
+        "hints": ["ZeroTier"],
+        "ports": [9993, 9994],
+        "scheme": "http",
+        "label": "ZeroTier",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Mumble": {
+        "hints": ["Mumble", "Murmur"],
+        "ports": [64738],
+        "scheme": "http",
+        "label": "Mumble",
+        "probe": "TLS ClientHello"
+    },
+    "Spice": {
+        "hints": ["SPICE protocol"],
+        "ports": [5900],
+        "scheme": "http",
+        "label": "Spice",
+        "probe": ""
+    },
+    "FusionDirectory": {
+        "hints": ["FusionDirectory"],
+        "ports": [80, 443],
+        "scheme": "http",
+        "label": "FusionDirectory",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Jenkins": {
+        "hints": ["Jenkins"],
+        "ports": [8080, 443],
+        "scheme": "http",
+        "label": "Jenkins",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "GitLab": {
+        "hints": ["GitLab"],
+        "ports": [80, 443],
+        "scheme": "http",
+        "label": "GitLab",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "GitHub": {
+        "hints": ["GitHub", "github.com"],
+        "ports": [443],
+        "scheme": "https",
+        "label": "GitHub",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Bitbucket": {
+        "hints": ["Bitbucket"],
+        "ports": [443],
+        "scheme": "https",
+        "label": "Bitbucket",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // ------------------ Legacy or Older Protocols ---------------
-    "Gopher": [
-        "Gopher"
-    ],
-    "Finger": [
-        "Finger"
-    ],
-    "Ident": [
-        "Ident"
-    ],
-    "Rlogin": [
-        "rlogin"
-    ],
-    "Rsync": [
-        "rsync"
-    ],
-    "UUCP": [
-        "UUCP"
-    ],
-    "AFS": [
-        "AFS", 
-        "OpenAFS"
-    ],
-    "NIS": [
-        "NIS", 
-        "YPServ"
-    ],
-    "Telnet SSL": [
-        "telnet-ssl"
-    ],
+    "Gopher": {
+        "hints": ["Gopher"],
+        "ports": [70],
+        "scheme": "gopher",
+        "label": "Gopher",
+        "probe": "\r\n"
+    },
+    "Finger": {
+        "hints": ["Finger"],
+        "ports": [79],
+        "scheme": "finger",
+        "label": "Finger",
+        "probe": "\r\n"
+    },
+    "Ident": {
+        "hints": ["Ident"],
+        "ports": [113],
+        "scheme": "ident",
+        "label": "Ident",
+        "probe": "0,0\r\n"
+    },
+    "Rlogin": {
+        "hints": ["rlogin"],
+        "ports": [513],
+        "scheme": "rlogin",
+        "label": "Rlogin",
+        "probe": ""
+    },
+    "Rsync": {
+        "hints": ["rsync"],
+        "ports": [873],
+        "scheme": "rsync",
+        "label": "Rsync",
+        "probe": "@RSYNCD: 31.0\n"
+    },
+    "UUCP": {
+        "hints": ["UUCP"],
+        "ports": [540],
+        "scheme": "uucp",
+        "label": "UUCP",
+        "probe": ""
+    },
+    "AFS": {
+        "hints": ["AFS", "OpenAFS"],
+        "ports": [7000, 7001],
+        "scheme": "http",
+        "label": "AFS",
+        "probe": ""
+    },
+    "NIS": {
+        "hints": ["NIS", "YPServ"],
+        "ports": [111],
+        "scheme": "rpc",
+        "label": "NIS",
+        "probe": "RPC Portmap"
+    },
+    "Telnet SSL": {
+        "hints": ["telnet-ssl"],
+        "ports": [992],
+        "scheme": "ssl",
+        "label": "Telnet SSL",
+        "probe": "TLS ClientHello"
+    },
 
     // ----------------- Big Data / Hadoop Ecosystem --------------
-    "Hadoop": [
-        "Hadoop",
-        "MapReduce",
-        "YARN"
-    ],
-    "HDFS": [
-        "HDFS"
-    ],
-    "Hive": [
-        "Hive",
-        "HiveServer2"
-    ],
-    "HBase": [
-        "HBase",
-        "HMaster"
-    ],
-    "Zookeeper": [
-        "Zookeeper",
-        "ZooKeeper"
-    ],
-    "Spark": [
-        "Spark"
-    ],
+    "Hadoop": {
+        "hints": ["Hadoop", "MapReduce", "YARN"],
+        "ports": [50070, 8088],
+        "scheme": "http",
+        "label": "Hadoop",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "HDFS": {
+        "hints": ["HDFS"],
+        "ports": [50070],
+        "scheme": "http",
+        "label": "HDFS",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Hive": {
+        "hints": ["Hive", "HiveServer2"],
+        "ports": [10000, 10001],
+        "scheme": "http",
+        "label": "Hive",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "HBase": {
+        "hints": ["HBase", "HMaster"],
+        "ports": [16010, 16020],
+        "scheme": "http",
+        "label": "HBase",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Zookeeper": {
+        "hints": ["Zookeeper", "ZooKeeper"],
+        "ports": [2181, 2888, 3888],
+        "scheme": "http",
+        "label": "Zookeeper",
+        "probe": "ruok\n"
+    },
+    "Spark": {
+        "hints": ["Spark"],
+        "ports": [7077, 8080],
+        "scheme": "http",
+        "label": "Spark",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // ------------ Web Frameworks / Application Servers ----------
-    "Tomcat": [
-        "Apache Tomcat",
-        "Apache-Coyote"
-    ],
-    "JBoss": [
-        "JBoss",
-        "JBoss EAP"
-    ],
-    "GlassFish": [
-        "GlassFish"
-    ],
-    "WebLogic": [
-        "WebLogic"
-    ],
-    "WebSphere": [
-        "WebSphere"
-    ],
-    "Jetty": [
-        "Jetty"
-    ],
+    "Tomcat": {
+        "hints": ["Apache Tomcat", "Apache-Coyote"],
+        "ports": [8080, 8009],
+        "scheme": "http",
+        "label": "Tomcat",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "JBoss": {
+        "hints": ["JBoss", "JBoss EAP"],
+        "ports": [8080, 9990],
+        "scheme": "http",
+        "label": "JBoss",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "GlassFish": {
+        "hints": ["GlassFish"],
+        "ports": [8080, 4848],
+        "scheme": "http",
+        "label": "GlassFish",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "WebLogic": {
+        "hints": ["WebLogic"],
+        "ports": [7001, 7002],
+        "scheme": "http",
+        "label": "WebLogic",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "WebSphere": {
+        "hints": ["WebSphere"],
+        "ports": [9080, 9443],
+        "scheme": "http",
+        "label": "WebSphere",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Jetty": {
+        "hints": ["Jetty"],
+        "ports": [8080],
+        "scheme": "http",
+        "label": "Jetty",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
     // Gunicorn and uWSGI also appear under HTTP if they surface in the banner.
 
     // ------- Additional Container / Orchestration Tools ---------
-    "Docker Swarm": [
-        "Swarm"
-    ],
+    "Docker Swarm": {
+        "hints": ["Swarm"],
+        "ports": [2377],
+        "scheme": "http",
+        "label": "Docker Swarm",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // ---------- Reverse Proxies / Load Balancers / Gateways -----
-    "HAProxy": [
-        "HAProxy"
-    ],
-    "Traefik": [
-        "Traefik"
-    ],
-    "Envoy": [
-        "Envoy"
-    ],
+    "HAProxy": {
+        "hints": ["HAProxy"],
+        "ports": [80, 443, 8404],
+        "scheme": "http",
+        "label": "HAProxy",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Traefik": {
+        "hints": ["Traefik"],
+        "ports": [80, 443],
+        "scheme": "http",
+        "label": "Traefik",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Envoy": {
+        "hints": ["Envoy"],
+        "ports": [80, 443],
+        "scheme": "http",
+        "label": "Envoy",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // ------------------ CI/CD and DevOps Tools ------------------
-    "Bamboo": [
-        "Bamboo"
-    ],
-    "TeamCity": [
-        "TeamCity"
-    ],
-    "Drone CI": [
-        "Drone"
-    ],
+    "Bamboo": {
+        "hints": ["Bamboo"],
+        "ports": [8085],
+        "scheme": "http",
+        "label": "Bamboo",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "TeamCity": {
+        "hints": ["TeamCity"],
+        "ports": [8111],
+        "scheme": "http",
+        "label": "TeamCity",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
+    "Drone CI": {
+        "hints": ["Drone"],
+        "ports": [8080],
+        "scheme": "http",
+        "label": "Drone CI",
+        "probe": "HEAD / HTTP/1.0\r\nHost: {host_hdr}\r\n\r\n"
+    },
 
     // ------------------- Just for completeness ------------------
-    "COBOL-based service": [
-        "Mainframe", 
-        "AS/400",
-        // Banner might mention "Enterprise COBOL" or "z/OS"
-        "z/OS"
-    ]
+    "COBOL-based service": {
+        "hints": ["Mainframe", "AS/400", "Enterprise COBOL", "z/OS"],
+        "ports": [32768],
+        "scheme": "http",
+        "label": "COBOL-based service",
+        "probe": ""
+    },
+
+    // -------------------- Game / Misc on 27015 ------------------
+    "Source": { "hints": ["Source"], "ports": [27015], "scheme": "source", "label": "Source", "probe": "(UDP)" },
+    "Minecraft": { "hints": ["Minecraft"], "ports": [27015], "scheme": "minecraft", "label": "Minecraft", "probe": "(UDP)" },
+    "Teamspeak": { "hints": ["Teamspeak"], "ports": [27015], "scheme": "teamspeak", "label": "Teamspeak", "probe": "(UDP)" },
+    "Garry's Mod": { "hints": ["Garry's Mod"], "ports": [27015], "scheme": "gmod", "label": "Garry's Mod", "probe": "(UDP)" },
+    "Rust": { "hints": ["Rust"], "ports": [27015], "scheme": "rust", "label": "Rust", "probe": "(UDP)" },
+    "ARK": { "hints": ["ARK"], "ports": [27015], "scheme": "ark", "label": "ARK", "probe": "(UDP)" },
+    "Terraria": { "hints": ["Terraria"], "ports": [27015], "scheme": "terraria", "label": "Terraria", "probe": "(UDP)" },
+    "Factorio": { "hints": ["Factorio"], "ports": [27015], "scheme": "factorio", "label": "Factorio", "probe": "(UDP)" },
+    "StarMade": { "hints": ["StarMade"], "ports": [27015], "scheme": "starmade", "label": "StarMade", "probe": "(UDP)" },
+    "7 Days to Die": { "hints": ["7 Days to Die"], "ports": [27015], "scheme": "7dtd", "label": "7 Days to Die", "probe": "(UDP)" },
+
+    // -------------------- Printers (special-case) ---------------
+    "Printer": { "hints": ["Printer", "JetDirect", "RAW printing"], "ports": [9100, 631], "label": "Printer", "probe": "none" }
 }

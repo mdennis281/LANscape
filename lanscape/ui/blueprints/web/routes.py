@@ -2,7 +2,7 @@
 Web blueprint routes for the LANscape application.
 Handles UI views including the main dashboard, scan results, error display, and exports.
 """
-from flask import render_template, request, redirect
+from flask import render_template, request, redirect, url_for
 from lanscape.ui.blueprints.web import web_bp
 from lanscape.libraries.net_tools import (
     get_all_network_subnets,
@@ -77,6 +77,33 @@ def view_errors(scan_id):
     if scanner := scan_manager.get_scan(scan_id):
         data = scanner.results.export()
         return render_template('scan/scan-error.html', data=data)
+    log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
+    return redirect('/')
+
+
+@web_bp.route('/device/<scan_id>/<device_ip>')
+def view_device(scan_id, device_ip):
+    """
+    Display detailed information about a specific device from a scan.
+
+    Args:
+        scan_id: Unique identifier for the scan
+        device_ip: IP address of the device to view
+
+    Returns:
+        Rendered device detail template or redirect to home if scan not found
+    """
+    if scanner := scan_manager.get_scan(scan_id):
+        devices = scanner.results.devices
+        device_info = next(
+            (device for device in devices if getattr(
+                device, 'ip', None) == device_ip), None)
+
+        if device_info:
+            return render_template('scan/device-detail.html', device=device_info, scan_id=scan_id)
+
+        log.debug(f'Device {device_ip} not found in scan {scan_id}')
+        return redirect(url_for('render_scan', scan_id=scan_id))
     log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
     return redirect('/')
 

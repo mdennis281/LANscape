@@ -154,6 +154,87 @@ class PokeConfig(BaseModel):
         return self.model_dump()
 
 
+class ServiceScanStrategy(Enum):
+    """
+    Enumeration of strategies for service scanning on open ports.
+
+    LAZY: Several common probes to see if we can identify the service.
+    BASIC: Common probes plus probes correlated to the port number.
+    AGGRESSIVE: All known probes in parallel to try to elicit a response.
+    """
+    LAZY = 'LAZY'
+    BASIC = 'BASIC'
+    AGGRESSIVE = 'AGGRESSIVE'
+
+
+class ServiceScanConfig(BaseModel):
+    """
+    Configuration for service scanning on open ports.
+    """
+    timeout: float = 5.0
+    lookup_type: ServiceScanStrategy = ServiceScanStrategy.BASIC
+    max_concurrent_probes: int = 10
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'ServiceScanConfig':
+        """
+        Create a ServiceScanConfig instance from a dictionary.
+
+        Args:
+            data: Dictionary containing ServiceScanConfig parameters
+
+        Returns:
+            A new ServiceScanConfig instance with the provided settings
+        """
+        return cls.model_validate(data)
+
+    def to_dict(self) -> dict:
+        """
+        Convert the ServiceScanConfig instance to a dictionary.
+
+        Returns:
+            Dictionary representation of the ServiceScanConfig
+        """
+        return self.model_dump()
+
+    def __str__(self):
+        return f'ServiceScanCfg(timeout={self.timeout})'
+
+
+class PortScanConfig(BaseModel):
+    """
+    Configuration for port scanning.
+    """
+    timeout: float = 1.0
+    retries: int = 0
+    retry_delay: float = 0.1
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'PortScanConfig':
+        """
+        Create a PortScanConfig instance from a dictionary.
+
+        Args:
+            data: Dictionary containing PortScanConfig parameters
+
+        Returns:
+            A new PortScanConfig instance with the provided settings
+        """
+        return cls.model_validate(data)
+
+    def to_dict(self) -> dict:
+        """
+        Convert the PortScanConfig instance to a dictionary.
+
+        Returns:
+            Dictionary representation of the PortScanConfig
+        """
+        return self.model_dump()
+
+    def __str__(self):
+        return f'PortScanCfg(timeout={self.timeout}, retry_delay={self.retry_delay})'
+
+
 class ScanType(Enum):
     """
     Enumeration of supported network scan types.
@@ -184,7 +265,7 @@ class ScanConfig(BaseModel):
 
     task_scan_ports: bool = True
     # below wont run if above false
-    task_scan_port_services: bool = False  # disabling until more stable
+    task_scan_port_services: bool = True
 
     lookup_type: List[ScanType] = [ScanType.ICMP_THEN_ARP]
 
@@ -192,6 +273,8 @@ class ScanConfig(BaseModel):
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
+    port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
+    service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
 
     def t_cnt(self, thread_id: str) -> int:
         """
@@ -259,7 +342,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_port_test=64,
         t_cnt_isalive=64,
         task_scan_ports=True,
-        task_scan_port_services=False,
+        task_scan_port_services=True,
         lookup_type=[ScanType.ICMP_THEN_ARP, ScanType.ARP_LOOKUP],
         arp_config=ArpConfig(
             attempts=3,
@@ -274,6 +357,16 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         arp_cache_config=ArpCacheConfig(
             attempts=2,
             wait_before=0.3
+        ),
+        port_scan_config=PortScanConfig(
+            timeout=2.5,
+            retries=1,
+            retry_delay=0.2
+        ),
+        service_scan_config=ServiceScanConfig(
+            timeout=8.0,
+            lookup_type=ServiceScanStrategy.AGGRESSIVE,
+            max_concurrent_probes=5
         )
     ),
     'fast': ScanConfig(
@@ -283,7 +376,7 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         t_cnt_port_test=256,
         t_cnt_isalive=512,
         task_scan_ports=True,
-        task_scan_port_services=False,
+        task_scan_port_services=True,
         lookup_type=[ScanType.POKE_THEN_ARP],
         arp_config=ArpConfig(
             attempts=1,
@@ -294,6 +387,11 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
             ping_count=1,
             timeout=0.5,
             retry_delay=0.25
+        ),
+        service_scan_config=ServiceScanConfig(
+            timeout=2.0,
+            lookup_type=ServiceScanStrategy.LAZY,
+            max_concurrent_probes=15
         )
     )
 }

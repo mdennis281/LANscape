@@ -10,7 +10,7 @@ from unittest.mock import patch
 from lanscape.ui.app import app
 from lanscape.libraries.net_tools import get_network_subnet
 
-from ._helpers import right_size_subnet
+from tests._helpers import right_size_subnet
 
 
 class ApiTestCase(unittest.TestCase):

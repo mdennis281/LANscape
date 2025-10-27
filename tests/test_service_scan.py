@@ -211,6 +211,7 @@ def test_multi_probe_generic_no_response():
 
     asyncio.run(run_test())
 
+
 @pytest.mark.integration
 def test_service_scan_integration():
     """Integration test for full service scanning workflow."""

@@ -10,7 +10,6 @@ This module provides utilities for parsing various IP address formats including:
 It also includes validation to prevent processing excessively large IP ranges.
 """
 import ipaddress
-import re
 
 from lanscape.core.errors import SubnetTooLargeError
 
@@ -50,13 +49,9 @@ def parse_ip_input(ip_input):
             for ip in net.hosts():
                 ip_ranges.append(ip)
 
-        # Handle IP range (e.g., 10.0.0.15-10.0.0.25)
+        # Handle IP range (e.g., 10.0.0.15-10.0.0.25) and (e.g., 10.0.9.1-253)
         elif '-' in entry:
             ip_ranges += parse_ip_range(entry)
-
-        # Handle shorthand IP range (e.g., 10.0.9.1-253)
-        elif re.search(r'\d+\-\d+', entry):
-            ip_ranges += parse_shorthand_ip_range(entry)
 
         # If no CIDR or range, assume a single IP
         else:
@@ -104,25 +99,6 @@ def parse_ip_range(entry):
 
     end_ip = ipaddress.IPv4Address(end_ip.strip())
     return list(ip_range_to_list(start_ip, end_ip))
-
-
-def parse_shorthand_ip_range(entry):
-    """
-    Parse a shorthand IP range (e.g., 192.168.1.1-10).
-
-    In this format, only the last octet of the end IP is specified.
-
-    Args:
-        entry (str): String containing a shorthand IP range
-
-    Returns:
-        list: List of IPv4Address objects in the range (inclusive)
-    """
-    start_ip, end_part = entry.split('-')
-    start_ip = ipaddress.IPv4Address(start_ip.strip())
-    end_ip = start_ip.exploded.rsplit('.', 1)[0] + '.' + end_part.strip()
-
-    return list(ip_range_to_list(start_ip, ipaddress.IPv4Address(end_ip)))
 
 
 def ip_range_to_list(start_ip, end_ip):

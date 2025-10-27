@@ -33,7 +33,6 @@ def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
                 changed_files_result = subprocess.run(changed_files_cmd, capture_output=True, text=True, check=True)
                 changed_files = [f.strip() for f in changed_files_result.stdout.strip().split('\n') if f.strip()]
                 
-                total_diff_size = 0
                 
                 for file_path in changed_files:
                     # Get diff for this specific file

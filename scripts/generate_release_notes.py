@@ -15,15 +15,18 @@ MAX_GIT_LOG_LENGTH = 80000  # Limit input to leave room for AI output
 MAX_FILE_DIFF_SIZE = 5000  # Limit per-file diff size
 
 
-def _truncate_text(text: str, max_length: int, suffix: str = "\n\n... (truncated for brevity)") -> str:
+def _truncate_text(
+        text: str,
+        max_length: int,
+        suffix: str = "\n\n... (truncated for brevity)") -> str:
     """Truncate text to max_length, preserving complete lines when possible."""
     if len(text) <= max_length:
         return text
-    
+
     # Try to truncate at a line boundary
     truncate_point = max_length - len(suffix)
     last_newline = text.rfind('\n', 0, truncate_point)
-    
+
     if last_newline > max_length * 0.8:  # If we can preserve at least 80% of content
         return text[:last_newline] + suffix
     else:
@@ -74,9 +77,10 @@ def _get_file_diffs(from_tag: str, to_tag: str) -> str:
     for file_path in changed_files:
         # Stop if we're approaching size limits
         if total_diff_size > MAX_FILE_DIFF_SIZE * 10:  # Total limit for all diffs
-            output += f"\n\n... (remaining {len(changed_files) - changed_files.index(file_path)} files truncated)"
+            output += f"\n\n... (remaining {len(changed_files) -
+                                            changed_files.index(file_path)} files truncated)"
             break
-            
+
         # Get diff for this specific file
         diff_cmd = [
             "git", "diff", "--unified=3", "--no-color",
@@ -90,9 +94,9 @@ def _get_file_diffs(from_tag: str, to_tag: str) -> str:
             if file_diff:
                 # Truncate individual file diffs
                 if len(file_diff) > MAX_FILE_DIFF_SIZE:
-                    file_diff = _truncate_text(file_diff, MAX_FILE_DIFF_SIZE, 
-                                             "\n... (diff truncated)")
-                
+                    file_diff = _truncate_text(file_diff, MAX_FILE_DIFF_SIZE,
+                                               "\n... (diff truncated)")
+
                 output += f"\n\n### {file_path}\n\n```diff\n{file_diff}\n```"
                 total_diff_size += len(file_diff)
 
@@ -183,6 +187,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
     2. Look for patterns across commits to identify larger themes
     3. Distinguish between user-facing changes and internal improvements
     4. Identify the scope of impact (core functionality, UI, performance, etc.)
+    5. Consolidate related changes into coherent sections
 
     Pay special attention to:
     - New classes, functions, or modules being added
@@ -339,21 +344,25 @@ For more details and troubleshooting, see the [README](https://github.com/mdenni
 
     # Print the complete release notes with final length check
     final_output = description + installation_instructions
-    
+
     if len(final_output) > MAX_RELEASE_BODY_LENGTH:
-        print(f"⚠️ Release notes too long ({len(final_output)} chars), truncating...", file=sys.stderr)
+        print(
+            f"⚠️ Release notes too long ({
+                len(final_output)} chars), truncating...",
+            file=sys.stderr)
         # Prioritize the AI-generated description over installation instructions
-        max_desc_length = MAX_RELEASE_BODY_LENGTH - len(installation_instructions) - 100  # Safety margin
+        max_desc_length = MAX_RELEASE_BODY_LENGTH - \
+            len(installation_instructions) - 100  # Safety margin
         if max_desc_length > 0:
-            description = _truncate_text(description, max_desc_length, 
-                                       "\n\n... (content truncated due to length limits)")
+            description = _truncate_text(description, max_desc_length,
+                                         "\n\n... (content truncated due to length limits)")
             final_output = description + installation_instructions
         else:
             # If even that's too long, truncate everything
             final_output = _truncate_text(final_output, MAX_RELEASE_BODY_LENGTH)
-        
+
         print(f"✓ Truncated to {len(final_output)} characters", file=sys.stderr)
-    
+
     print(final_output)
 
 

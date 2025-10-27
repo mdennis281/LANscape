@@ -142,9 +142,7 @@ def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
                         # Truncate diffs to fit
                         remaining_space = MAX_GIT_LOG_LENGTH - len(git_output)
                         diffs = _truncate_text(diffs, remaining_space)
-                    git_output += diffs
-                else:
-                    git_output = combined
+                git_output += diffs
             else:
                 first_release_info = _get_first_release_files(to_tag)
                 combined = git_output + first_release_info

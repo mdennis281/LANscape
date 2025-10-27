@@ -45,6 +45,8 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
     - Installation/upgrade notes if relevant
     
     Keep it professional and user-focused. Don't mention internal commits like "fix typos" or "update dependencies" unless they're significant.
+    
+    Ensure you make full use of markdown formatting for readability.
     """
     
     try:
@@ -64,7 +66,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
         print(f"Error generating description with OpenAI: {e}", file=sys.stderr)
         # Return fallback description
         return f"""
-## Release v{version}
+## Release v{version.split('/')[-1]}
 
 This release includes the following changes:
 

@@ -1,25 +1,4 @@
 """Service scanning module for identifying services running on network ports.
-
-Includes a probe/response debugger that records all successful banner/service
-responses to JSON for later analysis. Debug files live under ``debug/<ip>.json``
-with schema:
-
-{
-    "<port>": [
-         {"probe": "<probe>", "response": "<response>"},
-         ...
-    ],
-    ...
-}
-
-Design goals / edge cases handled:
-    * Concurrent async probes writing to same file -> guarded with per-IP locks.
-    * Partial/corrupt JSON (e.g. interrupted write) -> auto back up and recreate.
-    * Atomic writes (write temp then replace) to avoid torn files.
-    * Large responses truncated to a sane length (default 4KB) to keep files small.
-    * Deduplicate identical probe/response pairs per port.
-    * IPv6 address safe file names (':' replaced by '_').
-    * Graceful fallback if disk errors occur (logs at debug level, never raises).
 """
 
 from typing import Optional, Union

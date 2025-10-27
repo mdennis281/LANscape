@@ -65,12 +65,12 @@ def _get_file_diffs(from_tag: str, to_tag: str) -> str:
 
     changed_files = [f.strip()
                      for f in result.stdout.strip().split('\n') if f.strip()]
-
+    original_count = len(changed_files)
     # Limit number of files to prevent excessive output
     max_files = 15
-    if len(changed_files) > max_files:
+    if original_count > max_files:
         changed_files = changed_files[:max_files]
-        output += f"\n⚠️ Showing first {max_files} of {len(changed_files)} changed files\n"
+        output += f"\n⚠️ Showing first {max_files} of {original_count} changed files\n"
 
     total_diff_size = 0
     for file_path in changed_files:

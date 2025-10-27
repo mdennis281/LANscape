@@ -51,15 +51,15 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "python.exe -m pytest tests/*.py -v": {
+        "python.exe -m pytest tests/": {
             "approve": true,
             "matchCommandLine": false
         },
-        "python -m pytest tests/*.py -v": {
+        "python -m pytest tests/": {
             "approve": true,
             "matchCommandLine": false
         },
-        "pytest tests/*.py -v": {
+        "pytest tests/": {
             "approve": true,
             "matchCommandLine": false
         },

@@ -4,8 +4,8 @@ Tests the service_scan module including async probing, service identification,
 and configuration handling.
 """
 
-import unittest
 import asyncio
+import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from lanscape.libraries.service_scan import (
@@ -141,11 +141,10 @@ class ServiceScanTestCase(unittest.TestCase):
                 # Create simplified mocks
                 mock_reader = AsyncMock()
                 mock_reader.read.return_value = b"HTTP/1.1 200 OK\r\n"
-                
+
                 mock_writer = MagicMock()
                 mock_writer.drain = AsyncMock()
                 mock_writer.wait_closed = AsyncMock()
-                
                 mock_open_connection.return_value = (mock_reader, mock_writer)
 
                 result = await _try_probe("127.0.0.1", 80, "GET / HTTP/1.0\r\n\r\n")
@@ -171,7 +170,7 @@ class ServiceScanTestCase(unittest.TestCase):
             with patch('asyncio.open_connection') as mock_open_connection:
                 mock_open_connection.side_effect = asyncio.TimeoutError()
 
-                result = await _try_probe("127.0.0.1", 80, connect_timeout=0.1)
+                result = await _try_probe("127.0.0.1", 80, timeout=0.1)
                 self.assertIsNone(result)
 
         asyncio.run(run_test())
@@ -193,7 +192,7 @@ class ServiceScanTestCase(unittest.TestCase):
         asyncio_logger_suppression()
 
         # Verify that asyncio logger level was changed
-        import logging
+        import logging  # pylint: disable=import-outside-toplevel
         asyncio_logger = logging.getLogger("asyncio")
         self.assertGreaterEqual(asyncio_logger.level, logging.WARNING)
 
@@ -214,7 +213,7 @@ class ServiceScanTestCase(unittest.TestCase):
             )
 
             # Test on a high port that should be closed
-            result = scan_service("127.0.0.1", 54327 + strategy.value.__hash__() % 1000, config)
+            result = scan_service("127.0.0.1", 54327 + hash(strategy.value) % 1000, config)
             self.assertIsInstance(result, str)
             self.assertTrue(len(result) > 0)  # Should return something (likely "Unknown")
 

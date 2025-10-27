@@ -5,7 +5,6 @@ Resource and environment management utilities for Lanscape.
 
 from pathlib import Path
 import json
-import re
 
 
 class ResourceManager:

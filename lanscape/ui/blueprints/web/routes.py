@@ -101,9 +101,9 @@ def view_device(scan_id, device_ip):
 
         if device_info:
             return render_template('scan/device-detail.html', device=device_info, scan_id=scan_id)
-        else:
-            log.debug(f'Device {device_ip} not found in scan {scan_id}')
-            return redirect(f'/scan/{scan_id}')
+        
+        log.debug(f'Device {device_ip} not found in scan {scan_id}')
+        return redirect(f'/scan/{scan_id}')
     log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
     return redirect('/')
 

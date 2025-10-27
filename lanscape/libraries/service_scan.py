@@ -43,8 +43,7 @@ async def _try_probe(
     port: int,
     payload: Optional[Union[str, bytes]] = None,
     *,
-    connect_timeout: float = 5.0,
-    rw_timeout: float = 2.0,
+    timeout: float = 5.0,
     read_len: int = 1024,
 ) -> Optional[str]:
     """
@@ -52,7 +51,9 @@ async def _try_probe(
     Returns the decoded response string or None.
     """
     try:
-        reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout=connect_timeout)
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(ip, port), timeout=timeout
+        )
         try:
             if payload is not None:
                 data = payload if isinstance(
@@ -61,7 +62,7 @@ async def _try_probe(
                 writer.write(data)
                 await writer.drain()
             try:
-                response = await asyncio.wait_for(reader.read(read_len), timeout=rw_timeout)
+                response = await asyncio.wait_for(reader.read(read_len), timeout=timeout / 2)
             except asyncio.TimeoutError:
                 response = b""
             resp_str = response.decode("utf-8", errors="ignore") if response else ""
@@ -93,26 +94,20 @@ async def _multi_probe_generic(
     """
     Run a small set of generic probes in parallel and return the first non-empty response.
     """
-    # Spread the overall timeout across connect/read operations
-    # Keep per-probe rw timeout modest to avoid long hangs.
-    connect_timeout = min(3.0, max(0.2, cfg.timeout / 3))
-    rw_timeout = min(2.0, max(0.2, cfg.timeout / 2))
-
     probes = get_port_probes(port, cfg.lookup_type)
 
     semaphore = asyncio.Semaphore(cfg.max_concurrent_probes)
 
-    async def limited_probe(ip, port, payload, connect_timeout, rw_timeout):
+    async def limited_probe(ip, port, payload, timeout_val):
         async with semaphore:
             return await _try_probe(
                 ip, port, payload,
-                connect_timeout=connect_timeout,
-                rw_timeout=rw_timeout
+                timeout=timeout_val
             )
 
     tasks = [
         asyncio.create_task(
-            limited_probe(ip, port, p, connect_timeout, rw_timeout)
+            limited_probe(ip, port, p, cfg.timeout)
         )
         for p in probes
     ]
@@ -159,20 +154,23 @@ def get_port_probes(port: int, strategy: ServiceScanStrategy):
 
     if strategy == ServiceScanStrategy.LAZY:
         return probes
-    elif strategy == ServiceScanStrategy.BASIC:
+    
+    if strategy == ServiceScanStrategy.BASIC:
         for _, detail in SERVICES.items():
             if port in detail.get("ports", []):
                 if probe := detail.get("probe", ''):
                     probes.append(probe)
                     probes.append(probe.encode("utf-8"))
-    elif strategy == ServiceScanStrategy.AGGRESSIVE:
+        return probes
+    
+    if strategy == ServiceScanStrategy.AGGRESSIVE:
         for _, detail in SERVICES.items():
             if probe := detail.get("probe", ''):
                 probes.append(probe)
                 probes.append(probe.encode("utf-8"))
-    else:
-        return [None]  # Default to banner grab only
-    return probes
+        return probes
+    
+    return [None]  # Default to banner grab only
 
 
 def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:

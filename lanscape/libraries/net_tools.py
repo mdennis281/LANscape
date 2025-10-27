@@ -1,16 +1,17 @@
 """Network tools for scanning and managing devices on a network."""
 
-import logging
 import ipaddress
-import traceback
-import subprocess
-from typing import List, Dict, Optional
+import logging
+import re
 import socket
 import struct
-import re
-import psutil
+import subprocess
+import traceback
 from time import sleep
+from typing import List, Dict, Optional
 
+import psutil
+from pydantic import BaseModel, PrivateAttr
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
 from scapy.error import Scapy_Exception
@@ -20,8 +21,8 @@ from lanscape.libraries.mac_lookup import MacLookup, get_macs
 from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
 from lanscape.libraries.errors import DeviceError
 from lanscape.libraries.decorators import job_tracker, run_once, timeout_enforcer
-from pydantic import BaseModel, PrivateAttr
 from lanscape.libraries.scan_config import ServiceScanConfig, PortScanConfig
+
 try:
     from pydantic import ConfigDict, computed_field, model_serializer  # pydantic v2
     _PYD_V2 = True
@@ -56,11 +57,13 @@ class Device(BaseModel):
         model_config = ConfigDict(arbitrary_types_allowed=True)  # type: ignore[assignment]
     else:  # pragma: no cover
         class Config:
+            """Pydantic v1 configuration."""
             arbitrary_types_allowed = True
             extra = 'allow'
 
     @property
     def log(self) -> logging.Logger:
+        """Get the logger instance for this device."""
         return self._log
 
     # Computed fields for pydantic v2 (included in model_dump)
@@ -68,10 +71,12 @@ class Device(BaseModel):
         @computed_field(return_type=str)  # type: ignore[misc]
         @property
         def mac_addr(self) -> str:
+            """Get the primary MAC address for this device."""
             return self.get_mac() or ""
 
         @model_serializer(mode='wrap')  # type: ignore[misc]
         def _serialize(self, serializer):
+            """Serialize device data for output."""
             data = serializer(self)
             # Remove internals
             data.pop('job_stats', None)
@@ -93,6 +98,7 @@ class Device(BaseModel):
     # Fallback for pydantic v1: use dict() and enrich output
     if not _PYD_V2:
         def dict(self, *args, **kwargs) -> dict:  # type: ignore[override]
+            """Generate dictionary representation for pydantic v1."""
             data = super().dict(*args, **kwargs)
             data.pop('job_stats', None)
             mac_addr = self.get_mac() or ''
@@ -103,6 +109,7 @@ class Device(BaseModel):
     else:
         # In v2, route dict() to model_dump() so callers get the serialized enrichment
         def dict(self, *args, **kwargs) -> dict:  # type: ignore[override]
+            """Generate dictionary representation for pydantic v2."""
             try:
                 return self.model_dump(*args, **kwargs)  # type: ignore[attr-defined]
             except Exception:

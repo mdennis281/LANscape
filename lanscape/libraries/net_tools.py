@@ -139,7 +139,8 @@ class Device(BaseModel):
                 try:
                     result = sock.connect_ex((self.ip, port))
                     if result == 0:
-                        self.ports.append(port)
+                        if port not in self.ports:
+                            self.ports.append(port)
                         return True
                 except Exception:
                     pass  # Connection failed, try again if retries remain

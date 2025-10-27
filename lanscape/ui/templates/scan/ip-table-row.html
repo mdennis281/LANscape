@@ -28,7 +28,7 @@
         {% elif device.stage == 'scanning' %}
             <span class="badge badge-info">
                 scanning 
-                {{ (device.ports_scanned/data.port_list_length*100)|round|int }}%
+                {{ (device.ports_scanned/data.port_list_length*100)|round|int if data.port_list_length > 0 else 0 }}%
             </span>
         {% else %}
             <span class="badge badge-warning">{{device.stage}}</span>

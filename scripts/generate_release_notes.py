@@ -29,8 +29,7 @@ def _truncate_text(
 
     if last_newline > max_length * 0.8:  # If we can preserve at least 80% of content
         return text[:last_newline] + suffix
-    else:
-        return text[:truncate_point] + suffix
+    return text[:truncate_point] + suffix
 
 
 def _get_commit_log(from_tag: Optional[str], to_tag: str) -> str:
@@ -251,7 +250,8 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
                                     "focus on user-facing changes. You have access to "
                                     "detailed code diffs - use them to provide accurate, "
                                     "technical insights. You are not trying to market the changes, "
-                                    "Just relay the facts. Do your best to keep the character count under 10k.")
+                                    "Just relay the facts. Do your best to keep the character "
+                                    "count under 10k.")
                     },
                     {"role": "user", "content": prompt}
                 ],

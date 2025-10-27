@@ -149,7 +149,7 @@ def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
                 if len(combined) > MAX_GIT_LOG_LENGTH:
                     git_output = _truncate_text(combined, MAX_GIT_LOG_LENGTH)
                 else:
-                    git_output = combined
+                    git_output += first_release_info
 
         except subprocess.CalledProcessError:
             # If diff fails, just continue with the log

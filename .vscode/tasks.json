@@ -2,6 +2,46 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Run Linter (Pylint)",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "pylint",
+                "--score=yes",
+                "scripts/",
+                "lanscape/",
+                "tests/"
+            ],
+            "problemMatcher": [],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
+        },
+        {
             "label": "Tag and Push Release",
             "type": "shell",
             "args": [
@@ -116,7 +156,7 @@
             }
         }
     ],
-    
+
     "inputs": [
         {
             "id": "releaseVersion",

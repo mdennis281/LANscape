@@ -347,8 +347,9 @@ For more details and troubleshooting, see the [README](https://github.com/mdenni
 
     if len(final_output) > MAX_RELEASE_BODY_LENGTH:
         print(
-            f"⚠️ Release notes too long ({
-                len(final_output)} chars), truncating...",
+            "⚠️ Release notes too long"
+            f"({len(final_output)} chars)",
+            ", truncating...",
             file=sys.stderr)
         # Prioritize the AI-generated description over installation instructions
         max_desc_length = MAX_RELEASE_BODY_LENGTH - \

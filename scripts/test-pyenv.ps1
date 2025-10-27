@@ -1,7 +1,7 @@
 # note, emojis only display on PS7
 
 # Define the Python versions you want to test
-$pythonVersions = @(8..13 | ForEach-Object { "3.$_" })
+$pythonVersions = @(10..14 | ForEach-Object { "3.$_" })
 
 # Define the project directory
 $projectDir = (Get-Location).Path

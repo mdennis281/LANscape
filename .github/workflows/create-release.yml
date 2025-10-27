@@ -1,10 +1,6 @@
 name: Create GitHub Release with AI Summary
 
 on:
-  push:
-    tags:
-      - 'releases/**'
-      - 'pre-releases/**'
   workflow_call:
     inputs:
       version:
@@ -31,21 +27,72 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Fetch full history for changelog generation
+          ref: ${{ inputs.tag_name }}  # Use the specific tag provided by caller
+
+      - name: Debug workflow context
+        run: |
+          echo "=== Workflow Debug Information ==="
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Ref name: ${{ github.ref_name }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Inputs version: ${{ inputs.version }}"
+          echo "Inputs tag_name: ${{ inputs.tag_name }}"
+          echo "Current HEAD: $(git rev-parse HEAD)"
+          echo "Current branch/tag: $(git describe --always --tags)"
+          echo "All tags:"
+          git tag -l | sort -V | tail -10
+          echo "=== End Debug ==="
+
+      - name: Ensure tag is available
+        run: |
+          # Make sure we have the latest tags and checkout the specific tag
+          echo "Waiting for tag propagation..."
+          sleep 5
+          git fetch --tags --force
+          echo "Checking for tag: ${{ inputs.tag_name }}"
+          
+          # Try up to 3 times in case of propagation delay
+          for i in 1 2 3; do
+            if git rev-parse "${{ inputs.tag_name }}" >/dev/null 2>&1; then
+              echo "Tag ${{ inputs.tag_name }} found on attempt $i"
+              git checkout "${{ inputs.tag_name }}"
+              break
+            else
+              echo "Tag not found on attempt $i, retrying..."
+              sleep 5
+              git fetch --tags --force
+            fi
+          done
+          
+          # Final check
+          if ! git rev-parse "${{ inputs.tag_name }}" >/dev/null 2>&1; then
+            echo "Tag ${{ inputs.tag_name }} still not found after retries"
+            echo "Available tags:"
+            git tag -l | sort -V | tail -10
+            exit 1
+          fi
 
       - name: Extract version and tag info
         id: extract_info
         run: |
-          # Handle both workflow_call and push triggers
-          if [ "${{ github.event_name }}" = "workflow_call" ]; then
-            # Called from another workflow
-            VERSION="${{ inputs.version }}"
-            TAG_NAME="${{ inputs.tag_name }}"
-          else
-            # Triggered by tag push
-            TAG_NAME="${{ github.ref_name }}"
-            # Extract version from both releases/ and pre-releases/ prefixes
-            VERSION="${TAG_NAME#releases/}"
-            VERSION="${VERSION#pre-releases/}"
+          # This workflow is only called via workflow_call, so use the provided inputs
+          VERSION="${{ inputs.version }}"
+          TAG_NAME="${{ inputs.tag_name }}"
+          
+          echo "Using workflow inputs: VERSION=$VERSION, TAG_NAME=$TAG_NAME"
+          
+          # Validate that we have a proper version
+          if [ -z "$VERSION" ] || [ -z "$TAG_NAME" ]; then
+            echo "Error: Missing required inputs"
+            echo "Version: '$VERSION'"
+            echo "Tag name: '$TAG_NAME'"
+            exit 1
+          fi
+          
+          # Additional validation: check if version looks like a semantic version
+          if ! echo "$VERSION" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' > /dev/null; then
+            echo "Warning: Version '$VERSION' doesn't follow semantic versioning pattern"
           fi
           
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -56,13 +103,21 @@ jobs:
         run: |
           # Get the previous release tag (excluding the current one)
           CURRENT_TAG="${{ steps.extract_info.outputs.tag_name }}"
+          echo "Current tag: $CURRENT_TAG"
+          
+          # List all release tags for debugging
+          echo "All release tags:"
+          git tag -l "releases/*" --sort=-version:refname || echo "No release tags found"
+          
           PREVIOUS_TAG=$(git tag -l "releases/*" --sort=-version:refname | grep -v "$CURRENT_TAG" | head -n1)
+          
           if [ -z "$PREVIOUS_TAG" ]; then
-            # If no previous release tag, use the first commit
-            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
-            echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+            echo "No previous release tag found, this is the first release"
+            # For first release, we don't need a previous tag reference
+            echo "previous_tag=" >> "$GITHUB_OUTPUT"
             echo "is_first_release=true" >> "$GITHUB_OUTPUT"
           else
+            echo "Previous release tag: $PREVIOUS_TAG"
             echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
             echo "is_first_release=false" >> "$GITHUB_OUTPUT"
           fi
@@ -85,9 +140,15 @@ jobs:
           VERSION="${{ steps.extract_info.outputs.version }}"
           PREVIOUS_TAG="${{ steps.previous_tag.outputs.previous_tag }}"
           
-          if [ "${{ steps.previous_tag.outputs.is_first_release }}" = "true" ]; then
+          echo "Generating release description for version: $VERSION"
+          echo "Previous tag: $PREVIOUS_TAG"
+          echo "Is first release: ${{ steps.previous_tag.outputs.is_first_release }}"
+          
+          if [ "${{ steps.previous_tag.outputs.is_first_release }}" = "true" ] || [ -z "$PREVIOUS_TAG" ]; then
+            echo "Generating first release description..."
             python scripts/generate_release_notes.py "$VERSION" > release_description.txt
           else
+            echo "Generating diff-based release description..."
             python scripts/generate_release_notes.py "$VERSION" "$PREVIOUS_TAG" > release_description.txt
           fi
           

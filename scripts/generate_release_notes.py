@@ -344,7 +344,7 @@ For more details and troubleshooting, see the [README](https://github.com/mdenni
 
     if len(final_output) > MAX_RELEASE_BODY_LENGTH:
         print(
-            "⚠️ Release notes too long"
+            "⚠️ Release notes too long "
             f"({len(final_output)} chars)",
             ", truncating...",
             file=sys.stderr)

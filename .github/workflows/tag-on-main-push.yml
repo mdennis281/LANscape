@@ -39,8 +39,18 @@ jobs:
           git push origin "$TAG_NAME"
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
-  publish:
+  create-release:
     needs: tag
+    if: ${{ needs.tag.outputs.version != '' }}
+    uses: ./.github/workflows/create-release.yml
+    with:
+      version: ${{ needs.tag.outputs.version }}
+      tag_name: ${{ needs.tag.outputs.tag_name }}
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  publish:
+    needs: [tag, create-release]
     if: ${{ needs.tag.outputs.version != '' }}
     uses: ./.github/workflows/pypi-publish.yml
     with:

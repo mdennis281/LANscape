@@ -9,6 +9,7 @@ import inspect
 import functools
 import concurrent.futures
 import logging
+import threading
 from tabulate import tabulate
 
 
@@ -39,31 +40,66 @@ def run_once(func):
     return wrapper
 
 
-@dataclass
 class JobStats:
     """
+    Thread-safe singleton for tracking job statistics across all classes.
     Tracks statistics for job execution, including running, finished, and timing data.
     """
-    running: DefaultDict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
-    finished: DefaultDict[str, int] = field(
-        default_factory=lambda: defaultdict(int))
-    timing: DefaultDict[str, float] = field(
-        default_factory=lambda: defaultdict(float))
-
+    
     _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:  # Double-checked locking
+                    cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
-        # Only initialize once
-        if not hasattr(self, "running"):
+        if not hasattr(self, '_initialized'):
+            self._stats_lock = threading.RLock()
             self.running = defaultdict(int)
-            self.finished = defaultdict(int)
+            self.finished = defaultdict(int) 
             self.timing = defaultdict(float)
+            self._initialized = True
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super(JobStats, cls).__new__(cls)
-        return cls._instance
+    def start_job(self, func_name: str):
+        """Thread-safe increment of running counter."""
+        with self._stats_lock:
+            self.running[func_name] += 1
+
+    def finish_job(self, func_name: str, elapsed_time: float):
+        """Thread-safe update of job completion and timing."""
+        with self._stats_lock:
+            self.running[func_name] -= 1
+            self.finished[func_name] += 1
+            
+            # Calculate running average
+            count = self.finished[func_name]
+            old_avg = self.timing[func_name]
+            new_avg = (old_avg * (count - 1) + elapsed_time) / count
+            self.timing[func_name] = round(new_avg, 4)
+            
+            # Cleanup running if zero
+            if self.running[func_name] <= 0:
+                self.running.pop(func_name, None)
+
+    def clear_stats(self):
+        """Clear all statistics (useful between scans)."""
+        with self._stats_lock:
+            self.running.clear()
+            self.finished.clear() 
+            self.timing.clear()
+
+    def get_stats_copy(self) -> dict:
+        """Get a thread-safe copy of current statistics."""
+        with self._stats_lock:
+            return {
+                'running': dict(self.running),
+                'finished': dict(self.finished),
+                'timing': dict(self.timing)
+            }
 
     def __str__(self):
         """Return a formatted string representation of the job statistics."""
@@ -106,48 +142,40 @@ def job_tracker(func):
         Return the function name with the class name prepended if available.
         """
         qual_parts = func.__qualname__.split(".")
-        cls_name = qual_parts[-2] if len(qual_parts) > 1 else None
-        cls_obj = None  # resolved lazily
-        if cls_obj is None and cls_name:
-            mod = inspect.getmodule(func)
-            cls_obj = getattr(mod, cls_name, None)
-        if cls_obj and first_arg is not None:
-            if (first_arg is cls_obj or isinstance(first_arg, cls_obj)):
-                return f"{cls_name}.{func.__name__}"
+        
+        # If function has class context (e.g., "ClassName.method_name")
+        if len(qual_parts) > 1:
+            cls_name = qual_parts[-2]
+            
+            # Check if first_arg is an instance and has the expected class name
+            if first_arg is not None and hasattr(first_arg, '__class__'):
+                if first_arg.__class__.__name__ == cls_name:
+                    return f"{cls_name}.{func.__name__}"
+        
         return func.__name__
 
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         """Wrap the function to update job statistics before and after execution."""
-        class_instance = args[0]
         job_stats = JobStats()
-        fxn = get_fxn_src_name(
-            func,
-            class_instance
-        )
+        
+        # Determine function name for tracking
+        if args:
+            fxn = get_fxn_src_name(func, args[0])
+        else:
+            fxn = func.__name__
 
-        # Increment running counter and track execution time
-        job_stats.running[fxn] += 1
+        # Start job tracking
+        job_stats.start_job(fxn)
         start = time()
 
-        result = func(*args, **kwargs)  # Execute the wrapped function
-
-        # Update statistics after function execution
-        elapsed = time() - start
-        job_stats.running[fxn] -= 1
-        job_stats.finished[fxn] += 1
-
-        # Calculate the new average timing for the function
-        job_stats.timing[fxn] = round(
-            ((job_stats.finished[fxn] - 1) * job_stats.timing[fxn] + elapsed)
-            / job_stats.finished[fxn],
-            4
-        )
-
-        # Clean up if no more running instances of this function
-        if job_stats.running[fxn] == 0:
-            job_stats.running.pop(fxn)
-
-        return result
+        try:
+            result = func(*args, **kwargs)  # Execute the wrapped function
+            return result
+        finally:
+            # Always update statistics, even if function raises exception
+            elapsed = time() - start
+            job_stats.finish_job(fxn, elapsed)
 
     return wrapper
 

@@ -156,7 +156,7 @@ class ArpLookup():
     NOTE: This lookup method requires elevated privileges to access the ARP cache.
 
 
-    [Arp Lookup Requirements](/support/arp-issues.md)
+    [Arp Lookup Requirements](/docs/arp-issues.md)
     """
 
     @classmethod

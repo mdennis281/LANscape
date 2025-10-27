@@ -26,7 +26,7 @@ def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
         # Get per-file diffs for better context
         try:
             if from_tag:
-                git_output += f"\n\n## Code Changes by File\n"
+                git_output += "\n\n## Code Changes by File\n"
                 
                 # First get list of changed files
                 changed_files_cmd = ["git", "diff", "--name-only", f"{from_tag}..{to_tag}"]
@@ -52,7 +52,7 @@ def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
                 if files:
                     # Show main Python files and configs for context
                     main_files = [f for f in files.split('\n') if f.endswith(('.py', '.yml', '.yaml', '.toml', '.md', '.txt')) and not f.startswith('.')][:20]
-                    git_output += f"\n\n## Key Files in Release\n\n```\n" + '\n'.join(main_files) + "\n```"
+                    git_output += "\n\n## Key Files in Release\n\n```\n" + '\n'.join(main_files) + "\n```"
                 
         except subprocess.CalledProcessError:
             # If diff fails, just continue with the log

@@ -33,6 +33,9 @@ dependencies = [
 Homepage = "https://github.com/mdennis281/py-lanscape"
 Issues = "https://github.com/mdennis281/py-lanscape/issues"
 
+[project.scripts]
+lanscape = "lanscape.ui.main:main"
+
 [tool.setuptools]
 packages = { find = { include = ["lanscape*"], exclude = ["support*", "tests*"] } }
 

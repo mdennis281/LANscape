@@ -4,7 +4,6 @@ Tests the service_scan module including async probing, service identification,
 and configuration handling.
 """
 import asyncio
-import logging
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest

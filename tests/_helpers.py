@@ -10,10 +10,11 @@ def right_size_subnet(subnet: str) -> str:
     safety limit.
     """
     max_mask = 32
-    max_iterations = 64
+    max_iterations = 10
+    max_ips = 64
     iterations = 0
 
-    while get_address_count(subnet) > 64:
+    while get_address_count(subnet) > max_ips:
         parts = subnet.split('/')
         if len(parts) != 2:
             raise ValueError(f"Invalid subnet format: {subnet}")

@@ -265,7 +265,7 @@ class ScanConfig(BaseModel):
 
     task_scan_ports: bool = True
     # below wont run if above false
-    task_scan_port_services: bool = True  # disabling until more stable
+    task_scan_port_services: bool = True
 
     lookup_type: List[ScanType] = [ScanType.ICMP_THEN_ARP]
 

@@ -6,7 +6,7 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from lanscape.libraries.decorators import run_once, job_tracker, JobStats
+from lanscape.core.decorators import run_once, job_tracker, JobStats
 
 
 def test_run_once_caches_result_and_logs_once(caplog):
@@ -280,3 +280,4 @@ class TestJobTracker(unittest.TestCase):
         assert stats.finished["function_b"] == 1
         assert stats.timing["function_a"] > 0
         assert stats.timing["function_b"] > stats.timing["function_a"]  # b sleeps longer
+

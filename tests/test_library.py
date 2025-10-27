@@ -5,9 +5,9 @@ Tests scan configuration, network discovery, and subnet selection functionality.
 
 import unittest
 
-from lanscape.libraries.net_tools import smart_select_primary_subnet
-from lanscape.libraries.subnet_scan import ScanManager
-from lanscape.libraries.scan_config import ScanConfig, ScanType
+from lanscape.core.net_tools import smart_select_primary_subnet
+from lanscape.core.subnet_scan import ScanManager
+from lanscape.core.scan_config import ScanConfig, ScanType
 
 from tests._helpers import right_size_subnet
 
@@ -102,3 +102,4 @@ class LibraryTestCase(unittest.TestCase):
         # ensure everything got scanned
         self.assertEqual(scan.results.devices_scanned,
                          scan.results.devices_total)
+

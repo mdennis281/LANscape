@@ -9,10 +9,10 @@ import traceback
 import os
 import requests
 
-from lanscape.libraries.logger import configure_logging
-from lanscape.libraries.runtime_args import parse_args
-from lanscape.libraries.web_browser import open_webapp
-from lanscape.libraries.version_manager import get_installed_version, is_update_available
+from lanscape.core.logger import configure_logging
+from lanscape.core.runtime_args import parse_args
+from lanscape.core.web_browser import open_webapp
+from lanscape.core.version_manager import get_installed_version, is_update_available
 from lanscape.ui.app import start_webserver_daemon, start_webserver
 # do this so any logs generated on import are displayed
 args = parse_args()
@@ -136,3 +136,4 @@ def terminate():
 
 if __name__ == "__main__":
     main()
+

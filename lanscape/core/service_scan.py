@@ -7,8 +7,8 @@ import asyncio
 import logging
 import traceback
 
-from lanscape.libraries.app_scope import ResourceManager
-from lanscape.libraries.scan_config import ServiceScanConfig, ServiceScanStrategy
+from lanscape.core.app_scope import ResourceManager
+from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
 
 log = logging.getLogger('ServiceScan')
 SERVICES = ResourceManager('services').get_jsonc('definitions.jsonc')
@@ -202,3 +202,4 @@ def asyncio_logger_suppression():
 
 
 asyncio_logger_suppression()
+

@@ -4,7 +4,7 @@ Handles UI views including the main dashboard, scan results, error display, and 
 """
 from flask import render_template, request, redirect, url_for
 from lanscape.ui.blueprints.web import web_bp
-from lanscape.libraries.net_tools import (
+from lanscape.core.net_tools import (
     get_all_network_subnets,
     smart_select_primary_subnet
 )
@@ -150,3 +150,4 @@ def app_info():
         Rendered info template
     """
     return render_template('info.html')
+

@@ -6,9 +6,9 @@ execution environment detection, and network support features.
 
 import unittest
 
-from lanscape.libraries.version_manager import lookup_latest_version
-from lanscape.libraries.app_scope import ResourceManager, is_local_run
-from lanscape.libraries.net_tools import is_arp_supported
+from lanscape.core.version_manager import lookup_latest_version
+from lanscape.core.app_scope import ResourceManager, is_local_run
+from lanscape.core.net_tools import is_arp_supported
 
 
 class EnvTestCase(unittest.TestCase):
@@ -43,3 +43,4 @@ class EnvTestCase(unittest.TestCase):
         self.assertIn(arp_supported, [True, False],
                       f"ARP support should be either True or False, not {arp_supported}"
                       )
+

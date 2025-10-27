@@ -20,11 +20,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tabulate import tabulate
 
 # Local imports
-from lanscape.libraries.scan_config import ScanConfig
-from lanscape.libraries.decorators import job_tracker, terminator, JobStats
-from lanscape.libraries.net_tools import Device
-from lanscape.libraries.errors import SubnetScanTerminationFailure
-from lanscape.libraries.device_alive import is_device_alive
+from lanscape.core.scan_config import ScanConfig
+from lanscape.core.decorators import job_tracker, terminator, JobStats
+from lanscape.core.net_tools import Device
+from lanscape.core.errors import SubnetScanTerminationFailure
+from lanscape.core.device_alive import is_device_alive
 
 
 class SubnetScanner():
@@ -428,3 +428,4 @@ class ScanManager:
         t = threading.Thread(target=scan.start)
         t.start()
         return t
+

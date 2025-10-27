@@ -29,12 +29,12 @@ else:
     COMPUTED_FIELD = computed_field  # pylint: disable=invalid-name
     MODEL_SERIALIZER = model_serializer  # pylint: disable=invalid-name
 
-from lanscape.libraries.service_scan import scan_service
-from lanscape.libraries.mac_lookup import MacLookup, get_macs
-from lanscape.libraries.ip_parser import get_address_count, MAX_IPS_ALLOWED
-from lanscape.libraries.errors import DeviceError
-from lanscape.libraries.decorators import job_tracker, run_once, timeout_enforcer
-from lanscape.libraries.scan_config import ServiceScanConfig, PortScanConfig
+from lanscape.core.service_scan import scan_service
+from lanscape.core.mac_lookup import MacLookup, get_macs
+from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED
+from lanscape.core.errors import DeviceError
+from lanscape.core.decorators import job_tracker, run_once, timeout_enforcer
+from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -566,3 +566,4 @@ def is_arp_supported():
         return True
     except (Scapy_Exception, PermissionError, RuntimeError):
         return False
+

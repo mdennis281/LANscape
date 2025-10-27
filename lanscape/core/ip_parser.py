@@ -12,7 +12,7 @@ It also includes validation to prevent processing excessively large IP ranges.
 import ipaddress
 import re
 
-from lanscape.libraries.errors import SubnetTooLargeError
+from lanscape.core.errors import SubnetTooLargeError
 
 MAX_IPS_ALLOWED = 100000
 
@@ -139,3 +139,4 @@ def ip_range_to_list(start_ip, end_ip):
     # Yield the range of IPs
     for ip_int in range(int(start_ip), int(end_ip) + 1):
         yield ipaddress.IPv4Address(ip_int)
+

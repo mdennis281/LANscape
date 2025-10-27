@@ -7,11 +7,11 @@ import ipaddress
 import time
 import unittest
 
-from lanscape.libraries.ip_parser import parse_ip_input
-from lanscape.libraries.errors import SubnetTooLargeError
-from lanscape.libraries import ip_parser
-from lanscape.libraries.port_manager import PortManager
-from lanscape.libraries.decorators import timeout_enforcer
+from lanscape.core.ip_parser import parse_ip_input
+from lanscape.core.errors import SubnetTooLargeError
+from lanscape.core import ip_parser
+from lanscape.core.port_manager import PortManager
+from lanscape.core.decorators import timeout_enforcer
 
 
 class IPParserTests(unittest.TestCase):
@@ -107,3 +107,4 @@ class DecoratorTimeoutTests(unittest.TestCase):
 
         with self.assertRaises(TimeoutError):
             slow_raise()
+

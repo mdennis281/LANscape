@@ -8,12 +8,12 @@ import logging
 from flask import Flask, render_template
 from lanscape.ui.blueprints.web import web_bp, routes  # pylint: disable=unused-import
 from lanscape.ui.blueprints.api import api_bp, tools, port, scan  # pylint: disable=unused-import
-from lanscape.libraries.runtime_args import RuntimeArgs, parse_args
-from lanscape.libraries.version_manager import (
+from lanscape.core.runtime_args import RuntimeArgs, parse_args
+from lanscape.core.version_manager import (
     is_update_available, get_installed_version, lookup_latest_version
 )
-from lanscape.libraries.app_scope import is_local_run
-from lanscape.libraries.net_tools import is_arp_supported
+from lanscape.core.app_scope import is_local_run
+from lanscape.core.net_tools import is_arp_supported
 from lanscape.ui.shutdown_handler import FlaskShutdownHandler
 
 app = Flask(
@@ -122,3 +122,4 @@ def start_webserver(args: RuntimeArgs) -> int:
         'use_reloader': args.reloader
     }
     app.run(**run_args)
+

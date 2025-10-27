@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from lanscape.ui.app import app
-from lanscape.libraries.net_tools import get_network_subnet
+from lanscape.core.net_tools import get_network_subnet
 
 from tests._helpers import right_size_subnet
 
@@ -241,3 +241,4 @@ class ApiTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

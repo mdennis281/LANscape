@@ -7,8 +7,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 from time import time
 
-from lanscape.libraries.net_tools import Device
-from lanscape.libraries.scan_config import PortScanConfig
+from lanscape.core.net_tools import Device
+from lanscape.core.scan_config import PortScanConfig
 
 
 class PortScanTestCase(unittest.TestCase):
@@ -184,7 +184,7 @@ class PortScanTestCase(unittest.TestCase):
     def test_retry_delay_timing(self):
         """Test that retry delay is respected."""
         # We'll use a mock to avoid actually waiting
-        with patch('lanscape.libraries.net_tools.sleep') as mock_sleep:
+        with patch('lanscape.core.net_tools.sleep') as mock_sleep:
             with patch('socket.socket') as mock_socket_class:
                 mock_socket = MagicMock()
                 mock_socket_class.return_value = mock_socket
@@ -248,3 +248,4 @@ class PortScanTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

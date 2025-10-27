@@ -13,8 +13,8 @@ from unittest.mock import patch
 # Third-party imports - ensure 'click' is installed with 'pip install click'
 import click
 
-from lanscape.libraries.logger import configure_logging
-from lanscape.libraries.runtime_args import parse_args
+from lanscape.core.logger import configure_logging
+from lanscape.core.runtime_args import parse_args
 
 
 class LoggingConfigTests(unittest.TestCase):
@@ -76,3 +76,4 @@ class RuntimeArgsLoggingTests(unittest.TestCase):
         with patch('sys.argv', ['prog', '--logfile', '/tmp/custom.log']):
             args = parse_args()
         self.assertEqual(args.logfile, '/tmp/custom.log')
+

@@ -8,7 +8,7 @@ import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from lanscape.libraries.service_scan import (
+from lanscape.core.service_scan import (
     scan_service,
     get_port_probes,
     _try_probe,
@@ -16,7 +16,7 @@ from lanscape.libraries.service_scan import (
     PRINTER_PORTS,
     asyncio_logger_suppression
 )
-from lanscape.libraries.scan_config import ServiceScanConfig, ServiceScanStrategy
+from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
 
 
 class ServiceScanTestCase(unittest.TestCase):
@@ -250,3 +250,4 @@ class ServiceScanTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

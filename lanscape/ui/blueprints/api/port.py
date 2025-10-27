@@ -4,7 +4,7 @@ Provides CRUD operations for managing port lists used in network scans.
 """
 from flask import request, jsonify
 from lanscape.ui.blueprints.api import api_bp
-from lanscape.libraries.port_manager import PortManager
+from lanscape.core.port_manager import PortManager
 
 # Port Manager API
 ############################################
@@ -77,3 +77,4 @@ def delete_port_list(port_list):
         JSON response indicating success or failure
     """
     return jsonify(PortManager().delete_port_list(port_list))
+

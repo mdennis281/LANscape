@@ -1,5 +1,5 @@
 """Helper functions for tests in the lanscape project."""
-from lanscape.libraries.ip_parser import get_address_count
+from lanscape.core.ip_parser import get_address_count
 
 
 def right_size_subnet(subnet: str):
@@ -13,3 +13,4 @@ def right_size_subnet(subnet: str):
         mask += 1
         return right_size_subnet(f"{ip}/{mask}")
     return subnet
+

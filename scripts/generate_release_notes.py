@@ -248,8 +248,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
                                     "focus on user-facing changes. You have access to "
                                     "detailed code diffs - use them to provide accurate, "
                                     "technical insights. You are not trying to market the changes, "
-                                    "just relay the facts. Do your best to keep the character "
-                                    "count under 10k.")
+                                    "just relay the facts.")
                     },
                     {"role": "user", "content": prompt}
                 ],

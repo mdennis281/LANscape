@@ -555,6 +555,41 @@ input[type="range"] {
     color: var(--text-color);
 }
 
+/* Service Strategy Select Styles */
+.service-strategy-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 60%; /* Narrower than port list */
+}
+
+.service-strategy {
+    position: relative;
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 10px;
+    cursor: pointer;
+    width: 100%;
+    height: 42px;
+    user-select: none;
+    appearance: none;  /* Hide default arrow */
+    transition: all .2s ease-in-out;
+}
+
+.service-strategy:focus {
+    border-color: var(--primary-accent-hover);
+    outline: none;
+}
+
+.service-strategy-wrapper::after {
+    content: '▼';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    pointer-events: none;
+    color: var(--text-color);
+}
+
 
 
 .text-color {
@@ -612,6 +647,35 @@ input[type="range"] {
     background-color: var(--primary-bg-accent);
 }
 
+.table tbody tr td:has(.info-icon-container),
+.table thead tr th.detail-col
+{
+    width: 30px;
+    /*
+    background-color: var(--body-bg);
+    border: 1px solid var(--text-almost-hidden);
+    */
+}
+.table td:has(.info-icon-container) {
+    width: 30px;
+    text-align: center;      /* horizontal center */
+    vertical-align: middle;  /* vertical center inside the cell */
+    padding: 0;              /* optional: remove extra padding */
+}
+.table td .info-icon-container {
+    display: flex;
+    justify-content: center; /* horizontal center */
+    align-items: center;     /* vertical center */
+    height: 100%;            /* ensure it takes full cell height */
+}
+.table td .info-icon-container .info-icon {
+    font-size: 1.2em;
+    color: var(--text-placeholder);
+    cursor: pointer;
+}
+.table td .info-icon:hover {
+    color: var(--text-color);
+}
 
 /* Badge Styles */
 .badge-warning {
@@ -627,7 +691,7 @@ input[type="range"] {
 }
 
 .badge-info {
-    background-color: var(--info-accent);
+    background-color: var(--primary-accent);
 }
 
 .badge-secondary {

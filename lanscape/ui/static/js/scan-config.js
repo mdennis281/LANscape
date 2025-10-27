@@ -13,6 +13,7 @@ $(document).ready(function() {
     
     $('#t_cnt_port_scan, #t_cnt_port_test').on('input', updatePortTotals);
     $('#ping_attempts, #ping_ping_count').on('input', updatePingTotals);
+    $('#task_scan_port_services').on('change', updateVisibility);
 
     // Lookup type toggles
     $('.lookup-type-input').on('change', onLookupTypeChanged);
@@ -42,6 +43,30 @@ function setScanConfig(configName) {
     $('#t_cnt_isalive').val(config.t_cnt_isalive);
     $('#task_scan_ports').prop('checked', config.task_scan_ports);
     $('#task_scan_port_services').prop('checked', config.task_scan_port_services);
+
+    // port scan config
+    if (config.port_scan_config) {
+        $('#port_scan_timeout').val(config.port_scan_config.timeout);
+        $('#port_scan_retries').val(config.port_scan_config.retries);
+        $('#port_scan_retry_delay').val(config.port_scan_config.retry_delay);
+    } else {
+        // defaults if missing
+        $('#port_scan_timeout').val(1.0);
+        $('#port_scan_retries').val(0);
+        $('#port_scan_retry_delay').val(0.1);
+    }
+
+    // service config
+    if (config.service_scan_config) {
+        $('#service_lookup_type').val(config.service_scan_config.lookup_type || 'BASIC');
+        $('#service_timeout').val(config.service_scan_config.timeout);
+        $('#service_max_concurrent_probes').val(config.service_scan_config.max_concurrent_probes);
+    } else {
+        // defaults if missing
+        $('#service_lookup_type').val('BASIC');
+        $('#service_timeout').val(5.0);
+        $('#service_max_concurrent_probes').val(10);
+    }
 
     // lookup type (array of enum values as strings)
     setLookupTypeUI(config.lookup_type || []);
@@ -99,6 +124,16 @@ function getScanConfig() {
         poke_config: {
             attempts: parseInt($('#poke_attempts').val()),
             timeout: parseFloat($('#poke_timeout').val())
+        },
+        port_scan_config: {
+            timeout: parseFloat($('#port_scan_timeout').val()),
+            retries: parseInt($('#port_scan_retries').val()),
+            retry_delay: parseFloat($('#port_scan_retry_delay').val())
+        },
+        service_scan_config: {
+            timeout: parseFloat($('#service_timeout').val()),
+            lookup_type: $('#service_lookup_type').val(),
+            max_concurrent_probes: parseInt($('#service_max_concurrent_probes').val())
         }
     };
 }
@@ -168,6 +203,10 @@ function updateVisibility() {
     // Poke section only when POKE_THEN_ARP is selected
     const showPoke = types.has('POKE_THEN_ARP');
     toggleSection('#section-poke', showPoke);
+
+    // Service scan section visible only if stage enabled
+    const showService = $('#task_scan_port_services').is(':checked');
+    toggleSection('#section-service-scan', showService);
 }
 
 function toggleSection(selector, show) {

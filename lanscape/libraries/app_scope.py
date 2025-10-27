@@ -32,9 +32,27 @@ class ResourceManager:
         return json.loads(self.get(asset_name))
 
     def get_jsonc(self, asset_name: str):
-        """Get JSON content with comments removed."""
+        """AI Slop to get JSONC (JSON with comments) content of an asset as a JSON object."""
         content = self.get(asset_name)
-        cleaned_content = re.sub(r'//.*', '', content)
+        def strip_jsonc_lines(text):
+            result = []
+            in_string = False
+            escape = False
+            for line in text.splitlines():
+                new_line = []
+                i = 0
+                while i < len(line):
+                    char = line[i]
+                    if char == '"' and not escape:
+                        in_string = not in_string
+                    if not in_string and line[i:i+2] == "//":
+                        break  # Ignore rest of line (comment)
+                    new_line.append(char)
+                    escape = (char == '\\' and not escape)
+                    i += 1
+                result.append(''.join(new_line))
+            return '\n'.join(result)
+        cleaned_content = strip_jsonc_lines(content)
         return json.loads(cleaned_content)
 
     def update(self, asset_name: str, content: str):

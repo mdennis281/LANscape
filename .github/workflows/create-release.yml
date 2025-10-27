@@ -43,7 +43,9 @@ jobs:
           else
             # Triggered by tag push
             TAG_NAME="${{ github.ref_name }}"
+            # Extract version from both releases/ and pre-releases/ prefixes
             VERSION="${TAG_NAME#releases/}"
+            VERSION="${VERSION#pre-releases/}"
           fi
           
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -99,7 +101,7 @@ jobs:
           name: "Release v${{ steps.extract_info.outputs.version }}"
           body_path: release_description.txt
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.extract_info.outputs.tag_name, 'pre-releases/') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

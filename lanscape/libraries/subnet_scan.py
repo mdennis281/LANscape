@@ -63,9 +63,9 @@ class SubnetScanner():
         self._set_stage('scanning devices')
         self.running = True
         with ThreadPoolExecutor(
-            max_workers=self.cfg.t_cnt('isalive'), 
-            thread_name_prefix="DeviceAlive") as executor:
-            
+                max_workers=self.cfg.t_cnt('isalive'),
+                thread_name_prefix="DeviceAlive") as executor:
+
             futures = {executor.submit(self._get_host_details, str(
                 ip)): str(ip) for ip in self.subnet}
             for future in as_completed(futures):
@@ -202,7 +202,7 @@ class SubnetScanner():
 
     @terminator
     def _scan_network_ports(self):
-        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_scan'), 
+        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_scan'),
                                 thread_name_prefix="DevicePortScanParent") as executor:
             futures = {executor.submit(
                 self._scan_ports, device): device for device in self.results.devices}
@@ -215,8 +215,8 @@ class SubnetScanner():
         self.log.debug(f'[{device.ip}] Initiating port scan')
         device.stage = 'scanning'
         with ThreadPoolExecutor(
-            max_workers=self.cfg.t_cnt('port_test'), 
-            thread_name_prefix=f"{device.ip}-PortScan") as executor:
+                max_workers=self.cfg.t_cnt('port_test'),
+                thread_name_prefix=f"{device.ip}-PortScan") as executor:
             futures = {executor.submit(self._test_port, device, int(
                 port)): port for port in self.ports}
             for future in futures:

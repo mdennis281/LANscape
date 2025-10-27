@@ -55,7 +55,9 @@ async def _try_probe(
         reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout=connect_timeout)
         try:
             if payload is not None:
-                data = payload if isinstance(payload, (bytes, bytearray)) else str(payload).encode("utf-8", errors="ignore")
+                data = payload if isinstance(
+                    payload, (bytes, bytearray)) else str(payload).encode(
+                    "utf-8", errors="ignore")
                 writer.write(data)
                 await writer.drain()
             try:
@@ -87,7 +89,7 @@ async def _try_probe(
 
 async def _multi_probe_generic(
     ip: str, port: int, cfg: ServiceScanConfig
-    ) -> Optional[str]:
+) -> Optional[str]:
     """
     Run a small set of generic probes in parallel and return the first non-empty response.
     """
@@ -138,6 +140,7 @@ async def _multi_probe_generic(
 
     return None
 
+
 def get_port_probes(port: int, strategy: ServiceScanStrategy):
     """
     Return a list of probe payloads based on the port and strategy.
@@ -180,7 +183,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
     async def _async_scan_service(
         ip: str, port: int,
         cfg: ServiceScanConfig
-        ) -> str:
+    ) -> str:
         if port in PRINTER_PORTS:
             return "Printer"
 
@@ -205,6 +208,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
 
     # Use asyncio.run to execute the asynchronous logic synchronously
     return asyncio.run(_async_scan_service(ip, port, cfg=cfg))
+
 
 def asyncio_logger_suppression():
     """Suppress the noisy asyncio transport errors since they are expected in service scanning."""

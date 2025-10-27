@@ -80,7 +80,8 @@ class Device(BaseModel):
             # Ensure manufacturer present; prefer explicit model value
             manuf = data.get('manufacturer')
             if not manuf:
-                data['manufacturer'] = self._get_manufacturer(data['mac_addr']) if data['mac_addr'] else None
+                data['manufacturer'] = self._get_manufacturer(
+                    data['mac_addr']) if data['mac_addr'] else None
             return data
 
     def get_metadata(self):
@@ -119,10 +120,10 @@ class Device(BaseModel):
         """Test if a specific port is open on the device."""
         if port_config is None:
             port_config = PortScanConfig()  # Use defaults
-        
+
         # Calculate timeout enforcer: (timeout * (retries+1) * 1.5)
         enforcer_timeout = port_config.timeout * (port_config.retries + 1) * 1.5
-        
+
         @timeout_enforcer(enforcer_timeout, False)
         def do_test():
             for attempt in range(port_config.retries + 1):
@@ -137,13 +138,13 @@ class Device(BaseModel):
                     pass  # Connection failed, try again if retries remain
                 finally:
                     sock.close()
-                
+
                 # Wait before retry (except on last attempt)
                 if attempt < port_config.retries:
                     sleep(port_config.retry_delay)
-            
+
             return False
-        
+
         ans = do_test() or False
         self.ports_scanned += 1
         return ans

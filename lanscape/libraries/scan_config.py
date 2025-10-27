@@ -153,6 +153,7 @@ class PokeConfig(BaseModel):
         """
         return self.model_dump()
 
+
 class ServiceScanStrategy(Enum):
     """
     Enumeration of strategies for service scanning on open ports.
@@ -198,6 +199,7 @@ class ServiceScanConfig(BaseModel):
 
     def __str__(self):
         return f'ServiceScanCfg(timeout={self.timeout})'
+
 
 class PortScanConfig(BaseModel):
     """

@@ -34,6 +34,7 @@ class ResourceManager:
     def get_jsonc(self, asset_name: str):
         """AI Slop to get JSONC (JSON with comments) content of an asset as a JSON object."""
         content = self.get(asset_name)
+
         def strip_jsonc_lines(text):
             result = []
             in_string = False
@@ -45,7 +46,7 @@ class ResourceManager:
                     char = line[i]
                     if char == '"' and not escape:
                         in_string = not in_string
-                    if not in_string and line[i:i+2] == "//":
+                    if not in_string and line[i:i + 2] == "//":
                         break  # Ignore rest of line (comment)
                     new_line.append(char)
                     escape = (char == '\\' and not escape)

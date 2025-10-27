@@ -196,18 +196,10 @@ def main():
     if not git_log:
         print("No commits found for release notes", file=sys.stderr)
         sys.exit(1)
-        
-    # Show context (git log) then a divider before the generated description
-    print("---")
-    print("# Context (git log):\n")
-    print(git_log)
     
     # Generate description
     description = generate_release_description(git_log, version, api_key)
     
-    
-    print("---")
-    print("# Release Description:\n")
     print(description)
 
 

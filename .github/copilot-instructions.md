@@ -5,7 +5,7 @@ Things to remember, every change needs:
   - `.env/Scripts/activate` (windows)
   - `source .env/bin/activate` (linux/mac)
 - Passing tests
-  - Big changes: `python -m unittest"`
+  - Big changes: `Run Unit Tests` vscode task (check the output)
   - Smaller changes: `python.exe -m pytest tests/<test_file>.py -v`
 - Any changed requirements must be also added to pyproject.toml
 - There is an auto-pep8 

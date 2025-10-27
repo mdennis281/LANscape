@@ -2,10 +2,7 @@
 """Decorators and job tracking utilities for Lanscape."""
 
 from time import time
-from dataclasses import dataclass, field
-from typing import DefaultDict
 from collections import defaultdict
-import inspect
 import functools
 import concurrent.futures
 import logging
@@ -45,7 +42,7 @@ class JobStats:
     Thread-safe singleton for tracking job statistics across all classes.
     Tracks statistics for job execution, including running, finished, and timing data.
     """
-    
+
     _instance = None
     _lock = threading.Lock()
 
@@ -60,7 +57,7 @@ class JobStats:
         if not hasattr(self, '_initialized'):
             self._stats_lock = threading.RLock()
             self.running = defaultdict(int)
-            self.finished = defaultdict(int) 
+            self.finished = defaultdict(int)
             self.timing = defaultdict(float)
             self._initialized = True
 
@@ -74,13 +71,13 @@ class JobStats:
         with self._stats_lock:
             self.running[func_name] -= 1
             self.finished[func_name] += 1
-            
+
             # Calculate running average
             count = self.finished[func_name]
             old_avg = self.timing[func_name]
             new_avg = (old_avg * (count - 1) + elapsed_time) / count
             self.timing[func_name] = round(new_avg, 4)
-            
+
             # Cleanup running if zero
             if self.running[func_name] <= 0:
                 self.running.pop(func_name, None)
@@ -89,7 +86,7 @@ class JobStats:
         """Clear all statistics (useful between scans)."""
         with self._stats_lock:
             self.running.clear()
-            self.finished.clear() 
+            self.finished.clear()
             self.timing.clear()
 
     def get_stats_copy(self) -> dict:
@@ -100,6 +97,14 @@ class JobStats:
                 'finished': dict(self.finished),
                 'timing': dict(self.timing)
             }
+
+    @classmethod
+    def reset_for_testing(cls):
+        """Reset singleton instance for testing purposes only."""
+        with cls._lock:
+            if cls._instance:
+                cls._instance.clear_stats()
+            cls._instance = None
 
     def __str__(self):
         """Return a formatted string representation of the job statistics."""
@@ -142,23 +147,23 @@ def job_tracker(func):
         Return the function name with the class name prepended if available.
         """
         qual_parts = func.__qualname__.split(".")
-        
+
         # If function has class context (e.g., "ClassName.method_name")
         if len(qual_parts) > 1:
             cls_name = qual_parts[-2]
-            
+
             # Check if first_arg is an instance and has the expected class name
             if first_arg is not None and hasattr(first_arg, '__class__'):
                 if first_arg.__class__.__name__ == cls_name:
                     return f"{cls_name}.{func.__name__}"
-        
+
         return func.__name__
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         """Wrap the function to update job statistics before and after execution."""
         job_stats = JobStats()
-        
+
         # Determine function name for tracking
         if args:
             fxn = get_fxn_src_name(func, args[0])

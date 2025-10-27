@@ -10,7 +10,6 @@ from typing import Optional
 import openai
 
 
-
 def _get_commit_log(from_tag: Optional[str], to_tag: str) -> str:
     """Get git commit log with statistics."""
     if from_tag:

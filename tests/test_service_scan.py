@@ -14,8 +14,7 @@ from lanscape.core.service_scan import (
     get_port_probes,
     _try_probe,
     _multi_probe_generic,
-    PRINTER_PORTS,
-    asyncio_logger_suppression
+    PRINTER_PORTS
 )
 from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
 
@@ -212,20 +211,6 @@ def test_multi_probe_generic_no_response():
         assert result is None
 
     asyncio.run(run_test())
-
-
-# Logger and Integration Tests
-#############################
-
-def test_asyncio_logger_suppression():
-    """Test that asyncio logger suppression works."""
-    # This should not raise any exceptions
-    asyncio_logger_suppression()
-
-    # Verify that asyncio logger level was changed
-    asyncio_logger = logging.getLogger("asyncio")
-    assert asyncio_logger.level >= logging.WARNING
-
 
 @pytest.mark.integration
 def test_service_scan_integration():

@@ -110,7 +110,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
 
     prompt = f"""
     Create a comprehensive and professional release description for version {version} of
-    "lanscape" - a Python network scanning tool. 
+    "lanscape" - a Python network scanning tool.
 
     You have access to complete git history including detailed code diffs.
     Analyze the following data thoroughly:
@@ -149,7 +149,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
     - Enhancements to existing features
     - Performance optimizations
     - User experience improvements
-    
+
     ## 🔧 Technical Changes
     - Infrastructure improvements
     - Code quality enhancements

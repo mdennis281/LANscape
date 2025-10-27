@@ -74,14 +74,14 @@ def test_configure_logging_writes_file():
             pass
 
 
-def test_configure_logging_without_file(_logging_cleanup):
+def test_configure_logging_without_file(logging_cleanup):  # pylint: disable=unused-argument
     """Test that no file handlers are created when no log file is specified."""
     configure_logging('INFO', None, flask_logging=True)
     root_handlers = logging.getLogger().handlers
     assert all(not isinstance(h, RotatingFileHandler) for h in root_handlers)
 
 
-def test_disable_flask_logging_overrides_click(_logging_cleanup):
+def test_disable_flask_logging_overrides_click(logging_cleanup):  # pylint: disable=unused-argument
     """Test that disabling Flask logging properly overrides click echo functions."""
     original_click_echo = click.echo
     original_click_secho = click.secho

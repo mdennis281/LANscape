@@ -185,19 +185,3 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
 
     # Use asyncio.run to execute the asynchronous logic synchronously
     return asyncio.run(_async_scan_service(ip, port, cfg=cfg))
-
-
-def asyncio_logger_suppression():
-    """Suppress the noisy asyncio transport errors since they are expected in service scanning."""
-
-    # On modern Python (3.8+), the default ProactorEventLoop on Windows is sufficient
-    # for our network scanning needs and doesn't require special configuration
-    
-    # Tone down asyncio logger noise from transport callbacks
-    try:
-        logging.getLogger("asyncio").setLevel(logging.WARNING)
-    except Exception:
-        pass
-
-
-asyncio_logger_suppression()

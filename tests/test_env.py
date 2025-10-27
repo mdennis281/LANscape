@@ -35,8 +35,7 @@ def test_version_lookup_returns_valid_version():
     assert any(char.isdigit() for char in version)
 
 
-@pytest.mark.parametrize("expected_type", [str, type(None)])
-def test_version_lookup_return_type(_expected_type):
+def test_version_lookup_return_type():
     """Test version lookup returns expected type."""
     version = lookup_latest_version()
     if version is not None:
@@ -112,7 +111,7 @@ def test_arp_support_detection():
     ("linux", True),    # Linux typically supports ARP
     ("darwin", True),   # macOS typically supports ARP
 ])
-def test_arp_support_by_platform(platform, _expected):
+def test_arp_support_by_platform(platform, expected):  # pylint: disable=unused-argument
     """Test ARP support expectations by platform (informational test)."""
     with patch('sys.platform', platform):
         # This is more of an informational test about expectations

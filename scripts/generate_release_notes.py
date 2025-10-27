@@ -76,8 +76,7 @@ def _get_file_diffs(from_tag: str, to_tag: str) -> str:
     for file_path in changed_files:
         # Stop if we're approaching size limits
         if total_diff_size > MAX_FILE_DIFF_SIZE * 10:  # Total limit for all diffs
-            output += f"\n\n... (remaining {len(changed_files) -
-                                            changed_files.index(file_path)} files truncated)"
+            output += f"\n\n... (remaining {original_count - changed_files.index(file_path) - 1} files truncated)"
             break
 
         # Get diff for this specific file

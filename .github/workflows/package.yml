@@ -43,20 +43,24 @@ jobs:
           if [[ "$TAG_NAME" == releases/* ]]; then
             echo "✓ Proper release detected"
             echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           # Check if it's a beta release (pre-releases/* with 'b' in version)
           elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"b"* ]]; then
             echo "✓ Beta release detected"
             echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           # Check if it's an alpha release (pre-releases/* with 'a' in version)
           elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"a"* ]]; then
             echo "✓ Alpha release detected - publish only, no GitHub release"
             echo "should_create_release=false" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "✗ Conditions not met for release creation"
+            echo "✗ Conditions not met for release creation or publishing"
             echo "should_create_release=false" >> "$GITHUB_OUTPUT"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -72,7 +76,7 @@ jobs:
 
   publish:
     needs: [determine-release, create-release]
-    if: ${{ always() && needs.determine-release.outputs.should_create_release == 'true' }}
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' }}
     uses: ./.github/workflows/pypi-publish.yml
     with:
       branch: ${{ github.ref }}

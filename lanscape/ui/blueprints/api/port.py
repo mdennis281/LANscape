@@ -77,4 +77,3 @@ def delete_port_list(port_list):
         JSON response indicating success or failure
     """
     return jsonify(PortManager().delete_port_list(port_list))
-

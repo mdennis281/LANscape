@@ -23,4 +23,3 @@ except KeyboardInterrupt:
     scan.terminate()
 
 print(scan.results)
-

@@ -395,4 +395,3 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         )
     )
 }
-

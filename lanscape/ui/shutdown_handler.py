@@ -55,4 +55,3 @@ class FlaskShutdownHandler:
         """Exits the application if a shutdown request has been made."""
         if self._exiting:
             os._exit(0)
-

@@ -90,4 +90,3 @@ def is_local_run() -> bool:
     if any(parts):
         return False
     return True  # Installed package
-

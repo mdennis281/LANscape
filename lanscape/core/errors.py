@@ -40,4 +40,3 @@ class DeviceError(Exception):
 
     def __str__(self):
         return f'Error(source={self.method}, msg={self.base})'
-

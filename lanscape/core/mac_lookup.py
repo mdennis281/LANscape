@@ -105,4 +105,3 @@ def lookup_mac(mac: str) -> Optional[str]:
 def get_macs(ip: str) -> List[str]:
     """Backward compatibility function for MAC resolution."""
     return MacResolver().get_macs(ip)
-

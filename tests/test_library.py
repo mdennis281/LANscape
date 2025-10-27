@@ -102,4 +102,3 @@ class LibraryTestCase(unittest.TestCase):
         # ensure everything got scanned
         self.assertEqual(scan.results.devices_scanned,
                          scan.results.devices_total)
-

@@ -107,4 +107,3 @@ class DecoratorTimeoutTests(unittest.TestCase):
 
         with self.assertRaises(TimeoutError):
             slow_raise()
-

@@ -8,4 +8,3 @@ from lanscape.core.subnet_scan import ScanManager
 scan_manager = ScanManager()
 
 log = logging.getLogger('Blueprints')
-

@@ -72,4 +72,3 @@ def disable_flask_logging() -> None:
     werkzeug_log.setLevel(logging.ERROR)
 
     override_click_logging()
-

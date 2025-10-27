@@ -95,4 +95,3 @@ def get_installed_version(package=PACKAGE):
             log.debug(traceback.format_exc())
             log.warning(f'Cannot find {package} installation')
     return LOCAL_VERSION
-

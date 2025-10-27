@@ -13,4 +13,3 @@ def right_size_subnet(subnet: str):
         mask += 1
         return right_size_subnet(f"{ip}/{mask}")
     return subnet
-

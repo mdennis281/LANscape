@@ -150,4 +150,3 @@ def app_info():
         Rendered info template
     """
     return render_template('info.html')
-

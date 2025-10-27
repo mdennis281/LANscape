@@ -121,4 +121,3 @@ def get_scan_config():
     """
     data = request.get_json()
     return ScanConfig.from_dict(data)
-

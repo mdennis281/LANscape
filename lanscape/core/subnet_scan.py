@@ -428,4 +428,3 @@ class ScanManager:
         t = threading.Thread(target=scan.start)
         t.start()
         return t
-

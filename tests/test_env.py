@@ -43,4 +43,3 @@ class EnvTestCase(unittest.TestCase):
         self.assertIn(arp_supported, [True, False],
                       f"ARP support should be either True or False, not {arp_supported}"
                       )
-

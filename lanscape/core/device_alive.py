@@ -227,4 +227,3 @@ class Poker():
                 sock.close()
 
         do_poke()
-

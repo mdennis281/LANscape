@@ -63,4 +63,3 @@ def parse_args() -> RuntimeArgs:
 
     # Return the dataclass instance with the dynamically assigned values
     return RuntimeArgs(**filtered_args)
-

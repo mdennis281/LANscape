@@ -69,4 +69,3 @@ def get_default_configs():
         configs[key] = config_dict
 
     return jsonify(configs)
-

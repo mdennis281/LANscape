@@ -208,4 +208,3 @@ def windows_get_browser_from_registry() -> Optional[str]:
     system_browser = get_system_default_browser()
     if system_browser:
         return extract_executable(system_browser)
-

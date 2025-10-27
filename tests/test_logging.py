@@ -76,4 +76,3 @@ class RuntimeArgsLoggingTests(unittest.TestCase):
         with patch('sys.argv', ['prog', '--logfile', '/tmp/custom.log']):
             args = parse_args()
         self.assertEqual(args.logfile, '/tmp/custom.log')
-

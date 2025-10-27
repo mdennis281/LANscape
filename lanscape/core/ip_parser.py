@@ -139,4 +139,3 @@ def ip_range_to_list(start_ip, end_ip):
     # Yield the range of IPs
     for ip_int in range(int(start_ip), int(end_ip) + 1):
         yield ipaddress.IPv4Address(ip_int)
-

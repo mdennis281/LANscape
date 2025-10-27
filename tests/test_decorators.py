@@ -207,8 +207,11 @@ class TestJobTracker(unittest.TestCase):
         """Test that class methods are tracked with class.method naming."""
 
         class TestClass:
+            """Test class for method tracking."""
+
             @job_tracker
             def test_method(self):
+                """Test method that returns a string."""
                 time.sleep(0.01)
                 return "method_result"
 
@@ -280,4 +283,3 @@ class TestJobTracker(unittest.TestCase):
         assert stats.finished["function_b"] == 1
         assert stats.timing["function_a"] > 0
         assert stats.timing["function_b"] > stats.timing["function_a"]  # b sleeps longer
-

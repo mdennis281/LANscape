@@ -566,4 +566,3 @@ def is_arp_supported():
         return True
     except (Scapy_Exception, PermissionError, RuntimeError):
         return False
-

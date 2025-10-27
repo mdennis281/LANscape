@@ -7,12 +7,78 @@ on:
       - 'pre-releases/*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  determine-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should_create_release: ${{ steps.check_conditions.outputs.should_create_release }}
+      should_publish: ${{ steps.check_conditions.outputs.should_publish }}
+      clean_version: ${{ steps.extract_version.outputs.clean_version }}
+      is_prerelease: ${{ steps.check_conditions.outputs.is_prerelease }}
+    steps:
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          echo "Processing tag: $TAG_NAME"
+          
+          # Remove prefix to get clean version
+          CLEAN_VERSION="${TAG_NAME#releases/}"
+          CLEAN_VERSION="${CLEAN_VERSION#pre-releases/}"
+          
+          echo "clean_version=$CLEAN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Clean version: $CLEAN_VERSION"
+
+      - name: Check release conditions
+        id: check_conditions
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          CLEAN_VERSION="${{ steps.extract_version.outputs.clean_version }}"
+          
+          echo "Checking conditions for tag: $TAG_NAME"
+          
+          # Check if it's a proper release
+          if [[ "$TAG_NAME" == releases/* ]]; then
+            echo "✓ Proper release detected"
+            echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          # Check if it's a beta release (pre-releases/* with 'b' in version)
+          elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"b"* ]]; then
+            echo "✓ Beta release detected"
+            echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          # Check if it's an alpha release (pre-releases/* with 'a' in version)
+          elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"a"* ]]; then
+            echo "✓ Alpha release detected - publish only, no GitHub release"
+            echo "should_create_release=false" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "✗ Conditions not met for release creation or publishing"
+            echo "should_create_release=false" >> "$GITHUB_OUTPUT"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  create-release:
+    needs: determine-release
+    if: ${{ needs.determine-release.outputs.should_create_release == 'true' }}
+    uses: ./.github/workflows/create-release.yml
+    with:
+      version: ${{ needs.determine-release.outputs.clean_version }}
+      tag_name: ${{ github.ref_name }}
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
   publish:
+    needs: [determine-release, create-release]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' }}
     uses: ./.github/workflows/pypi-publish.yml
     with:
       branch: ${{ github.ref }}
-      version: ${{ github.ref_name }}
+      version: ${{ needs.determine-release.outputs.clean_version }}
     secrets: inherit

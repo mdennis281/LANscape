@@ -154,7 +154,11 @@ jobs:
           fi
           
           echo "Generated release description:"
-          cat release_description.txt
+          echo "Length: $(wc -c < release_description.txt) characters"
+          echo "First 500 characters:"
+          head -c 500 release_description.txt
+          echo ""
+          echo "... (showing first 500 chars of $(wc -c < release_description.txt) total)"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

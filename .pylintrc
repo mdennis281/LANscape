@@ -104,6 +104,7 @@ recursive=no
 # source root.
 source-roots=
 
+# The 'suggestion-mode' option was intentionally removed because it is deprecated or unsupported in the current version of Pylint.
 # When enabled, pylint would attempt to guess common misconfiguration and emit
 # user-friendly hints instead of false-positive error messages.
 # Allow loading of arbitrary C extensions. Extensions are imported into the

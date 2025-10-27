@@ -220,7 +220,7 @@ function openDeviceDetail(deviceIp) {
         const scanId = getActiveScanId();
         if (!scanId || !deviceIp) return;
 
-        const safeIp = encodeURIComponent(String(deviceIp).trim());
+        const safeIp = encodeURIComponent(deviceIp.trim());
 
         // Remove any existing modal instance to avoid duplicates
         $('#device-modal').remove();

@@ -6,10 +6,10 @@ def right_size_subnet(subnet: str):
     """
     Used to improve speed of test time
     """
-    if get_address_count(subnet) > 64:
+    while get_address_count(subnet) > 64:
         parts = subnet.split('/')
         ip = parts[0]
         mask = int(parts[1])
         mask += 1
-        return right_size_subnet(f"{ip}/{mask}")
+        subnet = f"{ip}/{mask}"
     return subnet

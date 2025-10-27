@@ -195,7 +195,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
 
             # Analyze the response to identify the service
             for service, config in SERVICES.items():
-                if any(hint.lower() in response_str.lower() for hint in config["hints"]):
+                if any(hint.lower() in response_str.lower() for hint in config.get("hints", [])):
                     return service
         except asyncio.TimeoutError:
             log.warning(f"Timeout scanning {ip}:{port}")

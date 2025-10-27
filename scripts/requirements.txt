@@ -1,0 +1,2 @@
+# Requirements for scripts in this directory
+openai>=1.0.0

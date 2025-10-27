@@ -1,0 +1,107 @@
+name: Create GitHub Release with AI Summary
+
+on:
+  push:
+    tags:
+      - 'releases/**'
+  workflow_call:
+    inputs:
+      version:
+        description: "Version number for the release"
+        required: true
+        type: string
+      tag_name:
+        description: "Tag name for the release"
+        required: true
+        type: string
+    secrets:
+      OPENAI_API_KEY:
+        description: "OpenAI API key for generating release descriptions"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for changelog generation
+
+      - name: Extract version and tag info
+        id: extract_info
+        run: |
+          # Handle both workflow_call and push triggers
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            # Called from another workflow
+            VERSION="${{ inputs.version }}"
+            TAG_NAME="${{ inputs.tag_name }}"
+          else
+            # Triggered by tag push
+            TAG_NAME="${{ github.ref_name }}"
+            VERSION="${TAG_NAME#releases/}"
+          fi
+          
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Get previous release tag
+        id: previous_tag
+        run: |
+          # Get the previous release tag (excluding the current one)
+          CURRENT_TAG="${{ steps.extract_info.outputs.tag_name }}"
+          PREVIOUS_TAG=$(git tag -l "releases/*" --sort=-version:refname | grep -v "$CURRENT_TAG" | head -n1)
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # If no previous release tag, use the first commit
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+            echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+            echo "is_first_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+            echo "is_first_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenAI dependency
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install openai
+
+      - name: Generate release description with OpenAI
+        id: generate_description
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          VERSION="${{ steps.extract_info.outputs.version }}"
+          PREVIOUS_TAG="${{ steps.previous_tag.outputs.previous_tag }}"
+          
+          if [ "${{ steps.previous_tag.outputs.is_first_release }}" = "true" ]; then
+            python scripts/generate_release_notes.py "$VERSION" > release_description.txt
+          else
+            python scripts/generate_release_notes.py "$VERSION" "$PREVIOUS_TAG" > release_description.txt
+          fi
+          
+          echo "Generated release description:"
+          cat release_description.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.extract_info.outputs.tag_name }}
+          name: "Release v${{ steps.extract_info.outputs.version }}"
+          body_path: release_description.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up temporary files
+        run: |
+          rm -f release_description.txt

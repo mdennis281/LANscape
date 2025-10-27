@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'releases/**'
+      - 'pre-releases/**'
   workflow_call:
     inputs:
       version:

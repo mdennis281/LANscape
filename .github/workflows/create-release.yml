@@ -47,13 +47,14 @@ jobs:
       - name: Ensure tag is available
         run: |
           # Make sure we have the latest tags and checkout the specific tag
+          MAX_RETRIES=3
           echo "Waiting for tag propagation..."
           sleep 5
           git fetch --tags --force
           echo "Checking for tag: ${{ inputs.tag_name }}"
           
-          # Try up to 3 times in case of propagation delay
-          for i in 1 2 3; do
+          # Try up to $MAX_RETRIES times in case of propagation delay
+          for ((i=1; i<=MAX_RETRIES; i++)); do
             if git rev-parse "${{ inputs.tag_name }}" >/dev/null 2>&1; then
               echo "Tag ${{ inputs.tag_name }} found on attempt $i"
               git checkout "${{ inputs.tag_name }}"

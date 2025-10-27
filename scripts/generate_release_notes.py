@@ -5,13 +5,10 @@ Generate release notes using OpenAI API based on git commit history.
 
 import os
 import sys
+from typing import Optional
 import subprocess
 import openai
-from typing import Optional
 
-# Configuration
-MAX_LINES_PER_FILE = 50  # Maximum lines to show per file diff
-MAX_TOTAL_DIFF_SIZE = 5000  # Maximum total diff size to avoid overwhelming AI
 
 
 def get_git_log(from_tag: Optional[str] = None, to_tag: str = "HEAD") -> str:
@@ -170,7 +167,6 @@ For more details, see the commit history.
 
 def main():
     """Main function to generate release notes."""
-    global MAX_LINES_PER_FILE
     
     if len(sys.argv) < 2:
         print("Usage: python generate_release_notes.py <version> [from_tag]", file=sys.stderr)

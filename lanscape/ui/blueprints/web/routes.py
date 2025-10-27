@@ -2,7 +2,7 @@
 Web blueprint routes for the LANscape application.
 Handles UI views including the main dashboard, scan results, error display, and exports.
 """
-from flask import render_template, request, redirect
+from flask import render_template, request, redirect, url_for
 from lanscape.ui.blueprints.web import web_bp
 from lanscape.libraries.net_tools import (
     get_all_network_subnets,
@@ -103,7 +103,7 @@ def view_device(scan_id, device_ip):
             return render_template('scan/device-detail.html', device=device_info, scan_id=scan_id)
         
         log.debug(f'Device {device_ip} not found in scan {scan_id}')
-        return redirect(f'/scan/{scan_id}')
+        return redirect(url_for('render_scan', scan_id=scan_id))
     log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
     return redirect('/')
 

@@ -49,7 +49,7 @@
               <div class="chip-group mt-1">
                 {% for p in ports %}
                   <span class="chip" title="Port {{ p }}">
-                    <span class="material-symbols-outlined">lan</span>{{ p }}
+                    <i class="fa-solid fa-network-wired"></i>{{ p }}
                   </span>
                 {% endfor %}
               </div>
@@ -65,7 +65,7 @@
                 {% for svc, svc_ports in services|dictsort %}
                   <div class="service-row">
                     <div class="service-name">
-                      <span class="material-symbols-outlined align-middle me-1">dns</span>{{ svc|default('Unknown') }}
+                      <i class="fa-solid fa-server align-middle me-1"></i>{{ svc|default('Unknown') }}
                     </div>
                     <div class="service-ports">
                       {% set s_ports = svc_ports|default([]) %}
@@ -91,7 +91,7 @@
               <ul class="list-unstyled error-list mt-1">
                 {% for err in errors %}
                   <li class="text-danger">
-                    <span class="material-symbols-outlined align-middle me-1">error</span>
+                    <i class="fa-solid fa-circle-exclamation align-middle me-1"></i>
                     {{ err }}
                   </li>
                 {% endfor %}

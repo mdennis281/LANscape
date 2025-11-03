@@ -8,21 +8,24 @@
       <div class="modal-body">
         <div class="d-flex gap-2 mb-3">
             <div class="config-option p-3 flex-fill flex-wrap" id="config-fast" data-config="fast" onclick="setScanConfig('fast')">
-                <h5 class="mb-1 d-flex align-items-center justify-content-center">
-                    <span class="material-symbols-outlined me-1">bolt</span>Fast
-                </h5>
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                    <i class="fa-solid fa-bolt mb-2" style="font-size: 1.5em;"></i>
+                    <h5 class="mb-1">Fast</h5>
+                </div>
                 <p class="mb-0">Fast scan, Low accuracy</p>
             </div>
             <div class="config-option p-3 flex-fill" id="config-balanced" data-config="balanced" onclick="setScanConfig('balanced')">
-                <h5 class="mb-1 d-flex align-items-center justify-content-center">
-                    <span class="material-symbols-outlined me-1">balance</span>Balanced
-                </h5>
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                    <i class="fa-solid fa-scale-balanced mb-2" style="font-size: 1.5em;"></i>
+                    <h5 class="mb-1">Balanced</h5>
+                </div>
                 <p class="mb-0">Balanced scan, Moderate accuracy</p>
             </div>
             <div class="config-option p-3 flex-fill" id="config-accurate" data-config="accurate" onclick="setScanConfig('accurate')">
-                <h5 class="mb-1 d-flex align-items-center justify-content-center">
-                    <span class="material-symbols-outlined me-1">target</span>Accurate
-                </h5>
+                <div class="d-flex flex-column align-items-center justify-content-center">
+                    <i class="fa-solid fa-bullseye mb-2" style="font-size: 1.5em;"></i>
+                    <h5 class="mb-1">Accurate</h5>
+                </div>
                 <p class="mb-0">Thorough scan, High accuracy</p>
             </div>
         </div>
@@ -51,15 +54,13 @@
                                     ARP Lookup
                                 </label>
                                 {% if not is_arp_supported %}
-                                    <span
-                                        class="material-symbols-outlined arp-help-ico"
+                                    <i
+                                        class="fa-solid fa-circle-question arp-help-ico"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
                                         title="ARP lookup is not supported on this system, click for more info"
                                         onclick="window.open('https://github.com/mdennis281/LANscape/blob/main/docs/arp-issues.md', '_blank')"
-                                    >
-                                        help
-                                    </span>
+                                    ></i>
                                 {% endif %}
                             </div>
                             <div class="form-check">

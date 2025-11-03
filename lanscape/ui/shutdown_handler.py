@@ -8,7 +8,7 @@ from flask import request
 from lanscape.core.runtime_args import parse_args
 
 
-log = logging.getLogger('shutdown_handler')
+log = logging.getLogger('ShutdownHandler')
 
 
 class FlaskShutdownHandler:

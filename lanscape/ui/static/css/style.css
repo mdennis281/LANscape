@@ -34,6 +34,9 @@
     --danger-border-color: #922; /* Bold red for danger borders */
     
     --footer-height: 25px;
+
+    --fa-primary-color: var(--text-accent-color);
+    --fa-secondary-color: var(--text-placeholder);
 }
 
 body {
@@ -244,7 +247,7 @@ details {
     transition: all .5s ease-in-out
 }
 
-#app-actions a .material-symbols-outlined {
+#app-actions a .fa-solid {
     font-size: inherit
 }
 #app-actions {
@@ -257,9 +260,12 @@ details {
     color: var(--text-color);
     text-decoration: none;
     cursor: pointer;
+    --fa-primary-color: var(--text-accent-color);
+    --fa-secondary-color: var(--text-placeholder);
 }
-#app-actions a:hover {
-    color: var(--text-placeholder)
+#app-actions a i:hover {
+    --fa-primary-color: var(--text-color);
+    --fa-secondary-color: var(--text-accent-color);
 }
 
 #power-button {
@@ -274,10 +280,10 @@ details {
     display: flex;
     justify-content: space-around;
     align-items: center;
-    a {
-        text-decoration: none;
-        margin: 0 3px;
-    }
+}
+
+#scan-actions i {
+    font-size: 20px;
 }
 
 #advanced-modal {
@@ -796,13 +802,7 @@ html {
 }
 
 
-.material-symbols-outlined {
-  font-variation-settings:
-  'FILL' 0,
-  'wght' 400,
-  'GRAD' 0,
-  'opsz' 24
-}
+/* FontAwesome Solid Icon Styling */
 
 #shutdown-sub-sub {
     color: var(--text-almost-hidden);
@@ -942,7 +942,7 @@ html {
     border-radius: 999px;
     color: var(--text-color);
 }
-#device-modal .chip .material-symbols-outlined {
+#device-modal .chip .fa-solid {
     font-size: 16px;
 }
 

@@ -23,12 +23,12 @@
                         <button
                             type="button"
                             id="settings-btn"
-                            class="btn btn-secondary start material-symbols-outlined"
+                            class="btn btn-secondary start"
                             data-bs-toggle="tooltip"
                             data-bs-placement="bottom"
                             title="Advanced scan settings"
                         >
-                            settings
+                            <i class="fa-solid fa-gear"></i>
                         </button>
                         <input type="text" id="subnet" name="subnet" class="form-control" value="{{ subnet }}" placeholder="Enter subnet">
                         <button class="btn btn-secondary dropdown-toggle end" type="button" id="subnet-dropdown" data-bs-toggle="dropdown" aria-expanded="false"></button>
@@ -59,13 +59,12 @@
                 <h2>Scan Results</h2>
                 <div id="scan-actions">
                     <a href="" id="export-link">
-                        <span 
-                            class="material-symbols-outlined secondary-icon-btn"
+                        <i 
+                            class="fa-solid fa-upload secondary-icon-btn"
                             data-bs-toggle="tooltip" 
                             data-bs-placement="top" 
                             title="Export scan to json">
-                            ios_share
-                        </span>
+                        </i>
                     </a>
                 </div>
             </div>

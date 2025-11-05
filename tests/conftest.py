@@ -182,7 +182,7 @@ def sample_port_list():
 def test_scan_config():
     """Standard scan configuration for testing."""
     return {
-        'subnet': right_size_subnet(get_network_subnet()),
+        'subnet': '1.1.1.1/28',
         'port_list': 'small',
         'lookup_type': ['POKE_THEN_ARP']
     }

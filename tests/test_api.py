@@ -8,10 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from lanscape.ui.app import app
-from lanscape.core.net_tools import get_network_subnet
 
-from tests._helpers import right_size_subnet
+from tests.test_constants import (
+    TEST_SUBNET,
+    TEST_SUBNET_HOST_COUNT,
+    MIN_EXPECTED_RUNTIME,
+    MIN_EXPECTED_ALIVE_DEVICES,
+    MAX_EXPECTED_ALIVE_DEVICES
+)
+from lanscape.ui.app import app
 
 
 @pytest.fixture
@@ -36,9 +41,12 @@ def updated_port_list():
 def test_scan_config():
     """Create a test scan configuration."""
     return {
-        'subnet': '1.1.1.1/28',
+        'subnet': TEST_SUBNET,
         'port_list': 'test_port_list_scan',
-        'lookup_type': ['POKE_THEN_ARP']
+        'lookup_type': ['ICMP'],  # Use ICMP for reliable external IP detection
+        't_multiplier': 1.5,  # Slower to ensure measurable runtime
+        't_cnt_isalive': 2,   # Limit threads to extend runtime
+        'ping_config': {'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     }
 
 # API Port Management Tests
@@ -273,10 +281,10 @@ def test_scan_api_async(api_client, test_scan_config):
     # Verify final scan state
     assert not summary['running']
     assert summary['stage'] == 'complete'
-    assert summary['runtime'] >= 0  # Runtime should be non-negative (may be 0 for very fast scans)
+    assert summary['runtime'] >= MIN_EXPECTED_RUNTIME  # Should take measurable time for network ops
 
     # Validate device counts
     devices = summary['devices']
     assert devices['scanned'] == devices['total']
-    assert devices['alive'] >= 0  # May not find alive devices for external IPs
-    assert devices['total'] == 14  # Should scan 14 host IPs in /28 subnet
+    assert MIN_EXPECTED_ALIVE_DEVICES <= devices['alive'] <= MAX_EXPECTED_ALIVE_DEVICES
+    assert devices['total'] == TEST_SUBNET_HOST_COUNT  # Should scan expected number of host IPs

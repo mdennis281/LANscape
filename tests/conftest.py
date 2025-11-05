@@ -9,8 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from lanscape.core.port_manager import PortManager
 from lanscape.core.scan_config import ScanConfig
-from lanscape.core.net_tools import get_network_subnet
-from ._helpers import right_size_subnet
+from .test_constants import TEST_SUBNET
 
 
 @pytest.fixture
@@ -182,7 +181,10 @@ def sample_port_list():
 def test_scan_config():
     """Standard scan configuration for testing."""
     return {
-        'subnet': '1.1.1.1/28',
+        'subnet': TEST_SUBNET,
         'port_list': 'small',
-        'lookup_type': ['POKE_THEN_ARP']
+        'lookup_type': ['ICMP'],  # Use ICMP for reliable external IP detection
+        't_multiplier': 1.5,  # Slower to ensure measurable runtime
+        't_cnt_isalive': 2,   # Limit threads to extend runtime
+        'ping_config': {'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     }

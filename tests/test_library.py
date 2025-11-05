@@ -9,7 +9,13 @@ from lanscape.core.net_tools import smart_select_primary_subnet
 from lanscape.core.subnet_scan import ScanManager
 from lanscape.core.scan_config import ScanConfig, ScanType
 
-from tests._helpers import right_size_subnet
+from tests.test_constants import (
+    TEST_SUBNET,
+    TEST_SUBNET_HOST_COUNT,
+    MIN_EXPECTED_RUNTIME,
+    MIN_EXPECTED_ALIVE_DEVICES,
+    MAX_EXPECTED_ALIVE_DEVICES
+)
 
 
 @pytest.fixture
@@ -75,14 +81,16 @@ def test_smart_select_primary_subnet():
 @pytest.mark.slow
 def test_scan(scan_manager):
     """
-    Test the network scanning functionality with a fixed subnet (1.1.1.1/28).
+    Test the network scanning functionality with a fixed external subnet.
     Verifies that the scan engine works correctly with external public IPs.
     """
     cfg = ScanConfig(
-        subnet='1.1.1.1/28',
-        t_multiplier=1.0,
+        subnet=TEST_SUBNET,
+        t_multiplier=1.5,  # Slower to ensure measurable runtime
         port_list='small',
-        lookup_type=[ScanType.POKE_THEN_ARP]
+        lookup_type=[ScanType.ICMP],  # Use ICMP for reliable external IP detection
+        t_cnt_isalive=2,   # Limit threads to extend runtime
+        ping_config={'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     )
     scan = scan_manager.new_scan(cfg)
     assert scan.running
@@ -112,9 +120,16 @@ def test_scan(scan_manager):
         # device must be alive to be in this list
         assert d.alive
 
-    # For external IPs like 1.1.1.1/28, we may not find devices but scan should complete
+    # For external IPs, we may not find responsive devices but scan should complete
     # The main goal is to test that the scan engine works correctly
     assert scan.results.devices_scanned == scan.results.devices_total
-    
-    # Verify the scan covered the expected number of IPs (14 host IPs in /28 subnet)
-    assert scan.results.devices_total == 14
+
+    # Verify the scan covered the expected number of host IPs
+    assert scan.results.devices_total == TEST_SUBNET_HOST_COUNT
+
+    # Verify scan took measurable time (should be > 0 for real network operations)
+    assert scan.results.get_runtime() >= MIN_EXPECTED_RUNTIME
+
+    # For external ranges, alive device count should be within expected bounds
+    alive_count = len([d for d in scan.results.devices if d.alive])
+    assert MIN_EXPECTED_ALIVE_DEVICES <= alive_count <= MAX_EXPECTED_ALIVE_DEVICES

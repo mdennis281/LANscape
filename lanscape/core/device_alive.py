@@ -127,20 +127,23 @@ class IcmpLookup():
                     # Windows/Linux both include “TTL” on a successful reply
                     if psutil.WINDOWS or psutil.LINUX:
                         if 'ttl' in output:
-                            return True
+                            device.alive = True
+                            break
                     # some distributions of Linux and macOS
                     if psutil.MACOS or psutil.LINUX:
                         bad = '100.0% packet loss'
                         good = 'ping statistics'
                         # mac doesnt include TTL, so we check good is there, and bad is not
                         if good in output and bad not in output:
-                            return True
+                            device.alive = True
+                            break
             except subprocess.CalledProcessError as e:
                 device.caught_errors.append(DeviceError(e))
 
             if r < cfg.attempts - 1:
                 time.sleep(cfg.retry_delay)
-        return False
+
+        return device.alive is True
 
 
 class ArpCacheLookup():

@@ -303,11 +303,11 @@ class ScannerResults:
         Calculate the runtime of the scan in seconds.
 
         Returns:
-            int: Runtime in seconds
+            float: Runtime in seconds
         """
         if self.scan.running:
-            return int(time() - self.start_time)
-        return int(self.end_time - self.start_time)
+            return time() - self.start_time
+        return self.end_time - self.start_time
 
     def export(self, out_type=dict) -> Union[str, dict]:
         """

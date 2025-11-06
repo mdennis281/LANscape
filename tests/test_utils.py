@@ -273,7 +273,9 @@ def test_scan_config_uses_arp():
         subnet='192.168.1.0/24',
         port_list='small',
         lookup_type=[
-            ScanType.ICMP])
+            ScanType.ICMP,
+            ScanType.POKE_THEN_ARP
+        ])
     assert scan_config_uses_arp(config_icmp) is False
 
     # Test configurations that use ARP

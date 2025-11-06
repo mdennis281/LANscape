@@ -32,9 +32,14 @@
         "wlan"
     ],
     "chat.tools.terminal.autoApprove": {
-        "python -m pylint --score=yes scripts/ lanscape/ tests/": {
+        "python -c": {
             "approve": true,
-            "matchCommandLine": true
+            "matchCommandLine": false
+        },
+
+        "python -m pylint": {
+            "approve": true,
+            "matchCommandLine": false
         },
         ".env/Scripts/activate": {
             "approve": true,
@@ -44,21 +49,17 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "python -m pytest tests/": {
+        "python -m pytest": {
             "approve": true,
-            "matchCommandLine": true
+            "matchCommandLine": false
         },
         ".\\.env\\Scripts\\python.exe -m": {
-            "approve": true,
-            "matchCommandLine": true
-        },
-        "pytest tests/": {
             "approve": true,
             "matchCommandLine": false
         },
         "pytest": {
             "approve": true,
-            "matchCommandLine": true
+            "matchCommandLine": false
         }
     },
     "chat.agent.maxRequests": 100

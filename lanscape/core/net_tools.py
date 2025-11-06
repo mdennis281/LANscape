@@ -31,10 +31,10 @@ else:
 
 from lanscape.core.service_scan import scan_service
 from lanscape.core.mac_lookup import MacLookup, get_macs
-from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED
+from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip_input
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, run_once, timeout_enforcer
-from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig
+from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, ScanType
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -550,6 +550,56 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
         selected = subnets[0]
 
     return selected.get("subnet", "")
+
+
+def is_internal_block(subnet: str) -> bool:
+    """
+    Check if a subnet contains only internal/private IP addresses.
+
+    Supports CIDR notation, IP ranges, comma-separated lists, and single IPs.
+    For ranges and complex inputs, samples representative IPs for efficiency.
+
+    Args:
+        subnet: IP subnet string in various formats
+
+    Returns:
+        bool: True if all sampled IPs are private/internal, False otherwise
+    """
+    try:
+        # Handle comma-separated subnets recursively
+        if ',' in subnet:
+            return all(is_internal_block(part.strip()) for part in subnet.split(','))
+
+        # Handle CIDR notation directly
+        if '/' in subnet:
+            return ipaddress.IPv4Network(subnet, strict=False).is_private
+
+        # Handle ranges and single IPs by parsing and sampling
+        ip_list = parse_ip_input(subnet)
+        sample_ips = ([ip_list[0], ip_list[-1]] if len(ip_list) > 1 else ip_list)
+        return all(ipaddress.IPv4Address(ip).is_private for ip in sample_ips)
+
+    except (ValueError, ipaddress.AddressValueError):
+        return False  # Assume external for unparseable input
+
+
+def scan_config_uses_arp(config) -> bool:
+    """
+    Check if a scan configuration uses ARP-based scanning methods.
+
+    Args:
+        config: ScanConfig instance
+
+    Returns:
+        bool: True if the configuration uses ARP scanning, False otherwise
+    """
+    arp_scan_types = {
+        ScanType.ARP_LOOKUP,
+        ScanType.POKE_THEN_ARP,
+        ScanType.ICMP_THEN_ARP
+    }
+
+    return any(scan_type in arp_scan_types for scan_type in config.lookup_type)
 
 
 @run_once

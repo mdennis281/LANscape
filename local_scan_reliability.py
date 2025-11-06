@@ -10,20 +10,25 @@ import time
 from tabulate import tabulate
 
 # LANscape imports
-from lanscape import ScanManager, ScanConfig, net_tools
+from lanscape import ScanManager, ScanConfig
+from lanscape.core.scan_config import ScanType
+
+# Use the same test subnet as the test suite for consistency
+TEST_SUBNET = "1.1.1.1/28"
 
 
 def main():
-    """run reliability test for local network scans"""
+    """run reliability test for external network scan"""
 
     # Initialize scan manager
     sm = ScanManager()
 
-    # Configure scan settings
+    # Configure scan settings using reliable external subnet
     cfg = ScanConfig(
-        subnet=net_tools.smart_select_primary_subnet(),
+        subnet=TEST_SUBNET,
         port_list='small',
-        t_multiplier=1
+        t_multiplier=1,
+        lookup_type=[ScanType.ICMP]  # Use ICMP for external IPs
     )
 
     try:

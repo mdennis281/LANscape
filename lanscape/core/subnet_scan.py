@@ -22,7 +22,9 @@ from tabulate import tabulate
 # Local imports
 from lanscape.core.scan_config import ScanConfig
 from lanscape.core.decorators import job_tracker, terminator, JobStats
-from lanscape.core.net_tools import Device
+from lanscape.core.net_tools import (
+    Device, is_internal_block, scan_config_uses_arp
+)
 from lanscape.core.errors import SubnetScanTerminationFailure
 from lanscape.core.device_alive import is_device_alive
 
@@ -301,11 +303,11 @@ class ScannerResults:
         Calculate the runtime of the scan in seconds.
 
         Returns:
-            int: Runtime in seconds
+            float: Runtime in seconds
         """
         if self.scan.running:
-            return int(time() - self.start_time)
-        return int(self.end_time - self.start_time)
+            return time() - self.start_time
+        return self.end_time - self.start_time
 
     def export(self, out_type=dict) -> Union[str, dict]:
         """
@@ -385,6 +387,13 @@ class ScanManager:
         Returns:
             SubnetScanner: The newly created scan instance
         """
+        if not is_internal_block(config.subnet) and scan_config_uses_arp(config):
+            self.log.warning(
+                f"ARP scanning detected for external subnet '{config.subnet}'. "
+                "ARP requests typically only work within the local network segment. "
+                "Consider using ICMP scanning for external IP ranges."
+            )
+
         scan = SubnetScanner(config)
         self._start(scan)
         self.log.info(f'Scan started - {config}')

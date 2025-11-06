@@ -88,7 +88,7 @@ def test_scan(scan_manager):
         subnet=TEST_SUBNET,
         t_multiplier=1.5,  # Slower to ensure measurable runtime
         port_list='small',
-        lookup_type=[ScanType.ICMP],  # Use ICMP for reliable external IP detection
+        lookup_type=[ScanType.ICMP, ScanType.POKE_THEN_ARP],  # Use ICMP for reliable external IP detection
         t_cnt_isalive=2,   # Limit threads to extend runtime
         ping_config={'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     )

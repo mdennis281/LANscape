@@ -134,7 +134,7 @@ class IcmpLookup():
                         if 'ttl' in output:
                             device.alive = True
                             return True  # Early return on success
-                    
+
                     # some distributions of Linux and macOS
                     if psutil.MACOS or psutil.LINUX:
                         bad = '100.0% packet loss'
@@ -144,7 +144,7 @@ class IcmpLookup():
                             device.alive = True
                             return True  # Early return on success
 
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, 
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
                     FileNotFoundError) as e:
                 device.caught_errors.append(DeviceError(e))
 

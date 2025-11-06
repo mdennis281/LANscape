@@ -113,22 +113,28 @@ class IcmpLookup():
 
         for r in range(cfg.attempts):
             try:
+                # Remove check=True to handle return codes manually
+                # Add timeout to prevent hanging
+                timeout_val = cfg.timeout * cfg.ping_count + 5
                 proc = subprocess.run(
                     cmd,
                     text=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    check=True
+                    timeout=timeout_val,
+                    check=False  # Handle return codes manually
                 )
 
+                # Check if ping was successful
                 if proc.returncode == 0:
                     output = proc.stdout.lower()
 
-                    # Windows/Linux both include “TTL” on a successful reply
+                    # Windows/Linux both include "TTL" on a successful reply
                     if psutil.WINDOWS or psutil.LINUX:
                         if 'ttl' in output:
                             device.alive = True
-                            break
+                            return True  # Early return on success
+                    
                     # some distributions of Linux and macOS
                     if psutil.MACOS or psutil.LINUX:
                         bad = '100.0% packet loss'
@@ -136,8 +142,10 @@ class IcmpLookup():
                         # mac doesnt include TTL, so we check good is there, and bad is not
                         if good in output and bad not in output:
                             device.alive = True
-                            break
-            except subprocess.CalledProcessError as e:
+                            return True  # Early return on success
+
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, 
+                    FileNotFoundError) as e:
                 device.caught_errors.append(DeviceError(e))
 
             if r < cfg.attempts - 1:

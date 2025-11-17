@@ -244,6 +244,13 @@ def test_scan_api_async(api_client, test_scan_config):
     """
     Test the full scan API lifecycle with progress monitoring
     """
+
+    def _get_scan_response(scan_id):
+        """Consolidated method to get scan response."""
+        response = api_client.get(f'/api/scan/{scan_id}')
+        assert response.status_code == 200
+        return json.loads(response.data)
+
     # Create the port list first (since test_scan_config references it)
     sample_port_list = {'80': 'http', '443': 'https'}
     api_client.post('/api/port/list/test_port_list_scan', json=sample_port_list)
@@ -263,9 +270,7 @@ def test_scan_api_async(api_client, test_scan_config):
 
     while percent_complete < 100 and iteration < max_iterations:
         # Get scan summary
-        response = api_client.get(f'/api/scan/{scan_id}/summary')
-        assert response.status_code == 200
-        summary = json.loads(response.data)
+        summary = _get_scan_response(scan_id)
         assert summary['running'] or summary['stage'] == 'complete'
 
         percent_complete = summary['percent_complete']
@@ -277,6 +282,9 @@ def test_scan_api_async(api_client, test_scan_config):
         if percent_complete < 100:
             time.sleep(2)
         iteration += 1
+        
+    time.sleep(1)
+    summary = _get_scan_response(scan_id)
 
     # Verify final scan state
     assert not summary['running']

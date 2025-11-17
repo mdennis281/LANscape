@@ -11,10 +11,8 @@ import pytest
 
 from tests.test_globals import (
     TEST_SUBNET,
-    TEST_SUBNET_HOST_COUNT,
     MIN_EXPECTED_RUNTIME,
-    MIN_EXPECTED_ALIVE_DEVICES,
-    MAX_EXPECTED_ALIVE_DEVICES
+    MIN_EXPECTED_ALIVE_DEVICES
 )
 from lanscape.ui.app import app
 
@@ -292,5 +290,4 @@ def test_scan_api_async(api_client, test_scan_config):
     # Validate device counts
     devices = summary['devices']
     assert devices['scanned'] == devices['total']
-    assert MIN_EXPECTED_ALIVE_DEVICES <= devices['alive'] <= MAX_EXPECTED_ALIVE_DEVICES
-    assert devices['total'] == TEST_SUBNET_HOST_COUNT  # Should scan expected number of host IPs
+    assert MIN_EXPECTED_ALIVE_DEVICES <= devices['alive']

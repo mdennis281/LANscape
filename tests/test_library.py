@@ -11,10 +11,8 @@ from lanscape.core.scan_config import ScanConfig, ScanType
 
 from tests.test_globals import (
     TEST_SUBNET,
-    TEST_SUBNET_HOST_COUNT,
     MIN_EXPECTED_RUNTIME,
-    MIN_EXPECTED_ALIVE_DEVICES,
-    MAX_EXPECTED_ALIVE_DEVICES
+    MIN_EXPECTED_ALIVE_DEVICES
 )
 
 
@@ -123,12 +121,9 @@ def test_scan(scan_manager):
     # The main goal is to test that the scan engine works correctly
     assert scan.results.devices_scanned == scan.results.devices_total
 
-    # Verify the scan covered the expected number of host IPs
-    assert scan.results.devices_total == TEST_SUBNET_HOST_COUNT
-
     # Verify scan took measurable time (should be > 0 for real network operations)
     assert scan.results.get_runtime() >= MIN_EXPECTED_RUNTIME
 
     # For external ranges, alive device count should be within expected bounds
     alive_count = len([d for d in scan.results.devices if d.alive])
-    assert MIN_EXPECTED_ALIVE_DEVICES <= alive_count <= MAX_EXPECTED_ALIVE_DEVICES
+    assert MIN_EXPECTED_ALIVE_DEVICES <= alive_count

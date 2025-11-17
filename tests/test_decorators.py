@@ -287,12 +287,12 @@ def test_job_tracker_multiple_different_functions():
 
     @job_tracker
     def function_a():
-        time.sleep(0.01)
+        time.sleep(0.1)
         return "a"
 
     @job_tracker
     def function_b():
-        time.sleep(0.02)
+        time.sleep(0.3)
         return "b"
 
     function_a()

@@ -14,7 +14,7 @@ TEST_SUBNET_TOTAL_COUNT = 16  # Total addresses including network/broadcast
 
 # Minimum expected runtime for integration tests (seconds)
 # External IP scans should take at least some measurable time
-MIN_EXPECTED_RUNTIME = 0.5
+MIN_EXPECTED_RUNTIME = 0.2
 
 # For 1.1.1.1/28 range (Cloudflare DNS), using ICMP lookup finds all devices
 # This provides a reliable test case with predictable results

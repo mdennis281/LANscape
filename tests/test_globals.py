@@ -1,12 +1,14 @@
 """
-Global constants for tests in the LANscape project.
+Globals for tests in the LANscape project.
 Provides shared configuration values used across multiple test files.
 """
+
+from tests._helpers import right_size_subnet
 
 # Test subnet for network scanning integration tests
 # Using 1.1.1.1/28 (Cloudflare DNS range) for consistent, external testing
 # This subnet contains 14 host addresses (1.1.1.1 - 1.1.1.14)
-TEST_SUBNET = "1.1.1.1/28"
+TEST_SUBNET = f"1.1.1.1/28, {right_size_subnet()}"
 
 # Expected values for TEST_SUBNET
 TEST_SUBNET_HOST_COUNT = 14  # Number of scannable host addresses

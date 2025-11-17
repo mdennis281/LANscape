@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 
-from tests.test_constants import (
+from tests.test_globals import (
     TEST_SUBNET,
     TEST_SUBNET_HOST_COUNT,
     MIN_EXPECTED_RUNTIME,
@@ -44,8 +44,7 @@ def test_scan_config():
         'subnet': TEST_SUBNET,
         'port_list': 'test_port_list_scan',
         'lookup_type': ['ICMP','POKE_THEN_ARP'],  # Use ICMP for reliable external IP detection
-        't_multiplier': 1.5,  # Slower to ensure measurable runtime
-        't_cnt_isalive': 2,   # Limit threads to extend runtime
+        't_multiplier': .5,  # Slower to ensure measurable runtime
         'ping_config': {'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     }
 
@@ -282,7 +281,7 @@ def test_scan_api_async(api_client, test_scan_config):
         if percent_complete < 100:
             time.sleep(2)
         iteration += 1
-        
+
     time.sleep(1)
     summary = _get_scan_response(scan_id)
 

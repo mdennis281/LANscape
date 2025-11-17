@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from lanscape.core.port_manager import PortManager
 from lanscape.core.scan_config import ScanConfig
-from .test_constants import TEST_SUBNET
+from .test_globals import TEST_SUBNET
 
 
 @pytest.fixture

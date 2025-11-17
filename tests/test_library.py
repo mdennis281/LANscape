@@ -9,7 +9,7 @@ from lanscape.core.net_tools import smart_select_primary_subnet
 from lanscape.core.subnet_scan import ScanManager
 from lanscape.core.scan_config import ScanConfig, ScanType
 
-from tests.test_constants import (
+from tests.test_globals import (
     TEST_SUBNET,
     TEST_SUBNET_HOST_COUNT,
     MIN_EXPECTED_RUNTIME,

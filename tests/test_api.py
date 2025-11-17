@@ -44,7 +44,6 @@ def test_scan_config():
         'subnet': TEST_SUBNET,
         'port_list': 'test_port_list_scan',
         'lookup_type': ['ICMP','POKE_THEN_ARP'],  # Use ICMP for reliable external IP detection
-        't_multiplier': .5,  # Slower to ensure measurable runtime
         'ping_config': {'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     }
 

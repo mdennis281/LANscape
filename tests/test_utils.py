@@ -6,6 +6,7 @@ Tests include IP parsing, port management, and decorator functionality.
 import ipaddress
 import logging
 import time
+import platform
 
 import pytest
 
@@ -153,7 +154,7 @@ def test_timeout_enforcer_parametrized(timeout, raise_flag, expected_exception):
 
     @timeout_enforcer(timeout, raise_on_timeout=raise_flag)
     def slow_function():
-        time.sleep(0.2)
+        time.sleep(0.5)
         return "done"
 
     if raise_flag:

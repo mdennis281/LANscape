@@ -247,7 +247,7 @@ def test_scan_api_async(api_client, test_scan_config):
 
     def _get_scan_response(scan_id):
         """Consolidated method to get scan response."""
-        response = api_client.get(f'/api/scan/{scan_id}')
+        response = api_client.get(f'/api/scan/{scan_id}/summary')
         assert response.status_code == 200
         return json.loads(response.data)
 

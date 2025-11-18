@@ -1,17 +1,21 @@
 """Helper functions for tests in the lanscape project."""
 from lanscape.core.ip_parser import get_address_count
+from lanscape.core.net_tools import smart_select_primary_subnet
 
 
-def right_size_subnet(subnet: str) -> str:
+def right_size_subnet(subnet: str = '') -> str:
     """
     Used to improve speed of test time by increasing the prefix length until
-    the subnet contains no more than 64 addresses. Protect against malformed
+    the subnet contains no more than 25 addresses. Protect against malformed
     input and infinite loops by validating the mask and applying a max-iteration
     safety limit.
     """
+    if not subnet:
+        subnet = smart_select_primary_subnet()
+
     max_mask = 32
     max_iterations = 10
-    max_ips = 64
+    max_ips = 25
     iterations = 0
 
     while get_address_count(subnet) > max_ips:

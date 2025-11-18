@@ -12,8 +12,9 @@ import psutil
 from scapy.sendrecv import srp
 from scapy.layers.l2 import ARP, Ether
 from icmplib import ping
+from icmplib.exceptions import SocketPermissionError
 
-from lanscape.core.net_tools import Device
+from lanscape.core.net_tools import Device, DeviceError
 from lanscape.core.scan_config import (
     ScanConfig, ScanType, PingConfig,
     ArpConfig, PokeConfig, ArpCacheConfig
@@ -72,18 +73,84 @@ class IcmpLookup():
         Returns:
             bool: True if the device is reachable via ICMP, False otherwise.
         """
-        # Perform up to cfg.attempts rounds of ping(count=cfg.ping_count)
-        for _ in range(cfg.attempts):
-            result = ping(
-                device.ip,
-                count=cfg.ping_count,
-                interval=cfg.retry_delay,
-                timeout=cfg.timeout,
-                privileged=psutil.WINDOWS  # Use privileged mode on Windows
-            )
-            if result.is_alive:
-                device.alive = True
-                break
+        try:
+            # Try using icmplib first
+            for _ in range(cfg.attempts):
+                result = ping(
+                    device.ip,
+                    count=cfg.ping_count,
+                    interval=cfg.retry_delay,
+                    timeout=cfg.timeout,
+                    privileged=psutil.WINDOWS  # Use privileged mode on Windows
+                )
+                if result.is_alive:
+                    device.alive = True
+                    break
+            return device.alive is True
+        except SocketPermissionError:
+            # Fallback to system ping command when raw sockets aren't available
+            return cls._ping_fallback(device, cfg)
+
+    @classmethod
+    def _ping_fallback(cls, device: Device, cfg: PingConfig) -> bool:
+        """Fallback ping using system ping command via subprocess.
+
+        Args:
+            device (Device): The device to ping.
+            cfg (PingConfig): The ping configuration.
+
+        Returns:
+            bool: True if the device responds to ping, False otherwise.
+        """
+        cmd = []
+
+        if psutil.WINDOWS:
+            # -n count, -w timeout in ms
+            cmd = ['ping', '-n', str(cfg.ping_count), '-w', str(int(cfg.timeout * 1000)), device.ip]
+        else:  # Linux, macOS, and other Unix-like systems
+            # -c count, -W timeout in s
+            cmd = ['ping', '-c', str(cfg.ping_count), '-W', str(int(cfg.timeout)), device.ip]
+
+        for r in range(cfg.attempts):
+            try:
+                # Remove check=True to handle return codes manually
+                # Add timeout to prevent hanging
+                timeout_val = cfg.timeout * cfg.ping_count + 5
+                proc = subprocess.run(
+                    cmd,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=timeout_val,
+                    check=False  # Handle return codes manually
+                )
+
+                # Check if ping was successful
+                if proc.returncode == 0:
+                    output = proc.stdout.lower()
+
+                    # Windows/Linux both include "TTL" on a successful reply
+                    if psutil.WINDOWS or psutil.LINUX:
+                        if 'ttl' in output:
+                            device.alive = True
+                            return True  # Early return on success
+
+                    # some distributions of Linux and macOS
+                    if psutil.MACOS or psutil.LINUX:
+                        bad = '100.0% packet loss'
+                        good = 'ping statistics'
+                        # mac doesnt include TTL, so we check good is there, and bad is not
+                        if good in output and bad not in output:
+                            device.alive = True
+                            return True  # Early return on success
+
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
+                    FileNotFoundError) as e:
+                device.caught_errors.append(DeviceError(e))
+
+            if r < cfg.attempts - 1:
+                time.sleep(cfg.retry_delay)
+
         return device.alive is True
 
 

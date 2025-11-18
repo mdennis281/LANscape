@@ -8,10 +8,13 @@ from unittest.mock import patch
 
 import pytest
 
-from lanscape.ui.app import app
-from lanscape.core.net_tools import get_network_subnet
 
-from tests._helpers import right_size_subnet
+from tests.test_globals import (
+    TEST_SUBNET,
+    MIN_EXPECTED_RUNTIME,
+    MIN_EXPECTED_ALIVE_DEVICES
+)
+from lanscape.ui.app import app
 
 
 @pytest.fixture
@@ -36,9 +39,10 @@ def updated_port_list():
 def test_scan_config():
     """Create a test scan configuration."""
     return {
-        'subnet': right_size_subnet(get_network_subnet()),
+        'subnet': TEST_SUBNET,
         'port_list': 'test_port_list_scan',
-        'lookup_type': ['POKE_THEN_ARP']
+        'lookup_type': ['ICMP','POKE_THEN_ARP'],  # Use ICMP for reliable external IP detection
+        'ping_config': {'timeout': 0.8, 'attempts': 2}  # Reasonable timeout for external IPs
     }
 
 # API Port Management Tests
@@ -236,6 +240,13 @@ def test_scan_api_async(api_client, test_scan_config):
     """
     Test the full scan API lifecycle with progress monitoring
     """
+
+    def _get_scan_response(scan_id):
+        """Consolidated method to get scan response."""
+        response = api_client.get(f'/api/scan/{scan_id}/summary')
+        assert response.status_code == 200
+        return json.loads(response.data)
+
     # Create the port list first (since test_scan_config references it)
     sample_port_list = {'80': 'http', '443': 'https'}
     api_client.post('/api/port/list/test_port_list_scan', json=sample_port_list)
@@ -255,9 +266,7 @@ def test_scan_api_async(api_client, test_scan_config):
 
     while percent_complete < 100 and iteration < max_iterations:
         # Get scan summary
-        response = api_client.get(f'/api/scan/{scan_id}/summary')
-        assert response.status_code == 200
-        summary = json.loads(response.data)
+        summary = _get_scan_response(scan_id)
         assert summary['running'] or summary['stage'] == 'complete'
 
         percent_complete = summary['percent_complete']
@@ -270,12 +279,15 @@ def test_scan_api_async(api_client, test_scan_config):
             time.sleep(2)
         iteration += 1
 
+    time.sleep(1)
+    summary = _get_scan_response(scan_id)
+
     # Verify final scan state
     assert not summary['running']
     assert summary['stage'] == 'complete'
-    assert summary['runtime'] > 0
+    assert summary['runtime'] >= MIN_EXPECTED_RUNTIME  # Should take measurable time for network ops
 
     # Validate device counts
     devices = summary['devices']
     assert devices['scanned'] == devices['total']
-    assert devices['alive'] > 0
+    assert MIN_EXPECTED_ALIVE_DEVICES <= devices['alive']

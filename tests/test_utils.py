@@ -6,7 +6,6 @@ Tests include IP parsing, port management, and decorator functionality.
 import ipaddress
 import logging
 import time
-import platform
 
 import pytest
 

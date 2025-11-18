@@ -50,8 +50,8 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15
-          max_attempts: 3
+          max_attempts: 2
           retry_wait_seconds: 30
-          command: python -m pytest tests/ -v
+          command: python -m pytest tests/ -v -n auto --dist=loadscope --maxfail=2
         env:
           PYTHONPATH: src

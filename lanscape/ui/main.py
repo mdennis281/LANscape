@@ -8,6 +8,9 @@ import logging
 import traceback
 import os
 import requests
+from subprocess import Popen
+
+from pwa_launcher import open_pwa
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args
@@ -70,7 +73,7 @@ def try_check_update():
         log.warning('Unable to check for updates.')
 
 
-def open_browser(url: str, wait=2) -> bool:
+def open_browser(url: str, wait=2) -> Popen:
     """
     Open a browser window to the specified
     url after waiting for the server to start
@@ -78,12 +81,12 @@ def open_browser(url: str, wait=2) -> bool:
     try:
         time.sleep(wait)
         log.info(f'Starting UI - http://127.0.0.1:{args.port}')
-        return open_webapp(url)
+        return open_pwa(url)
 
     except BaseException:
         log.debug(traceback.format_exc())
         log.info(f'Unable to open web browser, server running on {url}')
-    return False
+    return None
 
 
 def start_webserver_ui():
@@ -97,19 +100,17 @@ def start_webserver_ui():
         # if it was, dont open the browser again
         log.info('Opening UI as daemon')
         if not IS_FLASK_RELOAD:
-            threading.Thread(
-                target=open_browser,
-                args=(uri,),
-                daemon=True
-            ).start()
+            open_browser(uri)
         start_webserver(args)
     else:
         flask_thread = start_webserver_daemon(args)
-        app_closed = open_browser(uri)
+        proc = open_browser(uri)
+        
+        if proc:
+            app_closed = proc.wait()
+        else:
+            app_closed = False
 
-        # depending on env, open_browser may or
-        # may not be coupled with the closure of UI
-        # (if in browser tab, it's uncoupled)
         if not app_closed or args.persistent:
             # not doing a direct join so i can still
             # terminate the app with ctrl+c

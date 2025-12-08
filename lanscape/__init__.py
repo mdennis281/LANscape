@@ -22,3 +22,9 @@ from lanscape.core.scan_config import (
 from lanscape.core.port_manager import PortManager
 
 from lanscape.core import net_tools
+
+from lanscape.core.reliability_queue import (
+    ReliabilityQueue,
+    ReliabilityJob,
+    reliability_queue
+)

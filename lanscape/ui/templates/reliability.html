@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="header" class="reliability-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap">
+        <div>
+            <a href="/" class="text-decoration-none" aria-label="Go to main UI">
+                <h1 class="title mb-1">
+                    <span>LAN</span>scape Reliability Lab
+                </h1>
+            </a>
+            <p class="text-muted mb-0">Queue multiple scans, replay configs, and compare run-to-run stability.</p>
+        </div>
+        <div class="btn-group">
+            <a href="/" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-2"></i>Back to Scanner
+            </a>
+        </div>
+    </div>
+</div>
+
+<div id="content" class="scroll-container reliability-content">
+    <div class="container-fluid reliability-container">
+        <!-- Queue new reliability scans -->
+        <div class="card shadow-sm mb-4 reliability-panel reliability-panel-config">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h2 class="h4 mb-0">Configure Scan Batch</h2>
+                    <small class="text-muted">Reuse the advanced scan config modal to iterate quickly.</small>
+                </div>
+                <button
+                    type="button"
+                    id="reliability-settings-btn"
+                    class="btn btn-secondary"
+                    data-bs-toggle="tooltip"
+                    title="Advanced scan settings"
+                >
+                    <i class="fa-solid fa-gear me-2"></i>Advanced Settings
+                </button>
+            </div>
+
+            <form id="reliability-form" class="row gy-3 align-items-end">
+                <div class="col-lg-5">
+                    <label for="reliability-subnet" class="form-label">Subnet</label>
+                    <div class="input-group">
+                        <input type="text" id="reliability-subnet" name="subnet" class="form-control" value="{{ subnet }}" placeholder="192.168.0.0/24">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="reliability-subnet-dropdown" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                        <ul class="dropdown-menu" aria-labelledby="reliability-subnet-dropdown">
+                            {% for subnet_option in alternate_subnets %}
+                            <li><a class="dropdown-item" href="#" data-value="{{ subnet_option['subnet'] }}">{{ subnet_option['subnet'] }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <label for="run-count" class="form-label">Number of Runs</label>
+                    <input type="number" min="1" max="50" value="1" id="run-count" class="form-control">
+                </div>
+                <div class="col-md-3 col-6">
+                    <label for="run-label" class="form-label">Label (optional)</label>
+                    <input type="text" id="run-label" class="form-control" placeholder="Fast ARP validation">
+                </div>
+                <div class="col-lg-1 col-12 text-lg-end">
+                    <button type="submit" class="btn btn-primary w-100" id="queue-submit">Queue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+        <!-- Overview + Queue -->
+        <div class="row reliability-overview g-4">
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100 reliability-panel reliability-panel-overview">
+                <div class="card-body">
+                    <h3 class="h5">Run Overview</h3>
+                    <div class="reliability-stats">
+                        <div>
+                            <span class="stat-label">Queued</span>
+                            <span class="stat-value" id="stat-queued">0</span>
+                        </div>
+                        <div>
+                            <span class="stat-label">Running</span>
+                            <span class="stat-value" id="stat-running">0</span>
+                        </div>
+                        <div>
+                            <span class="stat-label">Completed</span>
+                            <span class="stat-value" id="stat-completed">0</span>
+                        </div>
+                        <div>
+                            <span class="stat-label">Errors</span>
+                            <span class="stat-value text-danger" id="stat-errors">0</span>
+                        </div>
+                    </div>
+                    <div class="run-overview-metrics">
+                        <div class="run-overview-metric">
+                            <div class="metric-label">Threads</div>
+                            <div class="metric-primary">
+                                <span id="stat-threads-process">--</span>
+                                <small>process</small>
+                            </div>
+                            <div class="metric-secondary">Python <span id="stat-threads-python">--</span></div>
+                        </div>
+                        <div class="run-overview-metric">
+                            <div class="metric-label">CPU Usage</div>
+                            <div class="metric-bar">
+                                <div class="bar-label">
+                                    <span>App</span>
+                                    <span id="stat-cpu-process">--</span>
+                                </div>
+                                <div class="metric-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="App CPU usage">
+                                    <div class="metric-progress-bar" id="bar-cpu-process"></div>
+                                </div>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="bar-label">
+                                    <span>System</span>
+                                    <span id="stat-cpu-system">--</span>
+                                </div>
+                                <div class="metric-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="System CPU usage">
+                                    <div class="metric-progress-bar bar-secondary" id="bar-cpu-system"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="run-overview-metric">
+                            <div class="metric-label">Memory</div>
+                            <div class="metric-bar">
+                                <div class="bar-label">
+                                    <span>Process</span>
+                                    <span><span id="stat-mem-process">--</span> MB · <span id="stat-mem-process-pct">--</span></span>
+                                </div>
+                                <div class="metric-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Process memory usage">
+                                    <div class="metric-progress-bar" id="bar-mem-process"></div>
+                                </div>
+                            </div>
+                            <div class="metric-bar">
+                                <div class="bar-label">
+                                    <span>System</span>
+                                    <span id="stat-mem-system">--</span>
+                                </div>
+                                <div class="metric-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="System memory usage">
+                                    <div class="metric-progress-bar bar-secondary" id="bar-mem-system"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0 small">Jobs update in near real-time while scans remain strictly FIFO.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100 reliability-panel reliability-panel-queue">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2 reliability-queue-toolbar">
+                        <h3 class="h5 mb-0">Scan Queue</h3>
+                        <small id="queue-updated">—</small>
+                    </div>
+                    <div id="queue-empty" class="reliability-queue-empty">No scans queued yet. Add a run to get started.</div>
+                    <div id="reliability-queue" class="reliability-job-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+{% include 'scan/config.html' %}
+
+<script>
+    window.initialReliabilityState = {{ initial_state | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/scan-config.js') }}"></script>
+<script src="{{ url_for('static', filename='js/reliability.js') }}"></script>
+{% endblock %}

@@ -15,6 +15,7 @@ from tests.test_globals import (
     MIN_EXPECTED_ALIVE_DEVICES
 )
 from lanscape.ui.app import app
+import lanscape.ui.blueprints.api.reliability as reliability_api
 
 
 @pytest.fixture
@@ -96,6 +97,99 @@ def test_port_lifecycle(api_client, sample_port_list, updated_port_list):
     # Delete the new port list
     response = api_client.delete(f'/api/port/list/{test_list_name}')
     assert response.status_code == 200
+
+
+def test_reliability_job_lifecycle(api_client, monkeypatch):
+    """Verify reliability API endpoints delegate to the queue correctly."""
+
+    sample_job = {
+        'id': 'job-123',
+        'label': 'Run job-123',
+        'status': 'queued',
+        'config': {'subnet': '10.0.0.0/24', 'port_list': 'small'},
+        'snapshot': None,
+        'queue_position': 0
+    }
+
+    class FakeJob:  # pylint: disable=too-few-public-methods
+        """Simple stub for queue responses."""
+
+        def summary(self):
+            return sample_job
+
+    fake_queue = type('FakeQueue', (), {
+        'list_jobs': staticmethod(lambda: [sample_job]),
+        'enqueue': staticmethod(lambda config, label=None, repeat=1: [FakeJob()]),
+        'get_job': staticmethod(lambda job_id: sample_job if job_id == 'job-123' else None),
+        'cancel': staticmethod(lambda job_id: job_id == 'job-123'),
+        'get_status_counts': staticmethod(lambda: {
+            'queued': 1,
+            'running': 0,
+            'completed': 0,
+            'errors': 0,
+            'cancelled': 0
+        })
+    })()
+
+    monkeypatch.setattr(reliability_api, 'reliability_queue', fake_queue)
+
+    # List jobs
+    response = api_client.get('/api/reliability/jobs')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['jobs'][0]['id'] == 'job-123'
+    assert 'metrics' not in payload
+
+    # Enqueue job
+    enqueue_payload = {'config': {'subnet': '10.0.0.0/24', 'port_list': 'small'}}
+    response = api_client.post('/api/reliability/jobs', json=enqueue_payload)
+    assert response.status_code == 201
+    assert response.get_json()['jobs'][0]['id'] == 'job-123'
+
+    # Get detail
+    response = api_client.get('/api/reliability/jobs/job-123')
+    assert response.status_code == 200
+    assert response.get_json()['id'] == 'job-123'
+
+    # Cancel job
+    response = api_client.post('/api/reliability/jobs/job-123/cancel')
+    assert response.status_code == 200
+    assert response.get_json()['success'] is True
+
+
+def test_reliability_metrics_endpoint(api_client, monkeypatch):
+    """Ensure the metrics endpoint returns system stats plus queue counts."""
+
+    fake_queue = type('FakeQueue', (), {
+        'get_status_counts': staticmethod(lambda: {'queued': 2, 'running': 1})
+    })()
+
+    fake_metrics = {
+        'cpu': {'process_percent': 12.5, 'system_percent': 34.5},
+        'memory': {
+            'process_percent': 1.2,
+            'process_mb': 256.0,
+            'system_percent': 42.0,
+            'system_used_gb': 9.5,
+            'system_total_gb': 32.0
+        },
+        'threads': {'process': 8, 'python': 5}
+    }
+
+    def fake_collect(extra=None):
+        payload = json.loads(json.dumps(fake_metrics))
+        if extra:
+            payload.update(extra)
+        return payload
+
+    monkeypatch.setattr(reliability_api, 'reliability_queue', fake_queue)
+    monkeypatch.setattr(reliability_api, 'collect_runtime_metrics', fake_collect)
+
+    response = api_client.get('/api/reliability/metrics')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['cpu']['process_percent'] == 12.5
+    assert data['queue']['queued'] == 2
 
 # API Scan Tests
 ################

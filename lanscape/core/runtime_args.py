@@ -14,6 +14,7 @@ class RuntimeArgs:
     loglevel: str = 'INFO'
     flask_logging: bool = False
     persistent: bool = False
+    reliability_test: bool = False
 
 
 def parse_args() -> RuntimeArgs:
@@ -35,6 +36,9 @@ def parse_args() -> RuntimeArgs:
                         help='Don\'t exit after browser is closed')
     parser.add_argument('--debug', action='store_true',
                         help='Shorthand debug mode (equivalent to "--loglevel DEBUG --reloader")')
+    parser.add_argument('-RT', '--reliability-test', action='store_true',
+                        dest='reliability_test',
+                        help='Launch the reliability test UI (queues sequential scans)')
 
     # Parse the arguments
     args = parser.parse_args()

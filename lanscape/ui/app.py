@@ -7,7 +7,7 @@ import threading
 import logging
 from flask import Flask, render_template
 from lanscape.ui.blueprints.web import web_bp, routes  # pylint: disable=unused-import
-from lanscape.ui.blueprints.api import api_bp, tools, port, scan  # pylint: disable=unused-import
+from lanscape.ui.blueprints.api import api_bp, tools, port, scan, reliability  # pylint: disable=unused-import
 from lanscape.core.runtime_args import RuntimeArgs, parse_args
 from lanscape.core.version_manager import (
     is_update_available, get_installed_version, lookup_latest_version

@@ -8,6 +8,8 @@ from lanscape.core.net_tools import (
     get_all_network_subnets,
     smart_select_primary_subnet
 )
+from lanscape.core.reliability_queue import reliability_queue
+from lanscape.core.system_stats import collect_runtime_metrics
 from lanscape.ui.blueprints import scan_manager, log
 
 # Template Renderer
@@ -150,3 +152,18 @@ def app_info():
         Rendered info template
     """
     return render_template('info.html')
+
+
+@web_bp.route('/reliability', methods=['GET'])
+def reliability_lab():
+    """Render the reliability testing dashboard."""
+    subnets = get_all_network_subnets()
+    subnet = smart_select_primary_subnet(subnets)
+    jobs = reliability_queue.list_jobs()
+    metrics = collect_runtime_metrics({'queue': reliability_queue.get_status_counts()})
+    return render_template(
+        'reliability.html',
+        subnet=subnet,
+        alternate_subnets=subnets,
+        initial_state={'jobs': jobs, 'metrics': metrics}
+    )

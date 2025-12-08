@@ -77,9 +77,8 @@ def open_browser(url: str, wait=2) -> bool:
     """
     try:
         time.sleep(wait)
-        log.info(f'Starting UI - http://127.0.0.1:{args.port}')
+        log.info(f'Starting UI - {url}')
         return open_webapp(url)
-
     except BaseException:
         log.debug(traceback.format_exc())
         log.info(f'Unable to open web browser, server running on {url}')
@@ -88,7 +87,9 @@ def open_browser(url: str, wait=2) -> bool:
 
 def start_webserver_ui():
     """Start the web server and open the UI in a browser."""
-    uri = f'http://127.0.0.1:{args.port}'
+    base_uri = f'http://127.0.0.1:{args.port}'
+    landing_path = '/reliability' if args.reliability_test else ''
+    target_uri = f'{base_uri}{landing_path}'
 
     # running reloader requires flask to run in main thread
     # this decouples UI from main process
@@ -99,13 +100,13 @@ def start_webserver_ui():
         if not IS_FLASK_RELOAD:
             threading.Thread(
                 target=open_browser,
-                args=(uri,),
+                args=(target_uri,),
                 daemon=True
             ).start()
         start_webserver(args)
     else:
         flask_thread = start_webserver_daemon(args)
-        app_closed = open_browser(uri)
+        app_closed = open_browser(target_uri)
 
         # depending on env, open_browser may or
         # may not be coupled with the closure of UI

@@ -35,13 +35,32 @@ python -m lanscape
  - `--logfile <path>` save log output to the given file path
  - `--loglevel <level>` set the logger's log level (default: INFO)
  - `--flask-logging` turn on flask logging (default: false)
+ - `--reliability-test / -RT` launch the reliability test UI (sequential queued scans)
 
 Examples:
 ```shell
 python -m lanscape --reloader
 python -m lanscape --port 5002
 python -m lanscape --logfile /tmp/lanscape.log --loglevel DEBUG
+python -m lanscape -reliability-test
 ```
+
+## Reliability Lab
+
+When you need to replay the same configuration multiple times to gauge stability, launch the new Reliability Lab:
+
+```shell
+python -m lanscape -reliability-test
+```
+
+This opens a dedicated dashboard where you can:
+
+- Queue one or many scans (FIFO, no parallel execution) using the standard advanced configuration modal.
+- Reuse identical configs across multiple runs or tweak between submissions.
+- Monitor live progress per run, including devices discovered, percent complete, runtime, and aggregate open ports.
+- Open any completed run in a full detail view via the existing scan pages.
+
+Queued jobs can be cancelled before they start, and the overview panel keeps a running tally of queued, active, completed, and errored runs.
 
 ## Troubleshooting
 

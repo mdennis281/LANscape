@@ -86,7 +86,6 @@ def open_browser(url: str, wait=2) -> Popen:
         success = webbrowser.open(url)
         if success:
             log.warning("Chromium browser not found. Falling back to default web browser.")
-            return None
         else:
             log.warning(f"Cannot find any web browser. LANScape UI running on {url}")
     except BaseException:

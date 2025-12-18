@@ -72,7 +72,7 @@ def try_check_update():
         log.warning('Unable to check for updates.')
 
 
-def open_browser(url: str, wait=2) -> Popen:
+def open_browser(url: str, wait=2) -> Popen | None:
     """
     Open a browser window to the specified
     url after waiting for the server to start

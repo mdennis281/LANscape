@@ -26,18 +26,6 @@ except ImportError:
     resource = None  # Will be skipped anyway on non-Linux
 
 
-@pytest.fixture
-def test_device():
-    """Create a test device for port scanning."""
-    return Device(ip="192.168.1.100")
-
-
-@pytest.fixture
-def high_concurrency_port_config():
-    """Create a PortScanConfig for high concurrency testing."""
-    return PortScanConfig(timeout=0.1, retries=1, retry_delay=0.05)
-
-
 def test_socket_properly_closed_on_success():
     """Test that sockets are properly closed when connection succeeds."""
     device = Device(ip="127.0.0.1")

@@ -276,12 +276,16 @@ def test_real_socket_exhaustion_scenario():
 
     # Should not have any "Too many open files" errors
     too_many_files_errors = [f for f in failures if "Too many open files" in f[1]]
-    assert len(too_many_files_errors) == 0, \
-        f"Got {len(too_many_files_errors)} 'Too many open files' errors: {too_many_files_errors[:5]}"
+    assert len(too_many_files_errors) == 0, (
+        f"Got {len(too_many_files_errors)} 'Too many open files' errors: "
+        f"{too_many_files_errors[:5]}"
+    )
 
 
 def test_socket_cleanup_in_timeout_enforcer():
     """Test that sockets are cleaned up even when timeout_enforcer kills the function."""
+    import time  # pylint: disable=import-outside-toplevel
+
     device = Device(ip="192.168.1.100")
     # Very short enforcer timeout to trigger timeout
     config = PortScanConfig(timeout=10.0, retries=0)  # 10 * 1 * 1.5 = 15s enforcer
@@ -291,8 +295,6 @@ def test_socket_cleanup_in_timeout_enforcer():
         mock_socket_class.return_value = mock_socket
 
         # Make connect_ex hang (simulate very slow network)
-        import time
-
         def slow_connect(*_args):
             time.sleep(0.5)
             return 1

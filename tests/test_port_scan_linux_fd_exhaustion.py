@@ -1,9 +1,9 @@
 """
-Tests for Linux file descriptor exhaustion during large port scans.
+Tests for file descriptor exhaustion during large port scans.
 
 This module tests the scenario where scanning a large number of ports
-can exhaust file descriptors (sockets) on Linux systems, causing
-"Too many open files" OSError.
+can exhaust file descriptors (sockets) on Unix-like systems such as
+Linux and macOS, causing "Too many open files" OSError.
 """
 
 import sys

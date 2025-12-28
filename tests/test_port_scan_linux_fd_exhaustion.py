@@ -9,6 +9,7 @@ Linux and macOS, causing "Too many open files" OSError.
 import sys
 from unittest.mock import patch, MagicMock
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 import pytest
 
 from lanscape.core.net_tools import Device
@@ -260,42 +261,32 @@ def test_real_socket_exhaustion_scenario():
     # Get current FD limit
     soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
 
-    # Track failures
-    failures = []
-    success_count = 0
-
-    # Try to scan many ports
+    # Try to scan many ports and collect results
+    results = []
     for port in range(1, min(200, soft_limit // 10)):
-        try:
-            result = device.test_port(port, config)
-            if result:
-                success_count += 1
-        except OSError as e:
-            failures.append((port, str(e)))
+        result = device.test_port(port, config)
+        results.append(result)
 
-    # Should not have any "Too many open files" errors
-    too_many_files_errors = [f for f in failures if "Too many open files" in f[1]]
-    assert len(too_many_files_errors) == 0, (
-        f"Got {len(too_many_files_errors)} 'Too many open files' errors: "
-        f"{too_many_files_errors[:5]}"
-    )
+    # All results should be boolean flags (success/failure), and no OSError
+    # should have propagated out of test_port during the scan.
+    assert all(isinstance(r, bool) for r in results)
+    # For a non-existent IP, we expect all failures since the IP doesn't exist
+    assert all(not r for r in results)
 
 
 def test_socket_cleanup_in_timeout_enforcer():
     """Test that sockets are cleaned up even when timeout_enforcer kills the function."""
-    import time  # pylint: disable=import-outside-toplevel
-
     device = Device(ip="192.168.1.100")
-    # Very short enforcer timeout to trigger timeout
-    config = PortScanConfig(timeout=10.0, retries=0)  # 10 * 1 * 1.5 = 15s enforcer
+    # Very short enforcer timeout to trigger timeout: 0.1 * 1 * 1.5 = 0.15s enforcer
+    config = PortScanConfig(timeout=0.1, retries=0)
 
     with patch('socket.socket') as mock_socket_class:
         mock_socket = MagicMock()
         mock_socket_class.return_value = mock_socket
 
-        # Make connect_ex hang (simulate very slow network)
+        # Make connect_ex hang longer than timeout (simulate very slow network)
         def slow_connect(*_args):
-            time.sleep(0.5)
+            time.sleep(0.5)  # Sleep longer than 0.15s enforcer timeout
             return 1
 
         mock_socket.connect_ex.side_effect = slow_connect

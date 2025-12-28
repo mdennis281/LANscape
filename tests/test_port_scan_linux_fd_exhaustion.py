@@ -6,13 +6,24 @@ can exhaust file descriptors (sockets) on Linux systems, causing
 "Too many open files" OSError.
 """
 
-import resource
+import sys
 from unittest.mock import patch, MagicMock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytest
 
 from lanscape.core.net_tools import Device
 from lanscape.core.scan_config import PortScanConfig
+
+# Skip all tests in this module on non-Linux platforms
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="File descriptor exhaustion tests are Linux-specific"
+)
+
+try:
+    import resource
+except ImportError:
+    resource = None  # Will be skipped anyway on non-Linux
 
 
 @pytest.fixture
@@ -247,8 +258,8 @@ def test_context_manager_style_socket_would_be_better():
 
 
 @pytest.mark.skipif(
-    resource.getrlimit(resource.RLIMIT_NOFILE)[0] > 10000,
-    reason="Only run on systems with reasonable FD limits"
+    not resource or resource.getrlimit(resource.RLIMIT_NOFILE)[0] > 10000,
+    reason="Only run on Linux systems with reasonable FD limits"
 )
 def test_real_socket_exhaustion_scenario():
     """

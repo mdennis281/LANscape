@@ -6,9 +6,8 @@ can exhaust file descriptors (sockets) on Linux systems, causing
 "Too many open files" OSError.
 """
 
-import socket
 import resource
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytest
 
@@ -132,7 +131,7 @@ def test_multiple_concurrent_port_scans_socket_cleanup():
     with patch('socket.socket') as mock_socket_class:
         mock_sockets = []
 
-        def create_mock_socket(*args, **kwargs):
+        def create_mock_socket(*_args, **_kwargs):
             mock_sock = MagicMock()
             mock_sock.connect_ex.return_value = 1  # All closed
             mock_sockets.append(mock_sock)
@@ -162,7 +161,7 @@ def test_socket_cleanup_with_high_fd_limit():
         call_count = 0
         max_calls_before_error = 50
 
-        def socket_with_limit(*args, **kwargs):
+        def socket_with_limit(*_args, **_kwargs):
             nonlocal call_count
             call_count += 1
 
@@ -200,7 +199,6 @@ def test_socket_error_handling_retries():
         # First attempt: Too many open files
         # Second attempt: Connection timeout
         # Third attempt: Success
-        mock_sock1 = MagicMock()
         mock_sock2 = MagicMock()
         mock_sock3 = MagicMock()
 
@@ -295,7 +293,7 @@ def test_socket_cleanup_in_timeout_enforcer():
         # Make connect_ex hang (simulate very slow network)
         import time
 
-        def slow_connect(*args):
+        def slow_connect(*_args):
             time.sleep(0.5)
             return 1
 

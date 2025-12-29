@@ -183,5 +183,38 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
             log.debug(traceback.format_exc())
         return "Unknown"
 
-    # Use asyncio.run to execute the asynchronous logic synchronously
-    return asyncio.run(_async_scan_service(ip, port, cfg=cfg))
+    # Create and properly manage event loop to avoid file descriptor leaks
+    # Using new_event_loop + explicit close is safer in threaded environments
+    # than asyncio.run() which can leave resources open under heavy load
+    loop = None
+    try:
+        try:
+            # Try to get existing loop first (if running in async context)
+            loop = asyncio.get_running_loop()
+            # If we're already in an async context, just await directly
+            return asyncio.run_coroutine_threadsafe(
+                _async_scan_service(ip, port, cfg=cfg), loop
+            ).result(timeout=cfg.timeout + 5)
+        except RuntimeError:
+            # No running loop, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(_async_scan_service(ip, port, cfg=cfg))
+            finally:
+                # Clean up the loop properly
+                try:
+                    # Cancel all remaining tasks
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    # Run loop once more to process cancellations
+                    if pending:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except Exception:
+                    pass
+                finally:
+                    loop.close()
+    except Exception as e:
+        log.error(f"Event loop error scanning {ip}:{port}: {e}")
+        return "Unknown"

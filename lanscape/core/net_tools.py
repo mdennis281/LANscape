@@ -138,18 +138,29 @@ class Device(BaseModel):
         @timeout_enforcer(enforcer_timeout, False)
         def do_test():
             for attempt in range(port_config.retries + 1):
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(port_config.timeout)
+                sock = None
                 try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(port_config.timeout)
                     result = sock.connect_ex((self.ip, port))
                     if result == 0:
                         if port not in self.ports:
                             self.ports.append(port)
                         return True
+                except OSError as e:
+                    # Handle socket creation failures (e.g., "Too many open files")
+                    # Log and continue to retry if attempts remain
+                    log = logging.getLogger('Device.test_port')
+                    log.debug(f"OSError on {self.ip}:{port} attempt {attempt + 1}: {e}")
                 except Exception:
                     pass  # Connection failed, try again if retries remain
                 finally:
-                    sock.close()
+                    # Always close socket if it was created
+                    if sock is not None:
+                        try:
+                            sock.close()
+                        except Exception:
+                            pass  # Ignore errors during cleanup
 
                 # Wait before retry (except on last attempt)
                 if attempt < port_config.retries:

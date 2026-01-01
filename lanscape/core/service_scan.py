@@ -154,7 +154,9 @@ def get_port_probes(port: int, strategy: ServiceScanStrategy):
 
 def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
     """
-    Synchronous function that attempts to identify the service running on a given port.
+    Synchronous function that attempts to identify the service 
+    running on a given port.
+    TODO: This is AI slop and needs to be reworked properly.
     """
 
     async def _async_scan_service(

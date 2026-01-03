@@ -21,6 +21,20 @@ def get_port_lists():
     return jsonify(PortManager().get_port_lists())
 
 
+@api_bp.route('/api/port/list/summary', methods=['GET'])
+def get_port_lists_summary():
+    """Get port list names with their port counts."""
+    manager = PortManager()
+    summaries = []
+    for name in manager.get_port_lists():
+        ports = manager.get_port_list(name) or {}
+        summaries.append({
+            'name': name,
+            'count': len(ports)
+        })
+    return jsonify(summaries)
+
+
 @api_bp.route('/api/port/list/<port_list>', methods=['GET'])
 def get_port_list(port_list):
     """

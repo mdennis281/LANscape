@@ -15,6 +15,7 @@ from tests.test_globals import (
     MIN_EXPECTED_ALIVE_DEVICES
 )
 from lanscape.ui.app import app
+import lanscape.ui.blueprints.api.port as port_api
 
 
 @pytest.fixture
@@ -96,6 +97,31 @@ def test_port_lifecycle(api_client, sample_port_list, updated_port_list):
     # Delete the new port list
     response = api_client.delete(f'/api/port/list/{test_list_name}')
     assert response.status_code == 200
+
+
+def test_port_list_summary(api_client, monkeypatch):
+    """Verify port list summary returns names with counts."""
+
+    class FakePortManager:  # pylint: disable=too-few-public-methods
+        def __init__(self):
+            self._lists = {
+                'small': {'80': 'http', '443': 'https'},
+                'custom': {'22': 'ssh'}
+            }
+
+        def get_port_lists(self):
+            return list(self._lists.keys())
+
+        def get_port_list(self, name):
+            return self._lists.get(name, {})
+
+    monkeypatch.setattr(port_api, 'PortManager', lambda: FakePortManager())
+
+    response = api_client.get('/api/port/list/summary')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert isinstance(data, list)
+    assert {item['name']: item['count'] for item in data} == {'small': 2, 'custom': 1}
 
 # API Scan Tests
 ################

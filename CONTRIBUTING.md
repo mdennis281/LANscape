@@ -27,6 +27,10 @@ Thank you for helping improve LANScape! This guide keeps local development consi
    ```
 
 ## Everyday development
+- **Execute locally** 
+   ```bash
+    python -m lanscape # ensure version number loads as 0.0.0
+   ```
 - **Run tests** (fast, parallel):
   ```bash
   python -m pytest tests/ -n auto --dist=loadscope -v

@@ -5,7 +5,6 @@ $pythonVersions = @(10..14 | ForEach-Object { "3.$_" })
 
 # Define the project directory
 $projectDir = (Get-Location).Path
-$requirementsFile = Join-Path -Path $projectDir -ChildPath "requirements.txt"
 
 # Check if pyenv is installed
 if (-not (Get-Command "pyenv" -ErrorAction SilentlyContinue)) {
@@ -58,17 +57,13 @@ foreach ($version in $pythonVersions) {
     }
     Write-Output "Validated venv version is $reportedVersion"
 
-    # Install dependencies
-    if (Test-Path $requirementsFile) {
-        Write-Output "Installing dependencies..."
-        pip install -r $requirementsFile
-        if ($LASTEXITCODE -ne 0) {
-            Write-Output "⚠️  Failed to install dependencies for Python $exactVersion."
-            deactivate
-            exit
-        }
-    } else {
-        Write-Output "⚠️  No requirements.txt found."
+    # Install dependencies from pyproject.toml
+    Write-Output "Installing dependencies from pyproject (dev extras)..."
+    pip install -e ".[dev]"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Output "⚠️  Failed to install dependencies for Python $exactVersion."
+        deactivate
+        exit
     }
 
     # Run tests

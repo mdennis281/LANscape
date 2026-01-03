@@ -139,15 +139,26 @@ function getScanConfig() {
 }
 
 function getPortLists(callback=null) {
-    $.get('/api/port/list', function(data) {
-        const customSelectDropdown = $('#port_list');
+    const customSelectDropdown = $('#port_list');
+
+    const renderOptions = (items) => {
         customSelectDropdown.empty();
-    
-        // Populate the dropdown with the options
-        data.forEach(function(portList) {
-            customSelectDropdown.append('<option>' + portList + '</option>');
+        items.forEach((item) => {
+            const name = item.name || item;
+            const count = item.count;
+            const label = count !== undefined ? `${name} (${count} ports)` : name;
+            customSelectDropdown.append(`<option value="${name}">${label}</option>`);
         });
+    };
+
+    $.get('/api/port/list/summary', function(data) {
+        renderOptions(data || []);
         if (callback) callback();
+    }).fail(function() {
+        $.get('/api/port/list', function(data) {
+            renderOptions(data || []);
+            if (callback) callback();
+        });
     });
 }
 

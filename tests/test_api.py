@@ -103,6 +103,7 @@ def test_port_list_summary(api_client, monkeypatch):
     """Verify port list summary returns names with counts."""
 
     class FakePortManager:  # pylint: disable=too-few-public-methods
+        """Lightweight fake port manager for summary testing."""
         def __init__(self):
             self._lists = {
                 'small': {'80': 'http', '443': 'https'},
@@ -110,12 +111,14 @@ def test_port_list_summary(api_client, monkeypatch):
             }
 
         def get_port_lists(self):
+            """Return available list names."""
             return list(self._lists.keys())
 
         def get_port_list(self, name):
+            """Return a specific port list by name."""
             return self._lists.get(name, {})
 
-    monkeypatch.setattr(port_api, 'PortManager', lambda: FakePortManager())
+    monkeypatch.setattr(port_api, 'PortManager', FakePortManager)
 
     response = api_client.get('/api/port/list/summary')
     assert response.status_code == 200

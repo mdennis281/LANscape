@@ -66,12 +66,15 @@ body:has(.submodule) footer {
 
 #header {
     background-color: var(--primary-bg);
-    padding: 8px 20px;
+    padding: 8px 2%;
     margin: 0;
     display: block;
     position: relative;
     box-shadow: 0 0 10px var(--box-shadow);
     width: 100vw;
+}
+#header .title {
+    font-size: 36px;
 }
 
 footer {
@@ -163,8 +166,10 @@ details {
 
 
 #scan-form {
-    width: 500px;
+    width: 60vw;
     margin: 0;
+    min-width: 300px;
+    max-width: 700px;
 }
 #scan-form label {
     margin-bottom: 0;
@@ -208,6 +213,9 @@ details {
     position: absolute;
     width: 30px;
     right: 0;
+}
+#scan-submit {
+    padding: inherit 2
 }
 
 .label-container {
@@ -304,6 +312,9 @@ details {
 }
 #advanced-modal label {
     font-size: 12px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 #advanced-modal .form-check {
     width: fit-content;
@@ -447,8 +458,10 @@ button {
 
 #scan-form #scan-submit {
     border: none;
-    padding: 10px 20px;
+    padding: 10px 3%;
     margin-top: 15px;
+    min-width: 55px;
+    margin: 15px;
 }
 
 /* Button Styling */

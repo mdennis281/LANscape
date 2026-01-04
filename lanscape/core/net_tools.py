@@ -98,6 +98,7 @@ class Device(BaseModel):
         if self.alive:
             self.hostname = self._get_hostname()
             self._get_mac_addresses()
+            self.manufacturer = self._get_manufacturer(self.get_mac())
 
     # Fallback for pydantic v1: use dict() and enrich output
     if not _PYD_V2:

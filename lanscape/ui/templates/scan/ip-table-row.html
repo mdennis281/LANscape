@@ -7,20 +7,20 @@
             ></i>
         </div>
     </td>
-    <td>
+    <td class="ip">
         <div>{{ device.ip }}</div>
         {% if device.hostname %} 
-            <div><span class=alt>{{device.hostname}}</span></div>
+            <span class="alt no-wrap">{{device.hostname}}</span>
         {% endif %}
     </td>
-    <td>
+    <td class="mac">
         <div>{{ device.mac_addr or 'Unknown' }}</div>
         {% if device.manufacturer %} 
-            <div><span class="alt">{{device.manufacturer}}</span></div>
+            <span class="alt no-wrap">{{device.manufacturer}}</span>
         {% endif %}
     </td>
-    <td>{{ device.ports | join(", ") }}</td>
-    <td>
+    <td class="ports">{{ device.ports | join(", ") }}</td>
+    <td class="stage">
         {% if device.stage == 'complete' %}
             <span class="badge badge-success">complete</span>
         {% elif device.stage == 'found' %}

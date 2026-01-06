@@ -171,6 +171,9 @@ details {
     min-width: 300px;
     max-width: 700px;
 }
+#scan-form .form-group {
+    margin: 0;
+}
 #scan-form label {
     margin-bottom: 0;
 }
@@ -213,9 +216,6 @@ details {
     position: absolute;
     width: 30px;
     right: 0;
-}
-#scan-submit {
-    padding: inherit 2
 }
 
 .label-container {
@@ -459,9 +459,9 @@ button {
 #scan-form #scan-submit {
     border: none;
     padding: 10px 3%;
-    margin-top: 15px;
+    margin: 0 15px;
     min-width: 55px;
-    margin: 15px;
+    height: 42px;
 }
 
 /* Button Styling */
@@ -670,10 +670,6 @@ input[type="range"] {
 .table thead tr th.detail-col
 {
     width: 30px;
-    /*
-    background-color: var(--body-bg);
-    border: 1px solid var(--text-almost-hidden);
-    */
 }
 .table td:has(.info-icon-container) {
     width: 30px;
@@ -721,6 +717,12 @@ input[type="range"] {
 /* Protocol Open Button Styles */
 span.alt {
     color: var(--text-accent-color);
+}
+span.no-wrap {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 .colorful-buttons a{
     margin:2px;

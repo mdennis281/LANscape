@@ -8,6 +8,9 @@ function quietReload() {
             var newDoc = new DOMParser().parseFromString(data, 'text/html');
             // replace current body with the new body content
             $('body').html($(newDoc.body).html());
+            if (typeof adjustNoWrap === 'function') {
+                adjustNoWrap();
+            }
         });
     }
     setTimeout(function() {

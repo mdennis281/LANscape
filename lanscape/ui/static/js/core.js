@@ -1,10 +1,12 @@
 $(document).ready(function() {
     rightSizeDocLayout(0,showFooter);
     initTooltips();
+    adjustNoWrap();
 })
 
 $(window).on('resize', function() {
     rightSizeDocLayout();
+    adjustNoWrap();
 });
 
 
@@ -36,4 +38,16 @@ function initTooltips() {
     tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new bootstrap.Tooltip(tooltipTriggerEl)
     })
+}
+
+/*
+    An imperfect approach to adjusting 
+    text field width within a table
+*/
+function adjustNoWrap() {
+    $('.no-wrap').width(0);
+    $('.no-wrap').each(function() {
+        var parentWidth = $(this).parent().width();
+        $(this).width(parseInt(parentWidth));
+    });
 }

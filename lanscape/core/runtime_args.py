@@ -14,6 +14,8 @@ class RuntimeArgs:
     loglevel: str = 'INFO'
     flask_logging: bool = False
     persistent: bool = False
+    ws_server: bool = False
+    ws_port: int = 8766
 
 
 def parse_args() -> RuntimeArgs:
@@ -35,6 +37,10 @@ def parse_args() -> RuntimeArgs:
                         help='Don\'t exit after browser is closed')
     parser.add_argument('--debug', action='store_true',
                         help='Shorthand debug mode (equivalent to "--loglevel DEBUG --reloader")')
+    parser.add_argument('--ws-server', action='store_true',
+                        help='Start WebSocket server instead of Flask UI')
+    parser.add_argument('--ws-port', type=int, default=8766,
+                        help='Port for WebSocket server (default: 8766)')
 
     # Parse the arguments
     args = parser.parse_args()

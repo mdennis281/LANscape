@@ -16,6 +16,7 @@ from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args
 from lanscape.core.version_manager import get_installed_version, is_update_available
 from lanscape.ui.app import start_webserver_daemon, start_webserver
+from lanscape.ui.ws.server import run_server
 # do this so any logs generated on import are displayed
 args = parse_args()
 configure_logging(args.loglevel, args.logfile, args.flask_logging)
@@ -48,6 +49,11 @@ def _main():
     else:
         log.info('Flask reloaded app.')
 
+    # Check if WebSocket server mode is requested
+    if args.ws_server:
+        start_websocket_server()
+        return
+
     args.port = get_valid_port(args.port)
 
     try:
@@ -70,6 +76,23 @@ def try_check_update():
     except BaseException:
         log.debug(traceback.format_exc())
         log.warning('Unable to check for updates.')
+
+
+def start_websocket_server():
+    """Start the WebSocket server."""
+    args.ws_port = get_valid_port(args.ws_port)
+    log.info(f'Starting WebSocket server on port {args.ws_port}')
+    log.info(f'React UI should connect to ws://localhost:{args.ws_port}')
+    
+    try:
+        # Bind to localhost only for better Chrome compatibility
+        run_server(host='127.0.0.1', port=args.ws_port)
+    except KeyboardInterrupt:
+        log.info('WebSocket server stopped by user')
+    except Exception as e:
+        log.critical(f'WebSocket server failed: {e}')
+        log.debug(traceback.format_exc())
+        raise
 
 
 def open_browser(url: str, wait=2) -> Popen | None:

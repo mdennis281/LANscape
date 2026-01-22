@@ -85,8 +85,7 @@ def start_websocket_server():
     log.info(f'React UI should connect to ws://localhost:{args.ws_port}')
     
     try:
-        # Bind to localhost only for better Chrome compatibility
-        run_server(host='127.0.0.1', port=args.ws_port)
+        run_server(host='0.0.0.0', port=args.ws_port)
     except KeyboardInterrupt:
         log.info('WebSocket server stopped by user')
     except Exception as e:

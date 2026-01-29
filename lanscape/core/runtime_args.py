@@ -1,7 +1,8 @@
 """Runtime argument handler for LANscape as module"""
 
-from dataclasses import dataclass, fields
 import argparse
+import sys
+from dataclasses import dataclass, fields
 from typing import Any, Dict, Optional
 
 
@@ -16,6 +17,16 @@ class RuntimeArgs:
     persistent: bool = False
     ws_server: bool = False
     ws_port: int = 8766
+
+
+def was_port_explicit() -> bool:
+    """Check if --port was explicitly provided on command line."""
+    return any(arg.startswith('--port') for arg in sys.argv)
+
+
+def was_ws_port_explicit() -> bool:
+    """Check if --ws-port was explicitly provided on command line."""
+    return any(arg.startswith('--ws-port') for arg in sys.argv)
 
 
 def parse_args() -> RuntimeArgs:
@@ -48,6 +59,7 @@ def parse_args() -> RuntimeArgs:
     # Dynamically map argparse Namespace to the Args dataclass
     # Convert the Namespace to a dictionary
     args_dict: Dict[str, Any] = vars(args)
+
     field_names = {field.name for field in fields(
         RuntimeArgs)}  # Get dataclass field names
 

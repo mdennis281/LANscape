@@ -13,7 +13,7 @@ from pwa_launcher import open_pwa, ChromiumNotFoundError
 
 
 from lanscape.core.logger import configure_logging
-from lanscape.core.runtime_args import parse_args
+from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
 from lanscape.core.version_manager import get_installed_version, is_update_available
 from lanscape.ui.app import start_webserver_daemon, start_webserver
 from lanscape.ui.ws.server import run_server
@@ -54,7 +54,12 @@ def _main():
         start_websocket_server()
         return
 
-    args.port = get_valid_port(args.port)
+    if was_port_explicit():
+        # Explicit port specified - validate it's available or error
+        validate_port_available(args.port, '--port')
+    else:
+        # No explicit port - auto-find an available one
+        args.port = get_valid_port(args.port)
 
     try:
         start_webserver_ui()
@@ -80,10 +85,15 @@ def try_check_update():
 
 def start_websocket_server():
     """Start the WebSocket server."""
-    args.ws_port = get_valid_port(args.ws_port)
+    if was_ws_port_explicit():
+        # Explicit port specified - validate it's available or error
+        validate_port_available(args.ws_port, '--ws-port')
+    else:
+        # No explicit port - auto-find an available one
+        args.ws_port = get_valid_port(args.ws_port)
     log.info(f'Starting WebSocket server on port {args.ws_port}')
     log.info(f'React UI should connect to ws://localhost:{args.ws_port}')
-    
+
     try:
         run_server(host='0.0.0.0', port=args.ws_port)
     except KeyboardInterrupt:
@@ -144,21 +154,43 @@ def start_webserver_ui():
                 time.sleep(1)
 
 
-def get_valid_port(port: int):
+def is_port_available(port: int) -> bool:
+    """Check if a port is available for binding."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) != 0
+
+
+def validate_port_available(port: int, flag_name: str) -> None:
     """
-    Get the first available port starting from the specified port
+    Validate that an explicitly specified port is available.
+    Raises an error if the port is already in use.
+    """
+    if not is_port_available(port):
+        raise OSError(
+            f"Port {port} is already in use. "
+            f"Either free the port or remove the {flag_name} flag to auto-select an available port."
+        )
+
+
+def get_valid_port(port: int) -> int:
+    """
+    Get the first available port starting from the specified port.
+    Used when no explicit port is specified.
     """
     while True:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(('localhost', port)) != 0:
-                return port
-            port += 1
+        if is_port_available(port):
+            return port
+        port += 1
 
 
 def terminate():
-    """send a request to the shutdown flask"""
-    log.info('Attempting flask shutdown')
-    requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core', timeout=2)
+    """Send a request to shutdown flask if it's running."""
+    try:
+        log.info('Attempting flask shutdown')
+        requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core', timeout=2)
+    except requests.exceptions.RequestException:
+        # Flask server not running or already shut down - that's fine
+        pass
 
 
 if __name__ == "__main__":

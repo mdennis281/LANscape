@@ -27,7 +27,7 @@ from lanscape.core.net_tools import (
 from lanscape.core.errors import SubnetScanTerminationFailure
 from lanscape.core.device_alive import is_device_alive
 from lanscape.core.models import (
-    ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem
+    ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem, ScanErrorInfo
 )
 
 
@@ -330,6 +330,13 @@ class ScannerResults:
         Returns:
             ScanMetadata: Current scan metadata for status updates
         """
+        # Convert error dicts to ScanErrorInfo models
+        error_infos = [
+            ScanErrorInfo(basic=err.get('basic', str(err)), traceback=err.get('traceback'))
+            if isinstance(err, dict) else ScanErrorInfo(basic=str(err))
+            for err in self.errors
+        ]
+
         return ScanMetadata(
             scan_id=self.uid,
             subnet=self.subnet,
@@ -343,7 +350,8 @@ class ScannerResults:
             port_list_length=self.port_list_length,
             start_time=self.start_time,
             end_time=self.end_time,
-            run_time=int(round(time() - self.start_time, 0))
+            run_time=int(round(time() - self.start_time, 0)),
+            errors=error_infos
         )
 
     def to_results(self) -> ScanResults:

@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 from lanscape.core.models.enums import ScanStage
 from lanscape.core.models.device import DeviceResult
 
+class ScanErrorInfo(BaseModel):
+    """Serializable representation of a scan-level error."""
+    basic: str = Field(description="Brief error summary")
+    traceback: Optional[str] = Field(default=None, description="Full traceback if available")
 
 class ScanMetadata(BaseModel):
     """
@@ -39,7 +43,7 @@ class ScanMetadata(BaseModel):
     run_time: int = Field(default=0, ge=0, description="Runtime in seconds")
 
     # Errors at scan level
-    errors: List[str] = Field(default_factory=list, description="Scan-level error messages")
+    errors: List[ScanErrorInfo] = Field(default_factory=list, description="Scan-level errors")
 
 
 class ScanResults(BaseModel):

@@ -94,6 +94,10 @@ class ScanSummary(BaseModel):
         default_factory=list,
         description="Services identified across all devices"
     )
+    warnings: List[dict] = Field(
+        default_factory=list,
+        description="Warnings generated during scan"
+    )
 
 
 class ScanListItem(BaseModel):

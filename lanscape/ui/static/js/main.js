@@ -144,12 +144,51 @@ function pollScanSummary(id) {
             },1000);
         }
         updateOverviewUI(summary);
+        updateWarningsUI(summary.warnings || []);
     }).fail(function(req) {
         if (req === 404) {
             console.log('Scan not found, redirecting to home');
             window.location.href = '/';
         }
     });
+}
+
+function updateWarningsUI(warnings) {
+    const badge = $('#warnings-badge');
+    const modalBody = $('#warnings-modal-body');
+    
+    if (!warnings || warnings.length === 0) {
+        badge.addClass('div-hide');
+        return;
+    }
+    
+    // Render badge
+    badge.removeClass('div-hide');
+    badge.html(`
+        <span class="scan-warnings-badge" data-bs-toggle="modal" data-bs-target="#warningsModal">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>${warnings.length}</span>
+        </span>
+    `);
+    
+    // Render modal body
+    let html = `<p class="small mb-3" style="color: var(--text-placeholder);">
+        Resource constraints caused thread concurrency to be reduced during the scan.
+    </p>`;
+    
+    warnings.forEach(w => {
+        html += `<div class="warning-item mb-2" style="background: var(--primary-bg-accent); border-radius: 4px; padding: 10px; border-left: 3px solid var(--warning-accent);">
+            <div class="small" style="color: var(--text-color);">${w.message || 'Thread multiplier reduced'}</div>`;
+        if (w.old_multiplier && w.new_multiplier) {
+            html += `<div class="mt-1" style="font-size: 0.75rem; color: var(--text-placeholder);">
+                <span>${Math.round(w.old_multiplier * 100)}% → ${Math.round(w.new_multiplier * 100)}%</span>
+                <span class="ms-2" style="color: var(--warning-accent);">(-${Math.round(w.decrease_percent)}%)</span>
+            </div>`;
+        }
+        html += `</div>`;
+    });
+    
+    modalBody.html(html);
 }
 
 function updateOverviewUI(summary) {

@@ -63,7 +63,9 @@ def render_scan(scan_id, section='all'):
             'uid': results.metadata.scan_id,
             'running': results.metadata.running,
             'errors': scanner.results.errors,
+            'warnings': scanner.results.warnings,
             'devices': [d.model_dump(mode='json') for d in results.devices],
+            'port_list_length': results.metadata.port_list_length,
         }
         filter_text = request.args.get('filter')
         return render_template('scan.html', data=data, section=section, filter=filter_text)

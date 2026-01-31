@@ -269,6 +269,11 @@ class ScanConfig(BaseModel):
 
     lookup_type: List[ScanType] = [ScanType.ICMP_THEN_ARP]
 
+    # Retry and resilience settings
+    failure_retry_cnt: int = 2
+    failure_multiplier_decrease: float = 0.25
+    failure_debounce_sec: float = 5.0
+
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)

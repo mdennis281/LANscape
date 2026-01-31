@@ -214,6 +214,7 @@ class Device(BaseModel):
             macs=self.macs,
             manufacturer=self.manufacturer or self._get_manufacturer(self.get_mac()),
             ports=self.ports,
+            ports_scanned=self.ports_scanned,
             stage=device_stage,
             services=self.services,
             errors=error_infos

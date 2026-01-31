@@ -275,19 +275,28 @@ class WebSocketServer:
         currently_running = set()
 
         for scan in self._scan_handler._scan_manager.scans:
-            if scan.running:
+            stage = scan.results.stage
+            if scan.running or stage == 'terminating':
+                # Scan is actively running or in the process of terminating
                 currently_running.add(scan.uid)
                 await self._send_scan_update_to_subscribers(scan)
             elif scan.uid in self._previously_running_scans:
-                # Scan just completed - send final update with complete event
-                await self._send_scan_complete_to_subscribers(scan)
+                # Scan just finished - send final update with appropriate event
+                await self._send_scan_finished_to_subscribers(scan)
 
         # Update tracking set
         self._previously_running_scans = currently_running
 
-    async def _send_scan_complete_to_subscribers(self, scan) -> None:
-        """Send scan complete event to all subscribed clients."""
+    async def _send_scan_finished_to_subscribers(self, scan) -> None:
+        """Send scan finished event (complete or terminated) to all subscribed clients."""
         subscribed_clients = self._scan_handler.get_subscriptions(scan.uid)
+        actual_stage = scan.results.stage
+
+        # Determine event type based on actual stage
+        if actual_stage == 'terminated':
+            event_name = 'scan.terminated'
+        else:
+            event_name = 'scan.complete'
 
         for client_id in subscribed_clients:
             websocket = self._clients.get(client_id)
@@ -301,14 +310,14 @@ class WebSocketServer:
                     {'scan_id': scan.uid, 'client_id': client_id},
                     None
                 )
-                # Force the complete stage in metadata
+                # Use the actual stage from the scan, not a hardcoded value
                 if 'metadata' in delta:
                     delta['metadata']['running'] = False
-                    delta['metadata']['stage'] = 'complete'
+                    delta['metadata']['stage'] = actual_stage
 
-                await self._send_event(websocket, 'scan.complete', delta)
+                await self._send_event(websocket, event_name, delta)
             except Exception as e:
-                self.log.debug(f"Error sending complete to {client_id}: {e}")
+                self.log.debug(f"Error sending {event_name} to {client_id}: {e}")
 
     async def _send_scan_update_to_subscribers(self, scan) -> None:
         """Send scan update to all subscribed clients."""
@@ -335,7 +344,10 @@ class WebSocketServer:
                 None
             )
 
-            if delta.get('has_changes'):
+            # Send update if there are device/metadata changes OR if stage is terminating
+            # (so clients see the terminating status even without device changes)
+            stage = delta.get('metadata', {}).get('stage', '')
+            if delta.get('has_changes') or stage == 'terminating':
                 await self._send_event(websocket, 'scan.update', delta)
         except Exception as e:
             self.log.debug(f"Error sending update to {client_id}: {e}")

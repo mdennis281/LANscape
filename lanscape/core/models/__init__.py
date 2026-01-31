@@ -9,6 +9,7 @@ from lanscape.core.models.enums import DeviceStage, ScanStage
 from lanscape.core.models.device import DeviceErrorInfo, DeviceResult
 from lanscape.core.models.scan import (
     ScanErrorInfo,
+    ScanWarningInfo,
     ScanMetadata,
     ScanResults,
     ScanDelta,
@@ -25,6 +26,7 @@ __all__ = [
     "DeviceResult",
     # Scan models
     "ScanErrorInfo",
+    "ScanWarningInfo",
     "ScanMetadata",
     "ScanResults",
     "ScanDelta",

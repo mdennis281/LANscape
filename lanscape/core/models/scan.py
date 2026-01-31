@@ -14,6 +14,15 @@ class ScanErrorInfo(BaseModel):
     basic: str = Field(description="Brief error summary")
     traceback: Optional[str] = Field(default=None, description="Full traceback if available")
 
+class ScanWarningInfo(BaseModel):
+    """Serializable representation of a scan-level warning."""
+    type: str = Field(description="Warning type identifier")
+    message: str = Field(description="Human-readable warning message")
+    old_multiplier: Optional[float] = Field(default=None, description="Previous multiplier")
+    new_multiplier: Optional[float] = Field(default=None, description="New multiplier")
+    decrease_percent: Optional[float] = Field(default=None, description="Percent decrease")
+    timestamp: Optional[float] = Field(default=None, description="Unix timestamp")
+
 class ScanMetadata(BaseModel):
     """
     Scan progress and status metadata.
@@ -44,6 +53,9 @@ class ScanMetadata(BaseModel):
 
     # Errors at scan level
     errors: List[ScanErrorInfo] = Field(default_factory=list, description="Scan-level errors")
+
+    # Warnings at scan level (e.g., multiplier reductions)
+    warnings: List[ScanWarningInfo] = Field(default_factory=list, description="Scan-level warnings")
 
 
 class ScanResults(BaseModel):

@@ -7,13 +7,16 @@ Tests cover:
 - Handler classes (ScanHandler, PortHandler, ToolsHandler)
 - WebSocket server functionality
 """
-# pylint: disable=protected-access
+# pylint: disable=protected-access,missing-class-docstring,too-many-locals,unsubscriptable-object
 
 import asyncio
 import json
 from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
+import websockets
 
+from tests.test_globals import TEST_SUBNET
+from lanscape.core.scan_config import ScanType
 from lanscape.ui.ws.protocol import (
     WSRequest,
     WSResponse,
@@ -822,12 +825,9 @@ class TestWebSocketIntegration:
     @pytest.mark.asyncio
     async def test_full_scan_event_flow(self):
         """
-        Run a full scan via WebSocket, subscribe to updates, and verify scan.update and scan.complete events.
+        Run a full scan via WebSocket, subscribe to updates,
+        and verify scan.update and scan.complete events.
         """
-        import websockets
-        from tests.test_globals import TEST_SUBNET
-        from lanscape.core.scan_config import ScanType
-
         server = WebSocketServer(host="127.0.0.1", port=18769)
         await server.start()
 
@@ -841,7 +841,7 @@ class TestWebSocketIntegration:
                 client_id = welcome_data["data"]["client_id"]
 
                 # Start a scan (use first subnet from TEST_SUBNET)
-                test_subnet = str(TEST_SUBNET).split(",")[0].strip()
+                test_subnet = str(TEST_SUBNET).split(",", maxsplit=1)[0].strip()
                 scan_config = {
                     "subnet": test_subnet,
                     "port_list": "small",
@@ -910,7 +910,6 @@ class TestWebSocketIntegration:
         await server.start()
 
         try:
-            import websockets
             async with websockets.connect("ws://127.0.0.1:18767") as ws:
                 # Should receive welcome message
                 welcome = await asyncio.wait_for(ws.recv(), timeout=5.0)
@@ -930,7 +929,6 @@ class TestWebSocketIntegration:
         await server.start()
 
         try:
-            import websockets
             async with websockets.connect("ws://127.0.0.1:18768") as ws:
                 # Skip welcome message
                 await ws.recv()

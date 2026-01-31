@@ -26,7 +26,8 @@ from lanscape.core.net_tools import (
 from lanscape.core.errors import SubnetScanTerminationFailure
 from lanscape.core.device_alive import is_device_alive
 from lanscape.core.models import (
-    ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem, ScanErrorInfo
+    ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem,
+    ScanErrorInfo, ScanWarningInfo
 )
 from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController
@@ -411,6 +412,20 @@ class ScannerResults:
             for err in self.errors
         ]
 
+        # Convert warning dicts to ScanWarningInfo models
+        warning_infos = [
+            ScanWarningInfo(
+                type=warn.get('type', 'unknown'),
+                message=warn.get('message', str(warn)),
+                old_multiplier=warn.get('old_multiplier'),
+                new_multiplier=warn.get('new_multiplier'),
+                decrease_percent=warn.get('decrease_percent'),
+                timestamp=warn.get('timestamp')
+            )
+            if isinstance(warn, dict) else ScanWarningInfo(type='unknown', message=str(warn))
+            for warn in self.warnings
+        ]
+
         return ScanMetadata(
             scan_id=self.uid,
             subnet=self.subnet,
@@ -425,7 +440,8 @@ class ScannerResults:
             start_time=self.start_time,
             end_time=self.end_time,
             run_time=int(round(time() - self.start_time, 0)),
-            errors=error_infos
+            errors=error_infos,
+            warnings=warning_infos
         )
 
     def to_results(self) -> ScanResults:

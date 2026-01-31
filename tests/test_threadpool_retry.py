@@ -1,9 +1,12 @@
 """
 Tests for the ThreadPoolRetryManager and related classes.
 """
-import pytest
+# pylint: disable=protected-access,broad-exception-raised,unused-variable
 from time import sleep
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock
+
+import pytest
+
 from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager,
     RetryJob,

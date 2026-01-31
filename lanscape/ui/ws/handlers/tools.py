@@ -12,7 +12,7 @@ from typing import Any, Callable, Optional
 from lanscape.core.net_tools import get_all_network_subnets, is_arp_supported
 from lanscape.core.ip_parser import parse_ip_input
 from lanscape.core.errors import SubnetTooLargeError
-from lanscape.core.scan_config import DEFAULT_CONFIGS
+from lanscape.core.scan_config import get_default_configs_with_arp_fallback
 from lanscape.ui.ws.handlers.base import BaseHandler
 
 
@@ -113,23 +113,7 @@ class ToolsHandler(BaseHandler):
         Returns:
             Dict of preset name -> ScanConfig dict
         """
-        arp_supported = is_arp_supported()
-
-        configs = {}
-        for key, config in DEFAULT_CONFIGS.items():
-            config_dict = config.to_dict()
-
-            if not arp_supported:
-                lookup_types = list(config_dict.get('lookup_type') or [])
-                if 'ARP_LOOKUP' in lookup_types:
-                    lookup_types = [lt for lt in lookup_types if lt != 'ARP_LOOKUP']
-                    if 'POKE_THEN_ARP' not in lookup_types:
-                        lookup_types.append('POKE_THEN_ARP')
-                    config_dict['lookup_type'] = lookup_types
-
-            configs[key] = config_dict
-
-        return configs
+        return get_default_configs_with_arp_fallback(is_arp_supported())
 
     def _handle_arp_supported(
         self,

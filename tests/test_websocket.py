@@ -467,15 +467,31 @@ class TestScanHandler:
         mock_scan.results.devices_scanned = 128
         mock_scan.results.devices = [MagicMock(), MagicMock()]
         mock_scan.results.devices_total = 256
+        # Mock the to_summary().model_dump() chain
+        mock_scan.results.to_summary.return_value.model_dump.return_value = {
+            'metadata': {
+                'scan_id': 'test-scan-123',
+                'subnet': '192.168.1.0/24',
+                'port_list': 'common',
+                'running': True,
+                'stage': 'scanning devices',
+                'percent_complete': 50,
+                'devices_total': 256,
+                'devices_scanned': 128,
+                'devices_alive': 2,
+            },
+            'ports_found': [],
+            'services_found': []
+        }
         mock_scan_manager.get_scan.return_value = mock_scan
 
         result = scan_handler._handle_summary({"scan_id": "test-scan-123"}, None)
 
-        assert result["running"] is True
-        assert result["percent_complete"] == 50
-        assert result["stage"] == "scanning devices"
-        assert result["devices"]["scanned"] == 128
-        assert result["devices"]["alive"] == 2
+        assert result["metadata"]["running"] is True
+        assert result["metadata"]["percent_complete"] == 50
+        assert result["metadata"]["stage"] == "scanning devices"
+        assert result["metadata"]["devices_scanned"] == 128
+        assert result["metadata"]["devices_alive"] == 2
 
     def test_handle_subscribe(self, scan_handler, mock_scan_manager):
         """Test subscribing to scan updates."""

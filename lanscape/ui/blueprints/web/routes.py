@@ -2,6 +2,7 @@
 Web blueprint routes for the LANscape application.
 Handles UI views including the main dashboard, scan results, error display, and exports.
 """
+import json
 from flask import render_template, request, redirect, url_for
 from lanscape.ui.blueprints.web import web_bp
 from lanscape.core.net_tools import (
@@ -56,7 +57,14 @@ def render_scan(scan_id, section='all'):
         Rendered scan template or redirect to home if scan not found
     """
     if scanner := scan_manager.get_scan(scan_id):
-        data = scanner.results.export()
+        results = scanner.results.to_results()
+        # Flatten structure for template compatibility
+        data = {
+            'uid': results.metadata.scan_id,
+            'running': results.metadata.running,
+            'errors': scanner.results.errors,
+            'devices': [d.model_dump(mode='json') for d in results.devices],
+        }
         filter_text = request.args.get('filter')
         return render_template('scan.html', data=data, section=section, filter=filter_text)
     log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
@@ -75,7 +83,8 @@ def view_errors(scan_id):
         Rendered error template or redirect to home if scan not found
     """
     if scanner := scan_manager.get_scan(scan_id):
-        data = scanner.results.export()
+        # errors are dicts with 'basic' and 'traceback' keys
+        data = {'errors': scanner.results.errors}
         return render_template('scan/scan-error.html', data=data)
     log.debug(f'Redirecting, scan {scan_id} doesnt exist in memory')
     return redirect('/')
@@ -120,7 +129,8 @@ def export_scan(scan_id):
         Rendered export template or redirect to home if scan not found
     """
     if scanner := scan_manager.get_scan(scan_id):
-        export_json = scanner.results.export(str)
+        results = scanner.results.to_results()
+        export_json = json.dumps(results.model_dump(mode='json'), indent=2)
         return render_template(
             'scan/export.html',
             scan=scanner,

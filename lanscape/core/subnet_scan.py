@@ -6,14 +6,13 @@ Handles scan management, result tracking, and scan termination.
 
 # Standard library imports
 import os
-import json
 import uuid
 import logging
 import ipaddress
 import traceback
 import threading
 from time import time, sleep
-from typing import List, Union
+from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Third-party imports
@@ -27,6 +26,9 @@ from lanscape.core.net_tools import (
 )
 from lanscape.core.errors import SubnetScanTerminationFailure
 from lanscape.core.device_alive import is_device_alive
+from lanscape.core.models import (
+    ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem
+)
 
 
 class SubnetScanner():
@@ -309,33 +311,93 @@ class ScannerResults:
             return time() - self.start_time
         return self.end_time - self.start_time
 
-    def export(self, out_type=dict) -> Union[str, dict]:
-        """
-        Export scan results in the specified format.
+    def _get_stage_enum(self) -> ScanStage:
+        """Convert stage string to ScanStage enum."""
+        stage_map = {
+            'instantiated': ScanStage.INSTANTIATED,
+            'scanning devices': ScanStage.SCANNING_DEVICES,
+            'testing ports': ScanStage.TESTING_PORTS,
+            'complete': ScanStage.COMPLETE,
+            'terminating': ScanStage.TERMINATING,
+            'terminated': ScanStage.TERMINATED,
+        }
+        return stage_map.get(self.stage, ScanStage.INSTANTIATED)
 
-        Args:
-            out_type: The output type (dict or str)
+    def get_metadata(self) -> ScanMetadata:
+        """
+        Get scan metadata as a Pydantic model.
 
         Returns:
-            Union[str, dict]: Scan results in the specified format
+            ScanMetadata: Current scan metadata for status updates
         """
-        self.running = self.scan.running
-        self.run_time = int(round(time() - self.start_time, 0))
+        return ScanMetadata(
+            scan_id=self.uid,
+            subnet=self.subnet,
+            port_list=self.port_list,
+            running=self.scan.running,
+            stage=self._get_stage_enum(),
+            percent_complete=self.scan.calc_percent_complete(),
+            devices_total=self.devices_total,
+            devices_scanned=self.devices_scanned,
+            devices_alive=self.devices_alive,
+            port_list_length=self.port_list_length,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            run_time=int(round(time() - self.start_time, 0))
+        )
 
-        out = vars(self).copy()
-        out.pop('scan')
-        out.pop('log')
-        out['cfg'] = vars(self.scan.cfg)
+    def to_results(self) -> ScanResults:
+        """
+        Export scan results as a Pydantic model.
 
-        devices: List[Device] = out.pop('devices')
+        Returns:
+            ScanResults: Complete scan results with metadata, devices, and config
+        """
         sorted_devices = sorted(
-            devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
-        out['devices'] = [device.dict() for device in sorted_devices]
+            self.devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
+        device_results = [device.to_result() for device in sorted_devices]
 
-        if out_type == str:
-            return json.dumps(out, default=str, indent=2)
-        # otherwise return dict
-        return out
+        return ScanResults(
+            metadata=self.get_metadata(),
+            devices=device_results,
+            config=self.scan.cfg.to_dict()
+        )
+
+    def to_summary(self) -> ScanSummary:
+        """
+        Get a summary of the scan results.
+
+        Returns:
+            ScanSummary: Summary with metadata and aggregate information
+        """
+        ports_found = set()
+        services_found = set()
+        for device in self.devices:
+            ports_found.update(device.ports)
+            services_found.update(device.services.keys())
+
+        return ScanSummary(
+            metadata=self.get_metadata(),
+            ports_found=sorted(ports_found),
+            services_found=sorted(services_found)
+        )
+
+    def to_list_item(self) -> ScanListItem:
+        """
+        Get a lightweight representation for scan lists.
+
+        Returns:
+            ScanListItem: Minimal scan info for listing
+        """
+        return ScanListItem(
+            scan_id=self.uid,
+            subnet=self.subnet,
+            running=self.scan.running,
+            stage=self._get_stage_enum(),
+            percent_complete=self.scan.calc_percent_complete(),
+            devices_alive=self.devices_alive,
+            devices_total=self.devices_total
+        )
 
     def __str__(self):
         # Prepare data for tabulate

@@ -125,10 +125,11 @@ function terminateScan() {
 }
 function pollScanSummary(id) {
     $.get(`/api/scan/${id}/summary`, function(summary) {
+        const meta = summary.metadata || {};
         let progress = $('#scan-progress-bar');
-        if (summary.running || summary.stage == 'terminating') {
+        if (meta.running || meta.stage == 'terminating') {
             progress.css('height','2px');
-            progress.css('width',`${summary.percent_complete}vw`);
+            progress.css('width',`${meta.percent_complete}vw`);
             setTimeout(() => {pollScanSummary(id)},500);
         } else {
             progress.css('width','100vw');
@@ -162,25 +163,28 @@ function updateOverviewUI(summary) {
       const ss = String(s).padStart(2, '0');
       return `${mm}:${ss}`;
     }
-  
-    const alive       = summary.devices.alive;
-    const scanned     = summary.devices.scanned;
-    const total       = summary.devices.total;
-  
+
+    // Extract metadata from the new nested structure
+    const meta = summary.metadata || {};
+
+    const alive       = meta.devices_alive || 0;
+    const scanned     = meta.devices_scanned || 0;
+    const total       = meta.devices_total || 0;
+
     // ensure we have a number of elapsed seconds
-    const runtimeSec  = parseFloat(summary.runtime) || 0;
-    const pctComplete = Number(summary.percent_complete) || 0;
-  
+    const runtimeSec  = parseFloat(meta.run_time) || 0;
+    const pctComplete = Number(meta.percent_complete) || 0;
+
     // compute remaining seconds correctly
     const remainingSec = pctComplete > 0
       ? (runtimeSec * (100 - pctComplete)) / pctComplete
       : 0;
-  
+
     // update everything…
     $('#scan-devices-alive').text(alive);
     $('#scan-devices-scanned').text(scanned);
     $('#scan-devices-total').text(total);
-  
+
     // …but format runtime and remaining as MM:SS
     $('#scan-run-time').text(formatMMSS(runtimeSec));
     if (pctComplete < 10) {
@@ -188,9 +192,8 @@ function updateOverviewUI(summary) {
     } else {
         $('#scan-remain-time').text(formatMMSS(remainingSec));
     }
-    
-  
-    $('#scan-stage').text(summary.stage);
+
+    $('#scan-stage').text(meta.stage || 'Unknown');
 }
 
 // Bind the iframe's load event to initialize the observer

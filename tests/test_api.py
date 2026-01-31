@@ -104,6 +104,7 @@ def test_port_list_summary(api_client, monkeypatch):
 
     class FakePortManager:  # pylint: disable=too-few-public-methods
         """Lightweight fake port manager for summary testing."""
+
         def __init__(self):
             self._lists = {
                 'small': {'80': 'http', '443': 'https'},
@@ -157,8 +158,9 @@ def test_scan(api_client, sample_port_list, test_scan_config):
     response = api_client.get(f"/api/scan/{scanid}")
     assert response.status_code == 200
     scan_data = json.loads(response.data)
-    assert scan_data['errors'] == []
-    assert scan_data['stage'] == 'complete'
+    # New structure: metadata contains stage and errors
+    assert scan_data['metadata']['errors'] == []
+    assert scan_data['metadata']['stage'] == 'complete'
 
     # Test scan UI rendering (if method exists)
     _render_scan_ui_if_available(api_client, scanid)
@@ -296,9 +298,10 @@ def test_scan_api_async(api_client, test_scan_config):
     while percent_complete < 100 and iteration < max_iterations:
         # Get scan summary
         summary = _get_scan_response(scan_id)
-        assert summary['running'] or summary['stage'] == 'complete'
+        metadata = summary['metadata']
+        assert metadata['running'] or metadata['stage'] == 'complete'
 
-        percent_complete = summary['percent_complete']
+        percent_complete = metadata['percent_complete']
         assert 0 <= percent_complete <= 100
 
         # Test UI rendering during scan
@@ -312,11 +315,12 @@ def test_scan_api_async(api_client, test_scan_config):
     summary = _get_scan_response(scan_id)
 
     # Verify final scan state
-    assert not summary['running']
-    assert summary['stage'] == 'complete'
-    assert summary['runtime'] >= MIN_EXPECTED_RUNTIME  # Should take measurable time for network ops
+    metadata = summary['metadata']
+    assert not metadata['running']
+    assert metadata['stage'] == 'complete'
+    # Should take measurable time for network ops
+    assert metadata['run_time'] >= MIN_EXPECTED_RUNTIME
 
     # Validate device counts
-    devices = summary['devices']
-    assert devices['scanned'] == devices['total']
-    assert MIN_EXPECTED_ALIVE_DEVICES <= devices['alive']
+    assert metadata['devices_scanned'] == metadata['devices_total']
+    assert MIN_EXPECTED_ALIVE_DEVICES <= metadata['devices_alive']

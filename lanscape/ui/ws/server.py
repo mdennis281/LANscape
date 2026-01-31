@@ -26,6 +26,7 @@ from lanscape.ui.ws.handlers import (
     ToolsHandler
 )
 
+
 class WebSocketServer:
     """
     Async WebSocket server for LANscape.
@@ -212,7 +213,7 @@ class WebSocketServer:
                 id=request.id,
                 action=request.action,
                 error=f"Unknown action: {request.action}. "
-                      f"Available actions: {self.get_actions()}"
+                f"Available actions: {self.get_actions()}"
             )
 
         await self._send(websocket, response)

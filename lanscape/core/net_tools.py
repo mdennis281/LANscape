@@ -35,6 +35,7 @@ from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, run_once, timeout_enforcer
 from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, ScanType
+from lanscape.core.models import DeviceResult, DeviceErrorInfo, DeviceStage
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -102,34 +103,6 @@ class Device(BaseModel):
                 self.manufacturer = self._get_manufacturer(
                     self.get_mac()
                 )
-
-    # Fallback for pydantic v1: use dict() and enrich output
-    if not _PYD_V2:
-        def dict(self, *args, **kwargs) -> dict:  # type: ignore[override]
-            """Generate dictionary representation for pydantic v1."""
-            data = super().dict(*args, **kwargs)
-            data.pop('job_stats', None)
-            mac_addr = self.get_mac() or ''
-            data['mac_addr'] = mac_addr
-            if not data.get('manufacturer'):
-                data['manufacturer'] = self._get_manufacturer(mac_addr) if mac_addr else None
-            return data
-    else:
-        # In v2, route dict() to model_dump() so callers get the serialized enrichment
-        def dict(self, *args, **kwargs) -> dict:  # type: ignore[override]
-            """Generate dictionary representation for pydantic v2."""
-            try:
-                return self.model_dump(*args, **kwargs)  # type: ignore[attr-defined]
-            except Exception:
-                # Safety fallback (shouldn't normally hit)
-                data = self.__dict__.copy()
-                data.pop('_log', None)
-                data.pop('job_stats', None)
-                mac_addr = self.get_mac() or ''
-                data['mac_addr'] = mac_addr
-                if not data.get('manufacturer'):
-                    data['manufacturer'] = self._get_manufacturer(mac_addr) if mac_addr else None
-                return data
 
     def test_port(self, port: int, port_config: Optional[PortScanConfig] = None) -> bool:
         """Test if a specific port is open on the device."""
@@ -214,6 +187,37 @@ class Device(BaseModel):
     def _get_manufacturer(self, mac_addr=None):
         """Get the manufacturer of a network device given its MAC address."""
         return mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
+
+    def to_result(self) -> DeviceResult:
+        """Convert this Device to a DeviceResult for API/WebSocket responses."""
+        # Convert DeviceError exceptions to DeviceErrorInfo models
+        error_infos = []
+        for err in self.caught_errors:
+            error_infos.append(DeviceErrorInfo(
+                source=err.method if hasattr(err, 'method') else 'unknown',
+                message=str(err.base) if hasattr(err, 'base') else str(err),
+                traceback=None  # Don't expose traceback in API responses
+            ))
+
+        # Map stage string to DeviceStage enum
+        stage_map = {
+            'found': DeviceStage.FOUND,
+            'scanning': DeviceStage.SCANNING,
+            'complete': DeviceStage.COMPLETE
+        }
+        device_stage = stage_map.get(self.stage, DeviceStage.FOUND)
+
+        return DeviceResult(
+            ip=self.ip,
+            alive=self.alive,
+            hostname=self.hostname,
+            macs=self.macs,
+            manufacturer=self.manufacturer or self._get_manufacturer(self.get_mac()),
+            ports=self.ports,
+            stage=device_stage,
+            services=self.services,
+            errors=error_infos
+        )
 
 
 class MacSelector:

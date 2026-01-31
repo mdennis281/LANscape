@@ -10,7 +10,6 @@ Provides handlers for:
 """
 
 import asyncio
-import json
 import logging
 from typing import Any, Callable, Optional
 
@@ -136,7 +135,7 @@ class ScanHandler(BaseHandler):
         if scan is None:
             raise ValueError(f"Scan not found: {scan_id}")
 
-        return json.loads(scan.results.export(str))
+        return scan.results.to_results().model_dump(mode='json')
 
     def _handle_get_delta(
         self,
@@ -166,7 +165,7 @@ class ScanHandler(BaseHandler):
             self._delta_trackers[tracker_key] = ScanDeltaTracker()
 
         tracker = self._delta_trackers[tracker_key]
-        full_results = json.loads(scan.results.export(str))
+        full_results = scan.results.to_results().model_dump(mode='json')
         delta = tracker.get_scan_delta(full_results)
 
         # Add scan status info
@@ -200,18 +199,7 @@ class ScanHandler(BaseHandler):
         if scan is None:
             raise ValueError(f"Scan not found: {scan_id}")
 
-        return {
-            'scan_id': scan_id,
-            'running': scan.running,
-            'percent_complete': scan.calc_percent_complete(),
-            'stage': scan.results.stage,
-            'runtime': scan.results.get_runtime(),
-            'devices': {
-                'scanned': scan.results.devices_scanned,
-                'alive': len(scan.results.devices),
-                'total': scan.results.devices_total
-            }
-        }
+        return scan.results.to_summary().model_dump(mode='json')
 
     def _handle_terminate(
         self,
@@ -316,16 +304,10 @@ class ScanHandler(BaseHandler):
         Returns:
             List of scan summaries
         """
-        scans = []
-        for scan in self._scan_manager.scans:
-            scans.append({
-                'scan_id': scan.uid,
-                'subnet': scan.subnet_str,
-                'running': scan.running,
-                'stage': scan.results.stage,
-                'devices_found': len(scan.results.devices)
-            })
-        return scans
+        return [
+            scan.results.to_list_item().model_dump(mode='json')
+            for scan in self._scan_manager.scans
+        ]
 
     def get_subscriptions(self, scan_id: str) -> set:
         """

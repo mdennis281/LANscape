@@ -112,7 +112,7 @@ def open_browser(url: str, wait=2) -> Popen | None:
     try:
         time.sleep(wait)
         log.info(f'Starting UI - http://127.0.0.1:{args.port}')
-        return open_pwa(url)
+        return open_pwa(url, auto_profile=False)
 
     except ChromiumNotFoundError:
         success = webbrowser.open(url)

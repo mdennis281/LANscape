@@ -22,3 +22,16 @@ from lanscape.core.scan_config import (
 from lanscape.core.port_manager import PortManager
 
 from lanscape.core import net_tools
+
+# Models for structured data
+from lanscape.core.models import (
+    DeviceStage,
+    ScanStage,
+    DeviceErrorInfo,
+    DeviceResult,
+    ScanMetadata,
+    ScanResults,
+    ScanDelta,
+    ScanSummary,
+    ScanListItem
+)

@@ -3,7 +3,6 @@ API endpoints for network scanning functionality in the LANscape application.
 Provides routes for initiating, monitoring, and retrieving network scan results.
 """
 
-import json
 import traceback
 
 from flask import request, jsonify
@@ -65,8 +64,9 @@ def get_scan(scan_id):
         JSON representation of scan results
     """
     scan = scan_manager.get_scan(scan_id)
-    # cast to str and back to handle custom JSON serialization
-    return jsonify(json.loads(scan.results.export(str)))
+    if not scan:
+        return jsonify({'error': 'scan not found'}), 404
+    return jsonify(scan.results.to_results().model_dump(mode='json'))
 
 
 @api_bp.route('/api/scan/<scan_id>/summary', methods=['GET'])
@@ -83,17 +83,7 @@ def get_scan_summary(scan_id):
     scan = scan_manager.get_scan(scan_id)
     if not scan:
         return jsonify({'error': 'scan not found'}), 404
-    return jsonify({
-        'running': scan.running,
-        'percent_complete': scan.calc_percent_complete(),
-        'stage': scan.results.stage,
-        'runtime': scan.results.get_runtime(),
-        'devices': {
-            'scanned': scan.results.devices_scanned,
-            'alive': len(scan.results.devices),
-            'total': scan.results.devices_total
-        }
-    })
+    return jsonify(scan.results.to_summary().model_dump(mode='json'))
 
 
 @api_bp.route('/api/scan/<scan_id>/terminate', methods=['GET'])

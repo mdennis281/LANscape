@@ -439,7 +439,7 @@ class ScannerResults:
             port_list_length=self.port_list_length,
             start_time=self.start_time,
             end_time=self.end_time,
-            run_time=int(round(time() - self.start_time, 0)),
+            run_time=int(round(self.get_runtime(), 0)),
             errors=error_infos,
             warnings=warning_infos
         )

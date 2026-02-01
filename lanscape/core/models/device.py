@@ -26,6 +26,16 @@ class DeviceErrorInfo(BaseModel):
         )
 
 
+class ServiceInfo(BaseModel):
+    """Information about a service discovered on a port."""
+    port: int = Field(description="Port number")
+    service: str = Field(description="Identified service name")
+    request: Optional[str] = Field(default=None, description="Request/probe that elicited response")
+    response: Optional[str] = Field(default=None, description="Raw response from service probe")
+    probes_sent: int = Field(default=0, description="Number of probes sent")
+    probes_received: int = Field(default=0, description="Number of responses received")
+
+
 class DeviceResult(BaseModel):
     """
     Result data for a discovered network device.
@@ -44,6 +54,10 @@ class DeviceResult(BaseModel):
     services: Dict[str, List[int]] = Field(
         default_factory=dict,
         description="Service name to list of ports mapping"
+    )
+    service_info: List[ServiceInfo] = Field(
+        default_factory=list,
+        description="Detailed service info with responses"
     )
     errors: List[DeviceErrorInfo] = Field(
         default_factory=list,
@@ -70,6 +84,10 @@ class DeviceResult(BaseModel):
                 "stage": "complete",
                 "ports_scanned": 100,
                 "services": {"ssh": [22], "http": [80, 443]},
+                "service_info": [
+                    {"port": 22, "service": "SSH", "response": "SSH-2.0-OpenSSH_8.9"},
+                    {"port": 80, "service": "HTTP", "response": "HTTP/1.1 200 OK\\nServer: nginx"}
+                ],
                 "errors": []
             }
         }

@@ -1,6 +1,7 @@
 """Service scanning module for identifying services running on network ports.
 """
 
+from dataclasses import dataclass
 from typing import Optional, Union
 import asyncio
 import logging
@@ -17,6 +18,25 @@ SERVICES = ResourceManager('services').get_jsonc('definitions.jsonc')
 
 # skip printer ports because they cause blank pages to be printed
 PRINTER_PORTS = [9100, 631]
+
+
+@dataclass
+class ServiceScanResult:
+    """Result of a service scan probe."""
+    service: str
+    response: Optional[str] = None
+    request: Optional[str] = None
+    probes_sent: int = 0
+    probes_received: int = 0
+
+
+@dataclass
+class ProbeResult:
+    """Result from multi-probe operation with statistics."""
+    response: Optional[str] = None
+    request: Optional[str] = None
+    probes_sent: int = 0
+    probes_received: int = 0
 
 
 async def _try_probe(
@@ -71,20 +91,26 @@ async def _try_probe(
 
 async def _multi_probe_generic(
     ip: str, port: int, cfg: ServiceScanConfig
-) -> Optional[str]:
+) -> ProbeResult:
     """
     Run a small set of generic probes in parallel and return the first non-empty response.
+    Returns ProbeResult with response and probe statistics.
     """
     probes = get_port_probes(port, cfg.lookup_type)
+    probes_sent = len(probes)
+    probes_received = 0
+    response_found = None
+    request_used = None
 
     semaphore = asyncio.Semaphore(cfg.max_concurrent_probes)
 
     async def limited_probe(ip, port, payload, timeout_val):
         async with semaphore:
-            return await _try_probe(
+            resp = await _try_probe(
                 ip, port, payload,
                 timeout=timeout_val
             )
+            return (payload, resp)
 
     tasks = [
         asyncio.create_task(
@@ -96,15 +122,21 @@ async def _multi_probe_generic(
     try:
         for fut in asyncio.as_completed(tasks, timeout=cfg.timeout):
             try:
-                resp = await fut
+                result = await fut
             except Exception:
-                resp = None
-            if resp and resp.strip():
-                # Cancel remaining tasks
-                for t in tasks:
-                    if not t.done():
-                        t.cancel()
-                return resp
+                result = None
+            if result is not None:
+                payload, resp = result
+                if resp is not None:
+                    probes_received += 1
+                    if resp.strip() and response_found is None:
+                        response_found = resp
+                        request_used = payload
+                        # Cancel remaining tasks since we found a good response
+                        for t in tasks:
+                            if not t.done():
+                                t.cancel()
+                        break
     except asyncio.TimeoutError:
         pass
     finally:
@@ -114,7 +146,23 @@ async def _multi_probe_generic(
                 t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    return None
+    # Format the request for display
+    request_display = None
+    if request_used is not None:
+        if isinstance(request_used, bytes):
+            request_display = request_used.decode('utf-8', errors='replace')
+        else:
+            request_display = str(request_used)
+    elif response_found is not None:
+        # Response came from banner grab (None payload)
+        request_display = "(banner grab - no request sent)"
+
+    return ProbeResult(
+        response=response_found,
+        request=request_display,
+        probes_sent=probes_sent,
+        probes_received=probes_received
+    )
 
 
 def get_port_probes(port: int, strategy: ServiceScanStrategy):
@@ -152,38 +200,100 @@ def get_port_probes(port: int, strategy: ServiceScanStrategy):
     return [None]  # Default to banner grab only
 
 
-def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
+# Maximum length for stored responses to avoid bloating results
+MAX_RESPONSE_LENGTH = 512
+
+
+def _clean_response(response: str) -> str:
+    """
+    Clean up a response string for storage.
+
+    - Strips leading/trailing whitespace
+    - Replaces control characters with readable representations
+    - Truncates to MAX_RESPONSE_LENGTH
+    """
+    if not response:
+        return ""
+
+    # Strip whitespace
+    cleaned = response.strip()
+
+    # Replace null bytes and other problematic control chars
+    # Keep newlines, tabs, and carriage returns as they're meaningful
+    cleaned = ''.join(
+        char if char.isprintable() or char in '\n\r\t' else f'\\x{ord(char):02x}'
+        for char in cleaned
+    )
+
+    # Truncate if too long
+    if len(cleaned) > MAX_RESPONSE_LENGTH:
+        cleaned = cleaned[:MAX_RESPONSE_LENGTH] + '...'
+
+    return cleaned
+
+
+def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResult:
     """
     Synchronous function that attempts to identify the service
     running on a given port.
-    TODO: This is AI slop and needs to be reworked properly.
+
+    Returns:
+        ServiceScanResult with service name, raw response, and probe statistics
     """
 
     async def _async_scan_service(
         ip: str, port: int,
         cfg: ServiceScanConfig
-    ) -> str:
+    ) -> ServiceScanResult:
         if port in PRINTER_PORTS:
-            return "Printer"
+            return ServiceScanResult(
+                service="Printer", response=None, request=None,
+                probes_sent=0, probes_received=0
+            )
 
         try:
             # Run multiple generic probes concurrently and take first useful response
-            response_str = await _multi_probe_generic(ip, port, cfg)
-            if not response_str:
-                return "Unknown"
+            probe_result = await _multi_probe_generic(ip, port, cfg)
 
-            log.debug(f"Service scan response from {ip}:{port} - {response_str}")
+            if not probe_result.response:
+                return ServiceScanResult(
+                    service="Unknown", response=None, request=None,
+                    probes_sent=probe_result.probes_sent,
+                    probes_received=probe_result.probes_received
+                )
+
+            log.debug(f"Service scan response from {ip}:{port} - {probe_result.response}")
+
+            # Clean up response for storage (limit length, strip control chars)
+            cleaned_response = _clean_response(probe_result.response)
 
             # Analyze the response to identify the service
             for service, config in SERVICES.items():
-                if any(hint.lower() in response_str.lower() for hint in config.get("hints", [])):
-                    return service
+                if any(hint.lower() in probe_result.response.lower()
+                       for hint in config.get("hints", [])):
+                    return ServiceScanResult(
+                        service=service, response=cleaned_response,
+                        request=probe_result.request,
+                        probes_sent=probe_result.probes_sent,
+                        probes_received=probe_result.probes_received
+                    )
+
+            # Unknown service but we got a response
+            return ServiceScanResult(
+                service="Unknown", response=cleaned_response,
+                request=probe_result.request,
+                probes_sent=probe_result.probes_sent,
+                probes_received=probe_result.probes_received
+            )
         except asyncio.TimeoutError:
             log.warning(f"Timeout scanning {ip}:{port}")
         except Exception as e:
             log.error(f"Error scanning {ip}:{port}: {str(e)}")
             log.debug(traceback.format_exc())
-        return "Unknown"
+        return ServiceScanResult(
+            service="Unknown", response=None, request=None,
+            probes_sent=0, probes_received=0
+        )
 
     # Create and properly manage event loop to avoid file descriptor leaks
     # Using new_event_loop + explicit close is safer in threaded environments
@@ -219,4 +329,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> str:
                     loop.close()
     except Exception as e:
         log.error(f"Event loop error scanning {ip}:{port}: {e}")
-        return "Unknown"
+        return ServiceScanResult(
+            service="Unknown", response=None, request=None,
+            probes_sent=0, probes_received=0
+        )

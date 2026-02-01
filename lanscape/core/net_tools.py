@@ -29,13 +29,13 @@ else:
     COMPUTED_FIELD = computed_field  # pylint: disable=invalid-name
     MODEL_SERIALIZER = model_serializer  # pylint: disable=invalid-name
 
-from lanscape.core.service_scan import scan_service
+from lanscape.core.service_scan import scan_service, ServiceScanResult
 from lanscape.core.mac_lookup import MacLookup, get_macs
 from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip_input
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, run_once, timeout_enforcer
 from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, ScanType
-from lanscape.core.models import DeviceResult, DeviceErrorInfo, DeviceStage
+from lanscape.core.models import DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -53,6 +53,7 @@ class Device(BaseModel):
     stage: str = 'found'
     ports_scanned: int = 0
     services: Dict[str, List[int]] = {}
+    service_info: List[ServiceInfo] = []
     caught_errors: List[DeviceError] = []
     job_stats: Optional[Dict] = None
 
@@ -152,10 +153,22 @@ class Device(BaseModel):
     @job_tracker
     def scan_service(self, port: int, cfg: ServiceScanConfig):
         """Scan a specific port for services."""
-        service = scan_service(self.ip, port, cfg)
-        service_ports = self.services.get(service, [])
+        result: ServiceScanResult = scan_service(self.ip, port, cfg)
+
+        # Update the services mapping (service name -> ports)
+        service_ports = self.services.get(result.service, [])
         service_ports.append(port)
-        self.services[service] = service_ports
+        self.services[result.service] = service_ports
+
+        # Store detailed service info with response and probe statistics
+        self.service_info.append(ServiceInfo(
+            port=port,
+            service=result.service,
+            request=result.request,
+            response=result.response,
+            probes_sent=result.probes_sent,
+            probes_received=result.probes_received
+        ))
 
     def get_mac(self):
         """Get the primary MAC address of the device."""
@@ -217,6 +230,7 @@ class Device(BaseModel):
             ports_scanned=self.ports_scanned,
             stage=device_stage,
             services=self.services,
+            service_info=self.service_info,
             errors=error_infos
         )
 

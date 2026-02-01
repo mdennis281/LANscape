@@ -1,12 +1,14 @@
 """
 Local network scanner
 """
+# Scanner core functionality
 from lanscape.core.subnet_scan import (
     SubnetScanner,
     ScannerResults,
     ScanManager
 )
 
+# Configuration models for scans
 from lanscape.core.scan_config import (
     ScanConfig,
     ArpConfig,

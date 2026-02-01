@@ -9,10 +9,12 @@ from pydantic import BaseModel, Field
 from lanscape.core.models.enums import ScanStage
 from lanscape.core.models.device import DeviceResult
 
+
 class ScanErrorInfo(BaseModel):
     """Serializable representation of a scan-level error."""
     basic: str = Field(description="Brief error summary")
     traceback: Optional[str] = Field(default=None, description="Full traceback if available")
+
 
 class ScanWarningInfo(BaseModel):
     """Serializable representation of a scan-level warning."""
@@ -22,6 +24,7 @@ class ScanWarningInfo(BaseModel):
     new_multiplier: Optional[float] = Field(default=None, description="New multiplier")
     decrease_percent: Optional[float] = Field(default=None, description="Percent decrease")
     timestamp: Optional[float] = Field(default=None, description="Unix timestamp")
+
 
 class ScanMetadata(BaseModel):
     """

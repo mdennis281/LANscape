@@ -167,7 +167,8 @@ class Device(BaseModel):
             request=result.request,
             response=result.response,
             probes_sent=result.probes_sent,
-            probes_received=result.probes_received
+            probes_received=result.probes_received,
+            is_tls=result.is_tls
         ))
 
     def get_mac(self):

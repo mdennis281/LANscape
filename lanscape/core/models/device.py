@@ -34,6 +34,7 @@ class ServiceInfo(BaseModel):
     response: Optional[str] = Field(default=None, description="Raw response from service probe")
     probes_sent: int = Field(default=0, description="Number of probes sent")
     probes_received: int = Field(default=0, description="Number of responses received")
+    is_tls: bool = Field(default=False, description="Whether TLS/SSL was detected")
 
 
 class DeviceResult(BaseModel):

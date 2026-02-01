@@ -35,7 +35,7 @@ class WebSocketServer:
     Supports real-time scan updates via subscriptions.
     """
 
-    DEFAULT_HOST = 'localhost'
+    DEFAULT_HOST = '0.0.0.0'
     DEFAULT_PORT = 8766
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):

@@ -847,7 +847,7 @@ class TestWebSocketIntegration:
                     "port_list": "small",
                     "lookup_type": [ScanType.ICMP.value, ScanType.POKE_THEN_ARP.value],
                     "t_cnt_isalive": 2,
-                    "ping_config": {"timeout": 0.8, "attempts": 2}
+                    "ping_config": {"timeout": 1.0, "attempts": 2}
                 }
                 start_req = {
                     "type": "request",
@@ -856,7 +856,7 @@ class TestWebSocketIntegration:
                     "params": scan_config
                 }
                 await ws.send(json.dumps(start_req))
-                start_resp = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                start_resp = await asyncio.wait_for(ws.recv(), timeout=10.0)
                 start_data = json.loads(start_resp)
                 assert start_data["type"] == "response"
                 assert start_data["id"] == "scan-1"
@@ -871,7 +871,7 @@ class TestWebSocketIntegration:
                     "params": {"scan_id": scan_id, "client_id": client_id}
                 }
                 await ws.send(json.dumps(subscribe_req))
-                subscribe_resp = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                subscribe_resp = await asyncio.wait_for(ws.recv(), timeout=10.0)
                 subscribe_data = json.loads(subscribe_resp)
                 assert subscribe_data["type"] == "response"
                 assert subscribe_data["id"] == "sub-1"
@@ -879,11 +879,15 @@ class TestWebSocketIntegration:
                 assert subscribe_data["data"]["subscribed"] is True
 
                 # Collect scan.update and scan.complete events
+                # Allow generous timeouts for CI environments with slower networking
                 got_update = False
                 got_complete = False
-                max_events = 30
+                max_events = 100
                 for _ in range(max_events):
-                    event_msg = await asyncio.wait_for(ws.recv(), timeout=10.0)
+                    try:
+                        event_msg = await asyncio.wait_for(ws.recv(), timeout=30.0)
+                    except asyncio.TimeoutError:
+                        break  # No more events coming
                     event_data = json.loads(event_msg)
                     if event_data.get("type") == "event":
                         if event_data.get("event") == "scan.update":

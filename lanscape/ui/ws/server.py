@@ -35,7 +35,7 @@ class WebSocketServer:
     Supports real-time scan updates via subscriptions.
     """
 
-    DEFAULT_HOST = '0.0.0.0'
+    DEFAULT_HOST = '127.0.0.1'
     DEFAULT_PORT = 8766
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
@@ -43,7 +43,7 @@ class WebSocketServer:
         Initialize the WebSocket server.
 
         Args:
-            host: Host to bind to (default: 0.0.0.0)
+            host: Host to bind to (default: 127.0.0.1)
             port: Port to listen on (default: 8766)
         """
         self.host = host

@@ -352,12 +352,45 @@ async def _try_probe(  # pylint: disable=too-many-locals,too-many-arguments
 
 
 def _detect_tls_from_bytes(data: bytes) -> bool:
-    """Check if response bytes indicate TLS/SSL."""
-    if not data or len(data) < 2:
+    """
+    Check if response bytes indicate TLS/SSL.
+
+    Detects TLS by checking for valid TLS record layer header format:
+    - Byte 0: Content type (0x14-0x17)
+    - Byte 1: Major version (0x03 for all TLS versions)
+    - Byte 2: Minor version (0x01-0x04 for TLS 1.0-1.3)
+
+    Supported versions:
+    - TLS 1.0 (0x0301)
+    - TLS 1.1 (0x0302)
+    - TLS 1.2 (0x0303)
+    - TLS 1.3 (0x0304) - Note: TLS 1.3 often uses 0x0303 in record layer for compatibility
+
+    Args:
+        data: Raw bytes from server response
+
+    Returns:
+        True if data appears to be a TLS record, False otherwise
+    """
+    if not data or len(data) < 3:
         return False
-    # TLS record types: 0x14=ChangeCipherSpec, 0x15=Alert, 0x16=Handshake, 0x17=Application
-    # Version bytes: 0x0301=TLS1.0, 0x0302=TLS1.1, 0x0303=TLS1.2, 0x0304=TLS1.3
-    if data[0] in (0x14, 0x15, 0x16, 0x17) and data[1] == 0x03:
+
+    # TLS record types:
+    # 0x14 = ChangeCipherSpec
+    # 0x15 = Alert
+    # 0x16 = Handshake
+    # 0x17 = ApplicationData
+    valid_content_types = (0x14, 0x15, 0x16, 0x17)
+
+    # All TLS versions use 0x03 as major version byte
+    # Minor version: 0x01=TLS1.0, 0x02=TLS1.1, 0x03=TLS1.2, 0x04=TLS1.3
+    # Note: TLS 1.3 may advertise 0x0303 in record layer for middlebox compatibility
+    tls_major_version = 0x03
+    valid_minor_versions = (0x01, 0x02, 0x03, 0x04)
+
+    if (data[0] in valid_content_types and
+            data[1] == tls_major_version and
+            data[2] in valid_minor_versions):
         return True
     return False
 

@@ -176,11 +176,25 @@ def get_valid_port(port: int) -> int:
     """
     Get the first available port starting from the specified port.
     Used when no explicit port is specified.
+
+    Args:
+        port: Starting port number to check
+
+    Returns:
+        First available port
+
+    Raises:
+        RuntimeError: If no available port found between port and 65535
     """
-    while True:
+    max_port = 65535
+    start_port = port
+    while port <= max_port:
         if is_port_available(port):
             return port
         port += 1
+    raise RuntimeError(
+        f"No available port found between {start_port} and {max_port}"
+    )
 
 
 def terminate():

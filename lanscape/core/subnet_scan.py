@@ -6,15 +6,13 @@ Handles scan management, result tracking, and scan termination.
 
 # Standard library imports
 import os
-import json
 import uuid
 import logging
 import ipaddress
-import traceback
 import threading
 from time import time, sleep
-from typing import List, Union
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List
+from concurrent.futures import ThreadPoolExecutor
 
 # Third-party imports
 from tabulate import tabulate
@@ -27,6 +25,13 @@ from lanscape.core.net_tools import (
 )
 from lanscape.core.errors import SubnetScanTerminationFailure
 from lanscape.core.device_alive import is_device_alive
+from lanscape.core.models import (
+    ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem,
+    ScanErrorInfo, ScanWarningInfo
+)
+from lanscape.core.threadpool_retry import (
+    ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController
+)
 
 
 class SubnetScanner():
@@ -54,6 +59,15 @@ class SubnetScanner():
         self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
 
+        # Multiplier controller for resilient thread management
+        self._multiplier_controller = MultiplierController(
+            initial_multiplier=config.t_multiplier,
+            decrease_percent=config.failure_multiplier_decrease,
+            debounce_sec=config.failure_debounce_sec,
+            min_multiplier=0.1,
+            on_warning=self._handle_warning
+        )
+
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(
             f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
@@ -64,23 +78,42 @@ class SubnetScanner():
         """
         self._set_stage('scanning devices')
         self.running = True
-        with ThreadPoolExecutor(
-                max_workers=self.cfg.t_cnt('isalive'),
-                thread_name_prefix="DeviceAlive") as executor:
 
-            futures = {executor.submit(self._get_host_details, str(
-                ip)): str(ip) for ip in self.subnet}
-            for future in as_completed(futures):
-                ip = futures[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    self.log.error(
-                        f'[{ip}] scan failed. details below:\n{traceback.format_exc()}')
-                    self.results.errors.append({
-                        'basic': f"Error scanning IP {ip}: {e}",
-                        'traceback': traceback.format_exc(),
-                    })
+        # Create retry manager for device scanning
+        retry_config = RetryConfig(
+            max_retries=self.cfg.failure_retry_cnt,
+            multiplier_decrease=self.cfg.failure_multiplier_decrease,
+            debounce_sec=self.cfg.failure_debounce_sec,
+        )
+
+        def on_device_error(job_id: str, error: Exception, tb_str: str):
+            """Callback for permanent device scan failures."""
+            self.results.errors.append({
+                'basic': f"Error scanning IP {job_id}: {error}",
+                'traceback': tb_str,
+            })
+
+        retry_manager = ThreadPoolRetryManager(
+            max_workers=self.cfg.t_cnt('isalive'),
+            retry_config=retry_config,
+            multiplier_controller=self._multiplier_controller,
+            thread_name_prefix="DeviceAlive",
+            on_job_error=on_device_error,
+        )
+
+        # Create jobs for each IP in the subnet
+        jobs = [
+            RetryJob(
+                job_id=str(ip),
+                func=self._get_host_details,
+                args=(str(ip),),
+                max_retries=self.cfg.failure_retry_cnt,
+            )
+            for ip in self.subnet
+        ]
+
+        # Execute with retry support
+        retry_manager.execute_all(jobs)
 
         self._set_stage('testing ports')
         if self.cfg.task_scan_ports:
@@ -204,12 +237,41 @@ class SubnetScanner():
 
     @terminator
     def _scan_network_ports(self):
-        with ThreadPoolExecutor(max_workers=self.cfg.t_cnt('port_scan'),
-                                thread_name_prefix="DevicePortScanParent") as executor:
-            futures = {executor.submit(
-                self._scan_ports, device): device for device in self.results.devices}
-            for future in futures:
-                future.result()
+        """Scan ports on all discovered devices using retry manager."""
+        retry_config = RetryConfig(
+            max_retries=self.cfg.failure_retry_cnt,
+            multiplier_decrease=self.cfg.failure_multiplier_decrease,
+            debounce_sec=self.cfg.failure_debounce_sec,
+        )
+
+        def on_port_scan_error(job_id: str, error: Exception, tb_str: str):
+            """Callback for permanent port scan failures."""
+            self.results.errors.append({
+                'basic': f"Error scanning ports on {job_id}: {error}",
+                'traceback': tb_str,
+            })
+
+        retry_manager = ThreadPoolRetryManager(
+            max_workers=self.cfg.t_cnt('port_scan'),
+            retry_config=retry_config,
+            multiplier_controller=self._multiplier_controller,
+            thread_name_prefix="DevicePortScan",
+            on_job_error=on_port_scan_error,
+        )
+
+        # Create jobs for each device
+        jobs = [
+            RetryJob(
+                job_id=device.ip,
+                func=self._scan_ports,
+                args=(device,),
+                max_retries=self.cfg.failure_retry_cnt,
+            )
+            for device in self.results.devices
+        ]
+
+        # Execute with retry support
+        retry_manager.execute_all(jobs)
 
     @terminator
     @job_tracker
@@ -253,6 +315,20 @@ class SubnetScanner():
         if not self.running:
             self.results.end_time = time()
 
+    def _handle_warning(self, warning_type: str, warning_data: dict):
+        """
+        Handle a warning from the multiplier controller or other sources.
+
+        Args:
+            warning_type: Type of warning (e.g., 'multiplier_reduced')
+            warning_data: Dict with warning details
+        """
+        self.results.warnings.append({
+            'type': warning_type,
+            **warning_data
+        })
+        self.log.warning(f'Scan warning [{warning_type}]: {warning_data.get("message", "")}')
+
 
 class ScannerResults:
     """
@@ -277,6 +353,7 @@ class ScannerResults:
 
         # Status tracking
         self.errors: List[str] = []
+        self.warnings: List[dict] = []  # Warnings like multiplier reductions
         self.running: bool = False
         self.start_time: float = time()
         self.end_time: int = None
@@ -309,33 +386,117 @@ class ScannerResults:
             return time() - self.start_time
         return self.end_time - self.start_time
 
-    def export(self, out_type=dict) -> Union[str, dict]:
-        """
-        Export scan results in the specified format.
+    def _get_stage_enum(self) -> ScanStage:
+        """Convert stage string to ScanStage enum."""
+        stage_map = {
+            'instantiated': ScanStage.INSTANTIATED,
+            'scanning devices': ScanStage.SCANNING_DEVICES,
+            'testing ports': ScanStage.TESTING_PORTS,
+            'complete': ScanStage.COMPLETE,
+            'terminating': ScanStage.TERMINATING,
+            'terminated': ScanStage.TERMINATED,
+        }
+        return stage_map.get(self.stage, ScanStage.INSTANTIATED)
 
-        Args:
-            out_type: The output type (dict or str)
+    def get_metadata(self) -> ScanMetadata:
+        """
+        Get scan metadata as a Pydantic model.
 
         Returns:
-            Union[str, dict]: Scan results in the specified format
+            ScanMetadata: Current scan metadata for status updates
         """
-        self.running = self.scan.running
-        self.run_time = int(round(time() - self.start_time, 0))
+        # Convert error dicts to ScanErrorInfo models
+        error_infos = [
+            ScanErrorInfo(basic=err.get('basic', str(err)), traceback=err.get('traceback'))
+            if isinstance(err, dict) else ScanErrorInfo(basic=str(err))
+            for err in self.errors
+        ]
 
-        out = vars(self).copy()
-        out.pop('scan')
-        out.pop('log')
-        out['cfg'] = vars(self.scan.cfg)
+        # Convert warning dicts to ScanWarningInfo models
+        warning_infos = [
+            ScanWarningInfo(
+                type=warn.get('type', 'unknown'),
+                message=warn.get('message', str(warn)),
+                old_multiplier=warn.get('old_multiplier'),
+                new_multiplier=warn.get('new_multiplier'),
+                decrease_percent=warn.get('decrease_percent'),
+                timestamp=warn.get('timestamp')
+            )
+            if isinstance(warn, dict) else ScanWarningInfo(type='unknown', message=str(warn))
+            for warn in self.warnings
+        ]
 
-        devices: List[Device] = out.pop('devices')
+        return ScanMetadata(
+            scan_id=self.uid,
+            subnet=self.subnet,
+            port_list=self.port_list,
+            running=self.scan.running,
+            stage=self._get_stage_enum(),
+            percent_complete=self.scan.calc_percent_complete(),
+            devices_total=self.devices_total,
+            devices_scanned=self.devices_scanned,
+            devices_alive=self.devices_alive,
+            port_list_length=self.port_list_length,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            run_time=int(round(self.get_runtime(), 0)),
+            errors=error_infos,
+            warnings=warning_infos
+        )
+
+    def to_results(self) -> ScanResults:
+        """
+        Export scan results as a Pydantic model.
+
+        Returns:
+            ScanResults: Complete scan results with metadata, devices, and config
+        """
         sorted_devices = sorted(
-            devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
-        out['devices'] = [device.dict() for device in sorted_devices]
+            self.devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
+        device_results = [device.to_result() for device in sorted_devices]
 
-        if out_type == str:
-            return json.dumps(out, default=str, indent=2)
-        # otherwise return dict
-        return out
+        return ScanResults(
+            metadata=self.get_metadata(),
+            devices=device_results,
+            config=self.scan.cfg.to_dict()
+        )
+
+    def to_summary(self) -> ScanSummary:
+        """
+        Get a summary of the scan results.
+
+        Returns:
+            ScanSummary: Summary with metadata and aggregate information
+        """
+        ports_found = set()
+        services_found = set()
+        for device in self.devices:
+            ports_found.update(device.ports)
+            services_found.update(device.services.keys())
+
+        return ScanSummary(
+            metadata=self.get_metadata(),
+            ports_found=sorted(ports_found),
+            services_found=sorted(services_found),
+            warnings=self.warnings
+        )
+
+    def to_list_item(self) -> ScanListItem:
+        """
+        Get a lightweight representation for scan lists.
+
+        Returns:
+            ScanListItem: Minimal scan info for listing
+        """
+        return ScanListItem(
+            scan_id=self.uid,
+            subnet=self.subnet,
+            running=self.scan.running,
+            stage=self._get_stage_enum(),
+            percent_complete=self.scan.calc_percent_complete(),
+            devices_alive=self.devices_alive,
+            devices_total=self.devices_total
+        )
 
     def __str__(self):
         # Prepare data for tabulate

@@ -713,6 +713,24 @@ input[type="range"] {
     background-color: var(--secondary-accent);
 }
 
+/* Scan Warnings Badge */
+.scan-warnings-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: rgba(204, 136, 1, 0.15);
+    border: 1px solid var(--warning-accent);
+    border-radius: 4px;
+    color: var(--warning-accent);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.scan-warnings-badge:hover {
+    background: rgba(204, 136, 1, 0.3);
+}
+
 
 /* Protocol Open Button Styles */
 span.alt {

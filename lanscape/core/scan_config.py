@@ -269,6 +269,11 @@ class ScanConfig(BaseModel):
 
     lookup_type: List[ScanType] = [ScanType.ICMP_THEN_ARP]
 
+    # Retry and resilience settings
+    failure_retry_cnt: int = 2
+    failure_multiplier_decrease: float = 0.25
+    failure_debounce_sec: float = 5.0
+
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
@@ -395,3 +400,33 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
         )
     )
 }
+
+
+def get_default_configs_with_arp_fallback(arp_supported: bool) -> Dict[str, dict]:
+    """
+    Get default scan configurations, adjusting for ARP support.
+
+    When ARP lookups are not supported on the host system, adjust any
+    presets that rely on ARP_LOOKUP to use the POKE_THEN_ARP fallback.
+
+    Args:
+        arp_supported: Whether active ARP scanning is available
+
+    Returns:
+        Dict of preset name -> ScanConfig dict
+    """
+    configs = {}
+    for key, config in DEFAULT_CONFIGS.items():
+        config_dict = config.to_dict()
+
+        if not arp_supported:
+            lookup_types = list(config_dict.get('lookup_type') or [])
+            if 'ARP_LOOKUP' in lookup_types:
+                lookup_types = [lt for lt in lookup_types if lt != 'ARP_LOOKUP']
+                if 'POKE_THEN_ARP' not in lookup_types:
+                    lookup_types.append('POKE_THEN_ARP')
+                config_dict['lookup_type'] = lookup_types
+
+        configs[key] = config_dict
+
+    return configs

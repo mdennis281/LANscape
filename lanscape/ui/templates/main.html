@@ -55,7 +55,8 @@
         <div id="scan-results" class="div-hide">
             <div class="d-flex justify-content-between">
                 <h2>Scan Results</h2>
-                <div id="scan-actions">
+                <div id="scan-actions" class="d-flex align-items-center gap-2">
+                    <div id="warnings-badge" class="div-hide"></div>
                     <a href="" id="export-link">
                         <i 
                             class="fa-solid fa-upload secondary-icon-btn"
@@ -64,6 +65,29 @@
                             title="Export scan to json">
                         </i>
                     </a>
+                </div>
+            </div>
+            
+            <!-- Warnings Modal -->
+            <div class="modal fade" id="warningsModal" tabindex="-1" aria-labelledby="warningsModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content" style="background-color: var(--primary-bg); border: 1px solid var(--border-color);">
+                        <div class="modal-header" style="border-bottom: 1px solid var(--warning-accent);">
+                            <h6 class="modal-title" id="warningsModalLabel" style="color: var(--warning-accent);">
+                                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                                Scan Warnings
+                            </h6>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body" id="warnings-modal-body" style="color: var(--text-color);">
+                        </div>
+                        <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                            <a href="https://github.com/mdennis281/LANscape/issues" target="_blank" class="btn btn-sm" style="color: var(--info-accent); border: 1px solid var(--info-accent);">
+                                <i class="fa-brands fa-github me-1"></i> Report
+                            </a>
+                            <button type="button" class="btn btn-sm" style="background: var(--secondary-accent); color: var(--text-color);" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             

@@ -13,7 +13,8 @@ from lanscape.core.service_scan import (
     get_port_probes,
     _try_probe,
     _multi_probe_generic,
-    PRINTER_PORTS
+    PRINTER_PORTS,
+    ServiceScanResult
 )
 from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
 
@@ -102,7 +103,8 @@ def test_printer_ports_detection(default_config):
     # Test service scan on printer ports
     for port in PRINTER_PORTS:
         result = scan_service("127.0.0.1", port, default_config)
-        assert result == "Printer"
+        assert isinstance(result, ServiceScanResult)
+        assert result.service == "Printer"
 
 
 # Service Scanning Tests
@@ -112,11 +114,13 @@ def test_scan_service_invalid_target(lazy_config):
     """Test service scanning against invalid targets."""
     # Test with non-existent IP
     result = scan_service("192.168.254.254", 80, lazy_config)
-    assert result in ["Unknown"]
+    assert isinstance(result, ServiceScanResult)
+    assert result.service == "Unknown"
 
     # Test with invalid port
     result = scan_service("127.0.0.1", 99999, lazy_config)  # Port out of range
-    assert result in ["Unknown"]
+    assert isinstance(result, ServiceScanResult)
+    assert result.service == "Unknown"
 
 
 def test_scan_service_timeout_configurations():
@@ -128,8 +132,8 @@ def test_scan_service_timeout_configurations():
     result1 = scan_service("127.0.0.1", 54321, short_timeout_config)
     result2 = scan_service("127.0.0.1", 54322, long_timeout_config)
 
-    assert isinstance(result1, str)
-    assert isinstance(result2, str)
+    assert isinstance(result1, ServiceScanResult)
+    assert isinstance(result2, ServiceScanResult)
 
 
 def test_concurrent_probe_limits():
@@ -149,8 +153,8 @@ def test_concurrent_probe_limits():
     result1 = scan_service("127.0.0.1", 54323, low_concurrency)
     result2 = scan_service("127.0.0.1", 54324, high_concurrency)
 
-    assert isinstance(result1, str)
-    assert isinstance(result2, str)
+    assert isinstance(result1, ServiceScanResult)
+    assert isinstance(result2, ServiceScanResult)
 
 
 # Async Probe Tests
@@ -170,8 +174,12 @@ def test_try_probe_success():
             mock_open_connection.return_value = (mock_reader, mock_writer)
 
             result = await _try_probe("127.0.0.1", 80, "GET / HTTP/1.0\r\n\r\n")
-            assert isinstance(result, str)
-            assert "HTTP" in result
+            # _try_probe now returns tuple of (bytes, str)
+            assert isinstance(result, tuple)
+            raw_bytes, decoded_str = result
+            assert isinstance(raw_bytes, bytes)
+            assert isinstance(decoded_str, str)
+            assert "HTTP" in decoded_str
 
     asyncio.run(run_test())
 
@@ -183,7 +191,9 @@ def test_try_probe_connection_refused():
             mock_open_connection.side_effect = ConnectionRefusedError()
 
             result = await _try_probe("127.0.0.1", 54325)
-            assert result is None
+            # _try_probe now returns tuple of (None, None) on failure
+            assert isinstance(result, tuple)
+            assert result == (None, None)
 
     asyncio.run(run_test())
 
@@ -195,7 +205,9 @@ def test_try_probe_timeout():
             mock_open_connection.side_effect = asyncio.TimeoutError()
 
             result = await _try_probe("127.0.0.1", 80, timeout=0.1)
-            assert result is None
+            # _try_probe now returns tuple of (None, None) on failure
+            assert isinstance(result, tuple)
+            assert result == (None, None)
 
     asyncio.run(run_test())
 
@@ -207,7 +219,10 @@ def test_multi_probe_generic_no_response():
 
         # Use a high port that should be closed
         result = await _multi_probe_generic("127.0.0.1", 54326, config)
-        assert result is None
+        # Now returns ProbeResult with statistics
+        assert result.response is None
+        assert result.probes_sent > 0
+        assert result.probes_received == 0
 
     asyncio.run(run_test())
 
@@ -231,8 +246,8 @@ def test_service_scan_integration():
 
         # Test on a high port that should be closed
         result = scan_service("127.0.0.1", 54327 + hash(strategy.value) % 1000, config)
-        assert isinstance(result, str)
-        assert len(result) > 0  # Should return something (likely "Unknown")
+        assert isinstance(result, ServiceScanResult)
+        assert len(result.service) > 0  # Should return something (likely "Unknown")
 
 
 # Configuration Tests
@@ -246,7 +261,7 @@ def test_service_config_validation():
         max_concurrent_probes=1
     )
     result = scan_service("127.0.0.1", 54328, min_config)
-    assert isinstance(result, str)
+    assert isinstance(result, ServiceScanResult)
 
     # Test with maximum reasonable values
     max_config = ServiceScanConfig(

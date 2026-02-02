@@ -125,10 +125,11 @@ function terminateScan() {
 }
 function pollScanSummary(id) {
     $.get(`/api/scan/${id}/summary`, function(summary) {
+        const meta = summary.metadata || {};
         let progress = $('#scan-progress-bar');
-        if (summary.running || summary.stage == 'terminating') {
+        if (meta.running || meta.stage == 'terminating') {
             progress.css('height','2px');
-            progress.css('width',`${summary.percent_complete}vw`);
+            progress.css('width',`${meta.percent_complete}vw`);
             setTimeout(() => {pollScanSummary(id)},500);
         } else {
             progress.css('width','100vw');
@@ -143,12 +144,51 @@ function pollScanSummary(id) {
             },1000);
         }
         updateOverviewUI(summary);
+        updateWarningsUI(summary.warnings || []);
     }).fail(function(req) {
         if (req === 404) {
             console.log('Scan not found, redirecting to home');
             window.location.href = '/';
         }
     });
+}
+
+function updateWarningsUI(warnings) {
+    const badge = $('#warnings-badge');
+    const modalBody = $('#warnings-modal-body');
+    
+    if (!warnings || warnings.length === 0) {
+        badge.addClass('div-hide');
+        return;
+    }
+    
+    // Render badge
+    badge.removeClass('div-hide');
+    badge.html(`
+        <span class="scan-warnings-badge" data-bs-toggle="modal" data-bs-target="#warningsModal">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>${warnings.length}</span>
+        </span>
+    `);
+    
+    // Render modal body
+    let html = `<p class="small mb-3" style="color: var(--text-placeholder);">
+        Resource constraints caused thread concurrency to be reduced during the scan.
+    </p>`;
+    
+    warnings.forEach(w => {
+        html += `<div class="warning-item mb-2" style="background: var(--primary-bg-accent); border-radius: 4px; padding: 10px; border-left: 3px solid var(--warning-accent);">
+            <div class="small" style="color: var(--text-color);">${w.message || 'Thread multiplier reduced'}</div>`;
+        if (w.old_multiplier && w.new_multiplier) {
+            html += `<div class="mt-1" style="font-size: 0.75rem; color: var(--text-placeholder);">
+                <span>${Math.round(w.old_multiplier * 100)}% → ${Math.round(w.new_multiplier * 100)}%</span>
+                <span class="ms-2" style="color: var(--warning-accent);">(-${Math.round(w.decrease_percent)}%)</span>
+            </div>`;
+        }
+        html += `</div>`;
+    });
+    
+    modalBody.html(html);
 }
 
 function updateOverviewUI(summary) {
@@ -162,25 +202,28 @@ function updateOverviewUI(summary) {
       const ss = String(s).padStart(2, '0');
       return `${mm}:${ss}`;
     }
-  
-    const alive       = summary.devices.alive;
-    const scanned     = summary.devices.scanned;
-    const total       = summary.devices.total;
-  
+
+    // Extract metadata from the new nested structure
+    const meta = summary.metadata || {};
+
+    const alive       = meta.devices_alive || 0;
+    const scanned     = meta.devices_scanned || 0;
+    const total       = meta.devices_total || 0;
+
     // ensure we have a number of elapsed seconds
-    const runtimeSec  = parseFloat(summary.runtime) || 0;
-    const pctComplete = Number(summary.percent_complete) || 0;
-  
+    const runtimeSec  = parseFloat(meta.run_time) || 0;
+    const pctComplete = Number(meta.percent_complete) || 0;
+
     // compute remaining seconds correctly
     const remainingSec = pctComplete > 0
       ? (runtimeSec * (100 - pctComplete)) / pctComplete
       : 0;
-  
+
     // update everything…
     $('#scan-devices-alive').text(alive);
     $('#scan-devices-scanned').text(scanned);
     $('#scan-devices-total').text(total);
-  
+
     // …but format runtime and remaining as MM:SS
     $('#scan-run-time').text(formatMMSS(runtimeSec));
     if (pctComplete < 10) {
@@ -188,9 +231,8 @@ function updateOverviewUI(summary) {
     } else {
         $('#scan-remain-time').text(formatMMSS(remainingSec));
     }
-    
-  
-    $('#scan-stage').text(summary.stage);
+
+    $('#scan-stage').text(meta.stage || 'Unknown');
 }
 
 // Bind the iframe's load event to initialize the observer

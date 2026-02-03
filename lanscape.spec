@@ -37,8 +37,7 @@ hiddenimports += [
 
 # Collect data files (port lists, resources, etc.)
 datas = [
-    ('ports', 'ports'),  # Include port list files
-    ('lanscape/resources', 'lanscape/resources'),  # Include resource files (services, mac addresses)
+    ('lanscape/resources', 'lanscape/resources'),  # Include resource files (ports, services, mac addresses)
 ]
 
 a = Analysis(

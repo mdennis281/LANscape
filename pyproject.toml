@@ -40,7 +40,8 @@ dev = [
     "pytest-asyncio>=0.23",
     "openai>=1.0.0",
     "pylint>=3.0",
-    "autopep8>=2.0"
+    "autopep8>=2.0",
+    "pyinstaller>=6.0"
 ]
 [project.urls]
 Homepage = "https://github.com/mdennis281/py-lanscape"

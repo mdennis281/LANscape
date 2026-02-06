@@ -6,9 +6,7 @@ Builds a single executable that runs the LANscape WebSocket server.
 Usage: pyinstaller lanscape.spec
 """
 
-import os
-import sys
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 

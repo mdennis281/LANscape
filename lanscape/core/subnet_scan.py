@@ -79,6 +79,9 @@ class SubnetScanner():
         self._set_stage('scanning devices')
         self.running = True
 
+        # Clear job stats from any previous scan to ensure accurate progress tracking
+        self.job_stats.clear_stats()
+
         # Create retry manager for device scanning
         retry_config = RetryConfig(
             max_retries=self.cfg.failure_retry_cnt,
@@ -145,7 +148,72 @@ class SubnetScanner():
             sleep(.5)
         raise SubnetScanTerminationFailure(self.job_stats.running)
 
-    def calc_percent_complete(self) -> int:  # 0 - 100
+    def _estimate_alive_devices(self) -> float:
+        """
+        Estimate the number of alive devices in the subnet.
+
+        Once device discovery is complete, returns the actual count.
+        During discovery, estimates based on current alive percentage.
+
+        Returns:
+            float: Estimated or actual number of alive devices
+        """
+        device_discovery_complete = (
+            self.results.devices_scanned >= self.results.devices_total
+        )
+
+        if device_discovery_complete:
+            return float(len(self.results.devices))
+
+        if self.results.devices and self.results.devices_scanned:
+            alive_percent = len(self.results.devices) / self.results.devices_scanned
+            return alive_percent * self.results.devices_total
+
+        # Assume 10% alive percentage if the scan just started
+        return 0.1 * self.results.devices_total
+
+    def _calc_host_discovery_time(self) -> tuple[float, float]:
+        """
+        Calculate total and remaining time for host discovery phase.
+
+        Returns:
+            tuple: (total_time_sec, remaining_time_sec) adjusted by thread multiplier
+        """
+        avg_host_detail_sec = self.job_stats.timing.get(
+            'SubnetScanner._get_host_details', 4.5)
+
+        remaining_devices = self.results.devices_total - self.results.devices_scanned
+        remaining_sec = remaining_devices * avg_host_detail_sec
+        total_sec = self.results.devices_total * avg_host_detail_sec
+
+        multiplier = self.cfg.t_cnt('isalive')
+        return total_sec / multiplier, remaining_sec / multiplier
+
+    def _calc_port_scan_time(self, est_alive_devices: float) -> tuple[float, float]:
+        """
+        Calculate total and remaining time for port scanning phase.
+
+        Args:
+            est_alive_devices: Estimated or actual number of alive devices
+
+        Returns:
+            tuple: (total_time_sec, remaining_time_sec) adjusted by thread multiplier
+        """
+        ports_scanned = self.job_stats.finished.get('SubnetScanner._test_port', 0)
+        # Use default timing until we have enough samples for accuracy
+        avg_port_test_sec = self.job_stats.timing.get(
+            'SubnetScanner._test_port', 1) if ports_scanned > 20 else 1
+
+        total_ports = est_alive_devices * len(self.ports)
+        remaining_ports = max(0, total_ports - ports_scanned)
+
+        remaining_sec = remaining_ports * avg_port_test_sec
+        total_sec = total_ports * avg_port_test_sec
+
+        multiplier = self.cfg.t_cnt('port_scan') * self.cfg.t_cnt('port_test')
+        return total_sec / multiplier, remaining_sec / multiplier
+
+    def calc_percent_complete(self) -> int:
         """
         Calculate the percentage completion of the scan.
 
@@ -157,47 +225,17 @@ class SubnetScanner():
         if not self.running:
             return 100
 
-        # --- Host discovery (isalive) calculations ---
-        avg_host_detail_sec = self.job_stats.timing.get(
-            '_get_host_details', 4.5)
-        # assume 10% alive percentage if the scan just started
-        if self.results.devices and self.results.devices_scanned:
-            est_subnet_alive_percent = (
-                # avoid div 0
-                len(self.results.devices)) / (self.results.devices_scanned)
-        else:
-            est_subnet_alive_percent = .1
-        est_subnet_devices = est_subnet_alive_percent * self.results.devices_total
+        est_alive_devices = self._estimate_alive_devices()
+        host_total, host_remaining = self._calc_host_discovery_time()
+        port_total, port_remaining = self._calc_port_scan_time(est_alive_devices)
 
-        remaining_isalive_sec = (
-            self.results.devices_total - self.results.devices_scanned) * avg_host_detail_sec
-        total_isalive_sec = self.results.devices_total * avg_host_detail_sec
+        est_total_time = host_total + port_total
+        est_remaining_time = host_remaining + port_remaining
 
-        isalive_multiplier = self.cfg.t_cnt('isalive')
+        if est_total_time <= 0:
+            return 0
 
-        # --- Port scanning calculations ---
-        device_ports_scanned = self.job_stats.finished.get('_test_port', 0)
-        # remediate initial inaccurate results because open ports reurn quickly
-        avg_port_test_sec = self.job_stats.timing.get(
-            '_test_port', 1) if device_ports_scanned > 20 else 1
-
-        device_ports_unscanned = max(
-            0, (est_subnet_devices * len(self.ports)) - device_ports_scanned)
-
-        remaining_port_test_sec = device_ports_unscanned * avg_port_test_sec
-        total_port_test_sec = est_subnet_devices * \
-            len(self.ports) * avg_port_test_sec
-
-        port_test_multiplier = self.cfg.t_cnt(
-            'port_scan') * self.cfg.t_cnt('port_test')
-
-        # --- Overall progress ---
-        est_total_time = (total_isalive_sec / isalive_multiplier) + \
-            (total_port_test_sec / port_test_multiplier)
-        est_remaining_time = (remaining_isalive_sec / isalive_multiplier) + \
-            (remaining_port_test_sec / port_test_multiplier)
-
-        return int(abs((1 - (est_remaining_time / est_total_time)) * 100))
+        return min(99, int(abs((1 - (est_remaining_time / est_total_time)) * 100)))
 
     def debug_active_scan(self, sleep_sec=1):
         """

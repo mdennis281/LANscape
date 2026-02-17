@@ -48,3 +48,13 @@ from lanscape.core.models import (
     ScanSummary,
     ScanListItem
 )
+
+# Webapp management for serving React UI
+from lanscape.ui.react_proxy import (
+    WebappManager,
+    start_webapp_server,
+    SUPPORTED_UI_VERSIONS,
+    VersionRange,
+    is_version_compatible,
+    get_supported_range
+)

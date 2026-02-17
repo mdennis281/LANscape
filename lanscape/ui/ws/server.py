@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Optional
+from typing import Optional, Callable
 
 import websockets
 from websockets.server import WebSocketServerProtocol
@@ -38,17 +38,24 @@ class WebSocketServer:
     DEFAULT_HOST = '127.0.0.1'
     DEFAULT_PORT = 8766
 
-    def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        on_client_change: Optional[Callable[[int], None]] = None
+    ):
         """
         Initialize the WebSocket server.
 
         Args:
             host: Host to bind to (default: 127.0.0.1)
             port: Port to listen on (default: 8766)
+            on_client_change: Optional callback when client count changes
         """
         self.host = host
         self.port = port
         self.log = logging.getLogger('WebSocketServer')
+        self._on_client_change = on_client_change
 
         # Initialize handlers
         self._scan_handler = ScanHandler()
@@ -151,6 +158,7 @@ class WebSocketServer:
         client_id = str(uuid.uuid4())
         self._clients[client_id] = websocket
         self.log.info(f"Client connected: {client_id}")
+        self._notify_client_change()
 
         # Send welcome message with client_id
         await self._send_event(
@@ -362,6 +370,15 @@ class WebSocketServer:
         self._clients.pop(client_id, None)
         self._scan_handler.cleanup_client(client_id)
         self.log.debug(f"Cleaned up client: {client_id}")
+        self._notify_client_change()
+
+    def _notify_client_change(self) -> None:
+        """Notify the callback of client count changes."""
+        if self._on_client_change:
+            try:
+                self._on_client_change(len(self._clients))
+            except Exception as e:
+                self.log.debug(f"Error in client change callback: {e}")
 
 
 def run_server(host: str = WebSocketServer.DEFAULT_HOST,

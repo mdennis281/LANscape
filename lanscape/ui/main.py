@@ -17,6 +17,7 @@ from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_por
 from lanscape.core.version_manager import get_installed_version, is_update_available
 from lanscape.ui.app import start_webserver_daemon, start_webserver
 from lanscape.ui.ws.server import run_server
+from lanscape.ui.react_proxy import start_webapp_server
 # do this so any logs generated on import are displayed
 args = parse_args()
 configure_logging(args.loglevel, args.logfile, args.flask_logging)
@@ -52,6 +53,11 @@ def _main():
     # Check if WebSocket server mode is requested
     if args.ws_server:
         start_websocket_server()
+        return
+
+    # Check if webapp mode is requested (React UI + WebSocket backend)
+    if args.webapp:
+        start_webapp_mode()
         return
 
     if was_port_explicit():
@@ -100,6 +106,39 @@ def start_websocket_server():
         log.info('WebSocket server stopped by user')
     except Exception as e:
         log.critical(f'WebSocket server failed: {e}')
+        log.debug(traceback.format_exc())
+        raise
+
+
+def start_webapp_mode():
+    """Start the React webapp with WebSocket backend."""
+    # Validate/auto-find ports
+    if was_port_explicit():
+        validate_port_available(args.port, '--port')
+    else:
+        args.port = get_valid_port(args.port)
+
+    if was_ws_port_explicit():
+        validate_port_available(args.ws_port, '--ws-port')
+    else:
+        args.ws_port = get_valid_port(args.ws_port)
+
+    log.info('Starting React webapp mode')
+    log.info(f'HTTP server will run on port {args.port}')
+    log.info(f'WebSocket server will run on port {args.ws_port}')
+
+    try:
+        start_webapp_server(
+            http_port=args.port,
+            ws_port=args.ws_port,
+            open_browser=True,
+            force_download=args.webapp_update,
+            persistent=args.persistent
+        )
+    except KeyboardInterrupt:
+        log.info('Webapp stopped by user')
+    except Exception as e:
+        log.critical(f'Webapp failed: {e}')
         log.debug(traceback.format_exc())
         raise
 

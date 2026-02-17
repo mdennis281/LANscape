@@ -17,6 +17,8 @@ class RuntimeArgs:
     persistent: bool = False
     ws_server: bool = False
     ws_port: int = 8766
+    webapp: bool = False
+    webapp_update: bool = False
 
 
 def was_port_explicit() -> bool:
@@ -52,6 +54,10 @@ def parse_args() -> RuntimeArgs:
                         help='Start WebSocket server instead of Flask UI')
     parser.add_argument('--ws-port', type=int, default=8766,
                         help='Port for WebSocket server (default: 8766)')
+    parser.add_argument('--webapp', action='store_true',
+                        help='Run the React webapp with WebSocket backend (no Node.js required)')
+    parser.add_argument('--webapp-update', action='store_true',
+                        help='Force re-download of the webapp even if cached')
 
     # Parse the arguments
     args = parser.parse_args()

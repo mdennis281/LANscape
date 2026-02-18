@@ -11,7 +11,6 @@ from logging.handlers import RotatingFileHandler
 from unittest.mock import patch
 
 import pytest
-import click
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args
@@ -43,7 +42,7 @@ def test_configure_logging_writes_file():
     tmpdir = tempfile.mkdtemp()
     try:
         logfile = os.path.join(tmpdir, 'test.log')
-        configure_logging('INFO', logfile, flask_logging=True)
+        configure_logging('INFO', logfile)
         logging.getLogger('test').info('hello file')
 
         # Flush all handlers to ensure content is written
@@ -76,20 +75,9 @@ def test_configure_logging_writes_file():
 
 def test_configure_logging_without_file(logging_cleanup):  # pylint: disable=unused-argument
     """Test that no file handlers are created when no log file is specified."""
-    configure_logging('INFO', None, flask_logging=True)
+    configure_logging('INFO', None)
     root_handlers = logging.getLogger().handlers
     assert all(not isinstance(h, RotatingFileHandler) for h in root_handlers)
-
-
-def test_disable_flask_logging_overrides_click(logging_cleanup):  # pylint: disable=unused-argument
-    """Test that disabling Flask logging properly overrides click echo functions."""
-    original_click_echo = click.echo
-    original_click_secho = click.secho
-
-    configure_logging('INFO', None, flask_logging=False)
-    assert click.echo != original_click_echo
-    assert click.secho != original_click_secho
-    assert logging.getLogger('werkzeug').level == logging.ERROR
 
 
 # Runtime Arguments Tests

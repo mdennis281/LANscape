@@ -554,8 +554,14 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
 
     Selection priority:
     1. Subnet associated with the primary interface (with default gateway)
-    2. Largest subnet within maximum allowed IP range
-    3. First subnet in the list as fallback
+    2. Largest non-deprioritized subnet within maximum allowed IP range
+    3. Largest deprioritized subnet as fallback
+    4. First subnet in the list as final fallback
+
+    Deprioritized subnets (virtual/system networks):
+    - 127.0.0.0/8 (loopback)
+    - 172.27.64.0/20 (WSL default)
+    - 172.17.0.0/16 (Docker default)
 
     Returns an empty string if no subnets are available.
     """
@@ -574,17 +580,63 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
                 if subnet["subnet"] == primary_subnet:
                     return primary_subnet
 
-    # Second priority: Find a reasonable sized subnet (existing logic)
+    # Second priority: Find a reasonable sized subnet, avoiding deprioritized ones
     selected = {}
+    deprioritized_selected = {}
+
     for subnet in subnets:
-        if selected.get("address_cnt", 0) < subnet["address_cnt"] < MAX_IPS_ALLOWED:
-            selected = subnet
+        subnet_str = subnet.get("subnet", "")
+        address_cnt = subnet.get("address_cnt", 0)
+
+        if address_cnt >= MAX_IPS_ALLOWED:
+            continue
+
+        if _is_deprioritized_subnet(subnet_str):
+            if address_cnt > deprioritized_selected.get("address_cnt", 0):
+                deprioritized_selected = subnet
+        else:
+            if address_cnt > selected.get("address_cnt", 0):
+                selected = subnet
+
+    # Prefer non-deprioritized, fall back to deprioritized
+    if not selected:
+        selected = deprioritized_selected
 
     # Third priority: Just take the first subnet if nothing else matched
     if not selected and subnets:
         selected = subnets[0]
 
     return selected.get("subnet", "")
+
+
+def _is_deprioritized_subnet(subnet: str) -> bool:
+    """
+    Check if a subnet should be deprioritized in auto-selection.
+
+    These are typically virtual/system networks that aren't the user's
+    primary LAN, such as WSL, Docker, or loopback networks.
+    """
+    try:
+        network = ipaddress.ip_network(subnet, strict=False)
+
+        # Loopback (127.0.0.0/8)
+        loopback = ipaddress.ip_network('127.0.0.0/8')
+        if network.overlaps(loopback):
+            return True
+
+        # WSL default network (172.27.64.0/20)
+        wsl_network = ipaddress.ip_network('172.27.64.0/20')
+        if network.overlaps(wsl_network):
+            return True
+
+        # Docker default bridge (172.17.0.0/16)
+        docker_network = ipaddress.ip_network('172.17.0.0/16')
+        if network.overlaps(docker_network):
+            return True
+
+        return False
+    except ValueError:
+        return False
 
 
 def is_internal_block(subnet: str) -> bool:

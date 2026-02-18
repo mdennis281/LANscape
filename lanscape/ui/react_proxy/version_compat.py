@@ -59,7 +59,7 @@ class VersionRange:
 # Supported UI version range for this backend version
 # Update these when making breaking API changes
 SUPPORTED_UI_VERSIONS = VersionRange(
-    min_version="0.1.0",
+    min_version="0.1.2",
     max_version=None  # No upper limit - accept all versions >= min
 )
 

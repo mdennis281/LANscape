@@ -654,6 +654,7 @@ class TestToolsHandler:
         assert "tools.subnet_list" in actions
         assert "tools.config_defaults" in actions
         assert "tools.arp_supported" in actions
+        assert "tools.app_info" in actions
 
     def test_handle_subnet_test_empty(self, tools_handler):
         """Test validating an empty subnet."""
@@ -713,6 +714,54 @@ class TestToolsHandler:
             mock.return_value = False
             result = tools_handler._handle_arp_supported({}, None)
             assert result["supported"] is False
+
+    def test_handle_app_info(self, tools_handler):
+        """Test getting app info."""
+        with patch('lanscape.ui.ws.handlers.tools.get_installed_version') as mock_version, \
+             patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
+             patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
+             patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
+            mock_version.return_value = '1.2.3'
+            mock_arp.return_value = True
+            mock_update.return_value = False
+            mock_args.return_value.port = 5001
+            mock_args.return_value.ws_port = 8766
+            mock_args.return_value.loglevel = 'INFO'
+            mock_args.return_value.persistent = False
+            mock_args.return_value.webapp_update = False
+            mock_args.return_value.logfile = None
+
+            result = tools_handler._handle_app_info({}, None)
+
+            assert result["name"] == "LANscape"
+            assert result["version"] == "1.2.3"
+            assert result["arp_supported"] is True
+            assert result["update_available"] is False
+            assert "runtime_args" in result
+            assert result["runtime_args"]["port"] == 5001
+
+    def test_handle_app_info_with_update(self, tools_handler):
+        """Test getting app info when update is available."""
+        with patch('lanscape.ui.ws.handlers.tools.get_installed_version') as mock_version, \
+             patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
+             patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
+             patch('lanscape.ui.ws.handlers.tools.lookup_latest_version') as mock_latest, \
+             patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
+            mock_version.return_value = '1.2.3'
+            mock_arp.return_value = True
+            mock_update.return_value = True
+            mock_latest.return_value = '1.3.0'
+            mock_args.return_value.port = 5001
+            mock_args.return_value.ws_port = 8766
+            mock_args.return_value.loglevel = 'INFO'
+            mock_args.return_value.persistent = False
+            mock_args.return_value.webapp_update = False
+            mock_args.return_value.logfile = None
+
+            result = tools_handler._handle_app_info({}, None)
+
+            assert result["update_available"] is True
+            assert result["latest_version"] == "1.3.0"
 
 
 # WebSocket Server Tests

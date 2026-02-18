@@ -4,6 +4,7 @@ WebSocket handler for utility tools.
 Provides handlers for:
 - Subnet validation and listing
 - Default configuration retrieval
+- App info (version, runtime args)
 """
 
 import traceback
@@ -13,6 +14,10 @@ from lanscape.core.net_tools import get_all_network_subnets, is_arp_supported
 from lanscape.core.ip_parser import parse_ip_input
 from lanscape.core.errors import SubnetTooLargeError
 from lanscape.core.scan_config import get_default_configs_with_arp_fallback
+from lanscape.core.version_manager import (
+    get_installed_version, is_update_available, lookup_latest_version
+)
+from lanscape.core.runtime_args import parse_args
 from lanscape.ui.ws.handlers.base import BaseHandler
 
 
@@ -25,6 +30,7 @@ class ToolsHandler(BaseHandler):
     - tools.subnet_list: List all network subnets on the system
     - tools.config_defaults: Get default scan configurations
     - tools.arp_supported: Check if ARP is supported on this system
+    - tools.app_info: Get app version, runtime args, and update status
     """
 
     def __init__(self):
@@ -36,6 +42,7 @@ class ToolsHandler(BaseHandler):
         self.register('subnet_list', self._handle_subnet_list)
         self.register('config_defaults', self._handle_config_defaults)
         self.register('arp_supported', self._handle_arp_supported)
+        self.register('app_info', self._handle_app_info)
 
     @property
     def prefix(self) -> str:
@@ -127,3 +134,52 @@ class ToolsHandler(BaseHandler):
             Dict with 'supported' boolean
         """
         return {'supported': is_arp_supported()}
+
+    def _handle_app_info(
+        self,
+        params: dict[str, Any],  # pylint: disable=unused-argument
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Get application info including version, runtime args, and update status.
+
+        Returns:
+            Dict with app info:
+            - name: Application name
+            - version: Current installed version
+            - arp_supported: Whether ARP is supported
+            - update_available: Whether an update is available
+            - latest_version: Latest available version (if update available)
+            - runtime_args: Dict of current runtime arguments
+        """
+        args = parse_args()
+
+        # Build runtime args dict (excluding None values)
+        runtime_args = {
+            'port': args.port,
+            'ws_port': args.ws_port,
+            'loglevel': args.loglevel,
+            'persistent': args.persistent,
+            'webapp_update': args.webapp_update,
+        }
+        if args.logfile:
+            runtime_args['logfile'] = args.logfile
+
+        result = {
+            'name': 'LANscape',
+            'version': get_installed_version(),
+            'arp_supported': is_arp_supported(),
+            'runtime_args': runtime_args,
+        }
+
+        # Check for updates (safely)
+        try:
+            if is_update_available():
+                result['update_available'] = True
+                result['latest_version'] = lookup_latest_version()
+            else:
+                result['update_available'] = False
+        except Exception:  # pylint: disable=broad-exception-caught
+            result['update_available'] = False
+
+        return result

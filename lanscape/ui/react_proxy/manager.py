@@ -17,7 +17,8 @@ import requests
 
 from lanscape.ui.react_proxy.version_compat import (
     SUPPORTED_UI_VERSIONS,
-    is_version_compatible
+    is_version_compatible,
+    parse_version
 )
 
 log = logging.getLogger('WebappManager')
@@ -119,7 +120,7 @@ class WebappManager:
         tag_name = release_data.get('tag_name', '')
         # Clean up version string (remove tag prefixes, longest first)
         version = tag_name
-        for prefix in ('pre-releases/', 'releases/'):
+        for prefix in ('pre-releases/', 'releases/', 'webapp/'):
             if version.startswith(prefix):
                 version = version[len(prefix):]
                 break
@@ -151,23 +152,40 @@ class WebappManager:
         if not releases:
             return None
 
+        compatible = []
         for release_data in releases:
             release_info = self._parse_release_info(release_data)
             if release_info is None:
                 continue
 
             if is_version_compatible(release_info['version']):
-                log.debug(
-                    f'Found compatible webapp: {release_info["tag_name"]} '
-                    f'(v{release_info["version"]})'
-                )
-                return release_info
+                compatible.append(release_info)
 
-        log.warning(
-            f'No compatible webapp releases found. '
-            f'Required: {SUPPORTED_UI_VERSIONS}'
+        if not compatible:
+            log.warning(
+                f'No compatible webapp releases found. '
+                f'Required: {SUPPORTED_UI_VERSIONS}'
+            )
+            return None
+
+        # Sort by parsed version (highest first)
+        def _sort_key(info: dict) -> tuple:
+            parsed = parse_version(info['version'])
+            if parsed is None:
+                return (0, 0, 0, '')
+            # Stable releases (empty prerelease) sort after prereleases
+            # Use a high-sorting string for empty prerelease
+            major, minor, patch, pre = parsed
+            return (major, minor, patch, pre == '', pre)
+
+        compatible.sort(key=_sort_key, reverse=True)
+        best = compatible[0]
+
+        log.debug(
+            f'Found compatible webapp: {best["tag_name"]} '
+            f'(v{best["version"]})'
         )
-        return None
+        return best
 
     def get_latest_release_info(self) -> Optional[dict]:
         """
@@ -184,7 +202,7 @@ class WebappManager:
             tag_name = data.get('tag_name', '')
             # Clean up version string (remove tag prefixes, longest first)
             version = tag_name
-            for prefix in ('pre-releases/', 'releases/'):
+            for prefix in ('pre-releases/', 'releases/', 'webapp/'):
                 if version.startswith(prefix):
                     version = version[len(prefix):]
                     break

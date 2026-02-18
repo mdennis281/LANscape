@@ -76,7 +76,7 @@ def parse_version(version: str) -> Optional[Tuple[int, int, int, str]]:
     """
     # Handle common prefixes (longest first to avoid partial matches)
     version = version.lstrip('v')
-    for prefix in ('pre-releases/', 'releases/'):
+    for prefix in ('pre-releases/', 'releases/', 'webapp/'):
         if version.startswith(prefix):
             version = version[len(prefix):]
             break

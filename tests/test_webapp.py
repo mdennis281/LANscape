@@ -210,6 +210,65 @@ class TestWebappManager:  # pylint: disable=too-many-public-methods
         """Test update detected when UI version matches but tag differs (dispatch build)."""
         assert manager.is_update_available() is True
 
+    @patch('lanscape.ui.react_proxy.manager.requests.get')
+    def test_get_compatible_picks_newest_version(self, mock_get, manager):
+        """Test that get_compatible_release_info picks the highest version,
+        not just the first one returned by the API (GitHub sorts stable first)."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            # GitHub puts stable releases first
+            {
+                'tag_name': 'releases/0.1.2',
+                'assets': [{'name': 'webapp-dist.zip',
+                             'browser_download_url': 'https://example.com/0.1.2.zip'}]
+            },
+            # Legacy webapp/ prefix
+            {
+                'tag_name': 'webapp/3.0.0a8',
+                'assets': [{'name': 'webapp-dist.zip',
+                             'browser_download_url': 'https://example.com/3.0.0a8.zip'}]
+            },
+            # Newest pre-release
+            {
+                'tag_name': 'pre-releases/3.0.0-alpha.9',
+                'assets': [{'name': 'webapp-dist.zip',
+                             'browser_download_url': 'https://example.com/3.0.0a9.zip'}]
+            },
+        ]
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        result = manager.get_compatible_release_info()
+
+        assert result is not None
+        assert result['tag_name'] == 'pre-releases/3.0.0-alpha.9'
+        assert result['version'] == '3.0.0-alpha.9'
+
+    @patch('lanscape.ui.react_proxy.manager.requests.get')
+    def test_get_compatible_stable_beats_prerelease_same_version(self, mock_get, manager):
+        """Test that a stable release beats a prerelease of the same base version."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                'tag_name': 'pre-releases/3.0.0-alpha.9',
+                'assets': [{'name': 'webapp-dist.zip',
+                             'browser_download_url': 'https://example.com/pre.zip'}]
+            },
+            {
+                'tag_name': 'releases/3.0.0',
+                'assets': [{'name': 'webapp-dist.zip',
+                             'browser_download_url': 'https://example.com/stable.zip'}]
+            },
+        ]
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        result = manager.get_compatible_release_info()
+
+        assert result is not None
+        assert result['tag_name'] == 'releases/3.0.0'
+        assert result['version'] == '3.0.0'
+
     def test_get_info_no_cache(self, manager):
         """Test get_info returns None when no cache."""
         assert manager.get_info() is None
@@ -298,6 +357,11 @@ class TestVersionCompatibility:
         """Test parsing version with pre-releases/ prefix."""
         result = parse_version('pre-releases/3.0.0-alpha.6')
         assert result == (3, 0, 0, 'alpha.6')
+
+    def test_parse_version_webapp_prefix(self):
+        """Test parsing version with legacy webapp/ prefix (PEP 440)."""
+        result = parse_version('webapp/3.0.0a8')
+        assert result == (3, 0, 0, 'alpha.8')
 
     def test_parse_version_two_parts(self):
         """Test parsing major.minor version."""

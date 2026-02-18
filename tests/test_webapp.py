@@ -54,7 +54,7 @@ def mock_release_response():
     }
 
 
-class TestWebappManager:
+class TestWebappManager:  # pylint: disable=too-many-public-methods
     """Tests for WebappManager class."""
 
     def test_init_default_cache_dir(self):
@@ -104,6 +104,26 @@ class TestWebappManager:
 
         assert manager.get_cached_version() is None
 
+    def test_get_cached_tag_none(self, manager):
+        """Test get_cached_tag returns None when no version file."""
+        assert manager.get_cached_tag() is None
+
+    def test_get_cached_tag_exists(self, manager, temp_cache_dir):
+        """Test get_cached_tag returns tag_name from file."""
+        temp_cache_dir.mkdir(parents=True, exist_ok=True)
+        version_file = temp_cache_dir / 'version.json'
+        version_file.write_text('{"version": "1.2.3", "tag_name": "releases/1.2.3"}')
+
+        assert manager.get_cached_tag() == 'releases/1.2.3'
+
+    def test_get_cached_tag_missing_key(self, manager, temp_cache_dir):
+        """Test get_cached_tag returns None when tag_name key is missing."""
+        temp_cache_dir.mkdir(parents=True, exist_ok=True)
+        version_file = temp_cache_dir / 'version.json'
+        version_file.write_text('{"version": "1.2.3"}')
+
+        assert manager.get_cached_tag() is None
+
     @patch('lanscape.ui.react_proxy.manager.requests.get')
     def test_get_latest_release_info_success(self, mock_get, manager, mock_release_response):
         """Test fetching latest release info from GitHub."""
@@ -151,28 +171,44 @@ class TestWebappManager:
         """Test update available when no cache exists."""
         assert manager.is_update_available() is True
 
+    @patch.object(WebappManager, 'get_cached_tag', return_value='releases/1.0.0')
     @patch.object(WebappManager, 'get_cached_version', return_value='1.0.0')
-    @patch.object(WebappManager, 'get_compatible_release_info', return_value={'version': '1.1.0'})
+    @patch.object(WebappManager, 'get_compatible_release_info',
+                  return_value={'version': '1.1.0', 'tag_name': 'releases/1.1.0'})
     @patch('lanscape.ui.react_proxy.manager.is_version_compatible', return_value=True)
     def test_is_update_available_newer_version(
-            self, _mock_compat, _mock_latest, _mock_cached, manager):
+            self, _mock_compat, _mock_latest, _mock_cached, _mock_tag, manager):
         """Test update available when newer version exists."""
         assert manager.is_update_available() is True
 
+    @patch.object(WebappManager, 'get_cached_tag', return_value='releases/1.0.0')
     @patch.object(WebappManager, 'get_cached_version', return_value='1.0.0')
-    @patch.object(WebappManager, 'get_compatible_release_info', return_value={'version': '1.0.0'})
+    @patch.object(WebappManager, 'get_compatible_release_info',
+                  return_value={'version': '1.0.0', 'tag_name': 'releases/1.0.0'})
     @patch('lanscape.ui.react_proxy.manager.is_version_compatible', return_value=True)
-    def test_is_update_available_current(self, _mock_compat, _mock_latest, _mock_cached, manager):
+    def test_is_update_available_current(
+            self, _mock_compat, _mock_latest, _mock_cached, _mock_tag, manager):
         """Test no update when version is current."""
         assert manager.is_update_available() is False
 
+    @patch.object(WebappManager, 'get_cached_tag', return_value='releases/1.0.0')
     @patch.object(WebappManager, 'get_cached_version', return_value='1.0.0')
     @patch.object(WebappManager, 'get_compatible_release_info', return_value=None)
     @patch('lanscape.ui.react_proxy.manager.is_version_compatible', return_value=True)
     def test_is_update_available_check_fails(
-            self, _mock_compat, _mock_latest, _mock_cached, manager):
+            self, _mock_compat, _mock_latest, _mock_cached, _mock_tag, manager):
         """Test no update when version check fails."""
         assert manager.is_update_available() is False
+
+    @patch.object(WebappManager, 'get_cached_tag', return_value='releases/0.1.2')
+    @patch.object(WebappManager, 'get_cached_version', return_value='0.1.2')
+    @patch.object(WebappManager, 'get_compatible_release_info',
+                  return_value={'version': '0.1.2', 'tag_name': 'webapp/3.0.0a7'})
+    @patch('lanscape.ui.react_proxy.manager.is_version_compatible', return_value=True)
+    def test_is_update_available_same_ui_version_different_tag(
+            self, _mock_compat, _mock_latest, _mock_cached, _mock_tag, manager):
+        """Test update detected when UI version matches but tag differs (dispatch build)."""
+        assert manager.is_update_available() is True
 
     def test_get_info_no_cache(self, manager):
         """Test get_info returns None when no cache."""

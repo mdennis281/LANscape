@@ -17,7 +17,6 @@ import requests
 
 from lanscape.ui.react_proxy.version_compat import (
     SUPPORTED_UI_VERSIONS,
-    parse_version,
     is_version_compatible
 )
 
@@ -81,6 +80,17 @@ class WebappManager:
         except (json.JSONDecodeError, IOError):
             return None
 
+    def get_cached_tag(self) -> Optional[str]:
+        """Get the tag name of the cached webapp release, if any."""
+        if not self.version_file.exists():
+            return None
+        try:
+            with open(self.version_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('tag_name')
+        except (json.JSONDecodeError, IOError):
+            return None
+
     def _fetch_all_releases(self) -> List[dict]:
         """
         Fetch all releases from GitHub.
@@ -125,19 +135,19 @@ class WebappManager:
 
     def get_compatible_release_info(self) -> Optional[dict]:
         """
-        Fetch the latest compatible release info from GitHub.
+        Fetch the most recent compatible release info from GitHub.
 
-        Searches through releases to find the newest version that falls
-        within the supported version range for this backend.
+        Returns the first release (newest by publish date) that has a
+        webapp-dist.zip asset and a compatible version. The GitHub API
+        returns releases newest-first, so iteration order is chronological.
 
         Returns:
-            Dictionary with 'version' and 'download_url' keys, or None if none found.
+            Dictionary with 'version', 'download_url', and 'tag_name' keys,
+            or None if none found.
         """
         releases = self._fetch_all_releases()
         if not releases:
             return None
-
-        compatible_releases = []
 
         for release_data in releases:
             release_info = self._parse_release_info(release_data)
@@ -145,29 +155,17 @@ class WebappManager:
                 continue
 
             if is_version_compatible(release_info['version']):
-                parsed = parse_version(release_info['version'])
-                if parsed:
-                    compatible_releases.append((parsed, release_info))
+                log.debug(
+                    f'Found compatible webapp: {release_info["tag_name"]} '
+                    f'(v{release_info["version"]})'
+                )
+                return release_info
 
-        if not compatible_releases:
-            log.warning(
-                f'No compatible webapp releases found. '
-                f'Required: {SUPPORTED_UI_VERSIONS}'
-            )
-            return None
-
-        # Sort by version (descending) to get the latest compatible
-        compatible_releases.sort(key=lambda x: x[0], reverse=True)
-
-        # Use custom comparison for proper sorting
-        compatible_releases.sort(
-            key=lambda x: x[0][:3],  # Sort by major, minor, patch
-            reverse=True
+        log.warning(
+            f'No compatible webapp releases found. '
+            f'Required: {SUPPORTED_UI_VERSIONS}'
         )
-
-        latest_compatible = compatible_releases[0][1]
-        log.debug(f'Found compatible webapp version: {latest_compatible["version"]}')
-        return latest_compatible
+        return None
 
     def get_latest_release_info(self) -> Optional[dict]:
         """
@@ -204,7 +202,12 @@ class WebappManager:
             return None
 
     def is_update_available(self) -> bool:
-        """Check if a newer compatible version of the webapp is available."""
+        """Check if a newer compatible webapp release exists.
+
+        Compares the cached release tag against the latest compatible
+        release tag. This correctly detects new builds even when the
+        UI version number hasn't changed (e.g. webapp/ dispatch builds).
+        """
         cached_version = self.get_cached_version()
         if cached_version is None:
             return True  # No cache means we need to download
@@ -217,7 +220,8 @@ class WebappManager:
         if latest is None:
             return False  # Can't check, assume current is fine
 
-        return cached_version != latest['version']
+        cached_tag = self.get_cached_tag()
+        return cached_tag != latest['tag_name']
 
     def download_webapp(self, force: bool = False) -> bool:
         """

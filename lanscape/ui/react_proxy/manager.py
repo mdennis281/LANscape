@@ -117,10 +117,12 @@ class WebappManager:
             Dictionary with version info, or None if invalid/missing webapp asset.
         """
         tag_name = release_data.get('tag_name', '')
-        # Clean up version string (remove tag prefixes)
+        # Clean up version string (remove tag prefixes, longest first)
         version = tag_name
-        for prefix in ('releases/', 'pre-releases/', 'webapp/'):
-            version = version.replace(prefix, '')
+        for prefix in ('pre-releases/', 'releases/'):
+            if version.startswith(prefix):
+                version = version[len(prefix):]
+                break
 
         # Find the webapp-dist.zip asset
         for asset in release_data.get('assets', []):
@@ -180,10 +182,12 @@ class WebappManager:
             data = response.json()
 
             tag_name = data.get('tag_name', '')
-            # Clean up version string (remove tag prefixes)
+            # Clean up version string (remove tag prefixes, longest first)
             version = tag_name
-            for prefix in ('releases/', 'pre-releases/', 'webapp/'):
-                version = version.replace(prefix, '')
+            for prefix in ('pre-releases/', 'releases/'):
+                if version.startswith(prefix):
+                    version = version[len(prefix):]
+                    break
 
             # Find the webapp-dist.zip asset
             for asset in data.get('assets', []):

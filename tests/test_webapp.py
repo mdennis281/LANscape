@@ -279,6 +279,26 @@ class TestVersionCompatibility:
         result = parse_version('1.2.3-beta.1')
         assert result == (1, 2, 3, 'beta.1')
 
+    def test_parse_version_pep440_alpha(self):
+        """Test parsing PEP 440 alpha pre-release."""
+        result = parse_version('3.0.0a6')
+        assert result == (3, 0, 0, 'alpha.6')
+
+    def test_parse_version_pep440_beta(self):
+        """Test parsing PEP 440 beta pre-release."""
+        result = parse_version('3.0.0b1')
+        assert result == (3, 0, 0, 'beta.1')
+
+    def test_parse_version_pep440_rc(self):
+        """Test parsing PEP 440 release candidate."""
+        result = parse_version('3.0.0rc2')
+        assert result == (3, 0, 0, 'rc.2')
+
+    def test_parse_version_pre_releases_prefix(self):
+        """Test parsing version with pre-releases/ prefix."""
+        result = parse_version('pre-releases/3.0.0-alpha.6')
+        assert result == (3, 0, 0, 'alpha.6')
+
     def test_parse_version_two_parts(self):
         """Test parsing major.minor version."""
         result = parse_version('1.2')

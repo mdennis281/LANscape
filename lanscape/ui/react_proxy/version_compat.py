@@ -74,10 +74,20 @@ def parse_version(version: str) -> Optional[Tuple[int, int, int, str]]:
     Returns:
         Tuple of (major, minor, patch, prerelease) or None if invalid
     """
-    # Handle common prefixes
+    # Handle common prefixes (longest first to avoid partial matches)
     version = version.lstrip('v')
-    for prefix in ('releases/', 'pre-releases/', 'webapp/'):
-        version = version.replace(prefix, '')
+    for prefix in ('pre-releases/', 'releases/'):
+        if version.startswith(prefix):
+            version = version[len(prefix):]
+            break
+
+    # Normalize PEP 440 pre-release tags to semver
+    # 3.0.0a6  -> 3.0.0-alpha.6
+    # 3.0.0b1  -> 3.0.0-beta.1
+    # 3.0.0rc2 -> 3.0.0-rc.2
+    version = re.sub(r'^(\d+\.\d+\.\d+)a(\d+)$', r'\1-alpha.\2', version)
+    version = re.sub(r'^(\d+\.\d+\.\d+)b(\d+)$', r'\1-beta.\2', version)
+    version = re.sub(r'^(\d+\.\d+\.\d+)rc(\d+)$', r'\1-rc.\2', version)
 
     # Match semver pattern: major.minor.patch[-prerelease]
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$', version)

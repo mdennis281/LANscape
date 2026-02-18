@@ -81,7 +81,7 @@ class ScanHandler(BaseHandler):
         """
         config = ScanConfig.from_dict(params)
         scan = self._scan_manager.new_scan(config)
-        self.log.info(f"Started scan {scan.uid} for {config.subnet}")
+        self.log.debug(f"Started scan {scan.uid} for {config.subnet}")
 
         return {
             'scan_id': scan.uid,

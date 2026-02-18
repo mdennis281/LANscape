@@ -95,7 +95,7 @@ class WebSocketServer:
 
     async def start(self) -> None:
         """Start the WebSocket server."""
-        self.log.info(f"Starting WebSocket server on ws://{self.host}:{self.port}")
+        self.log.debug(f"Starting WebSocket server on ws://{self.host}:{self.port}")
 
         self._running = True
 
@@ -103,8 +103,13 @@ class WebSocketServer:
         self._server = await websockets.serve(
             self._handle_connection,
             self.host,
-            self.port
+            self.port,
+            logger=logging.getLogger('websockets.server'),
         )
+
+        # Suppress noisy websockets library logs (connection open/close, server listening)
+        logging.getLogger('websockets.server').setLevel(logging.WARNING)
+        logging.getLogger('websockets').setLevel(logging.WARNING)
 
         # Start the background update task
         self._update_task = asyncio.create_task(self._broadcast_scan_updates())
@@ -113,7 +118,7 @@ class WebSocketServer:
 
     async def stop(self) -> None:
         """Stop the WebSocket server."""
-        self.log.info("Stopping WebSocket server...")
+        self.log.debug("Stopping WebSocket server...")
         self._running = False
 
         if self._update_task:
@@ -135,7 +140,7 @@ class WebSocketServer:
                 self.log.debug(f"Error closing client {client_id}: {e}")
 
         self._clients.clear()
-        self.log.info("WebSocket server stopped")
+        self.log.debug("WebSocket server stopped")
 
     async def serve_forever(self) -> None:
         """Run the server until stopped."""
@@ -157,7 +162,7 @@ class WebSocketServer:
         """
         client_id = str(uuid.uuid4())
         self._clients[client_id] = websocket
-        self.log.info(f"Client connected: {client_id}")
+        self.log.debug(f"Client connected: {client_id}")
         self._notify_client_change()
 
         # Send welcome message with client_id
@@ -171,7 +176,7 @@ class WebSocketServer:
             async for message in websocket:
                 await self._handle_message(client_id, websocket, message)
         except websockets.ConnectionClosed:
-            self.log.info(f"Client disconnected: {client_id}")
+            self.log.debug(f"Client disconnected: {client_id}")
         except Exception as e:
             self.log.error(f"Error handling client {client_id}: {e}")
         finally:

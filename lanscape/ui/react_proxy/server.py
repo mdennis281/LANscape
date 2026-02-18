@@ -74,7 +74,7 @@ def start_static_server(directory: Path, port: int, host: str = '127.0.0.1') -> 
     """
     handler = partial(SPAHandler, directory=str(directory))
     server = HTTPServer((host, port), handler)
-    log.info(f'Static server starting on http://{host}:{port}')
+    log.debug(f'Static server binding on http://{host}:{port}')
     return server
 
 
@@ -171,7 +171,7 @@ class WebappServerController:
             daemon=True
         )
         ws_thread.start()
-        log.info(f'WebSocket server started on ws://{self.host}:{self.ws_port}')
+        log.debug(f'WebSocket server started on ws://{self.host}:{self.ws_port}')
 
         # Start HTTP server
         self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
@@ -203,22 +203,44 @@ class WebappServerController:
             self._shutdown()
 
     def _shutdown(self) -> None:
-        """Shutdown all servers."""
-        log.info('Shutting down webapp server...')
+        """Shutdown all servers and validate port closure."""
+        log.debug('Shutting down webapp server...')
+        errors = []
 
         # Stop HTTP server
         if self._http_server:
-            self._http_server.server_close()
+            try:
+                self._http_server.server_close()
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                errors.append(f'HTTP server (port {self.http_port}): {e}')
 
         # Stop WebSocket server
         if self._ws_server and self._ws_loop:
-            # Schedule stop on the WS event loop
-            asyncio.run_coroutine_threadsafe(
-                self._ws_server.stop(),
-                self._ws_loop
-            )
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self._ws_server.stop(),
+                    self._ws_loop
+                )
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                errors.append(f'WebSocket server (port {self.ws_port}): {e}')
 
-        log.info('Webapp server stopped')
+        # Validate ports are released
+        import socket as _socket  # pylint: disable=import-outside-toplevel
+        time.sleep(0.3)  # Brief wait for OS to release ports
+
+        for port_num, label in [
+            (self.http_port, 'HTTP'),
+            (self.ws_port, 'WebSocket')
+        ]:
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+                if s.connect_ex(('localhost', port_num)) == 0:
+                    errors.append(f'{label} port {port_num} did not close cleanly')
+
+        if errors:
+            for err in errors:
+                log.warning(err)
+        else:
+            log.info('LANscape closed gracefully')
 
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -248,44 +270,11 @@ def start_webapp_server(
 
     webapp_dir = manager.get_webapp_dir()
 
-    # Check if we need to download (not cached, force download, or incompatible cached version)
-    need_download = force_download or not manager.is_cached()
+    # Determine UI source: cached, download, or fallback
+    ui_source, ui_version = _resolve_webapp(manager, force_download)
 
-    if not need_download:
-        # Check if cached version is compatible
-        cached_version = manager.get_cached_version()
-        if cached_version and not is_version_compatible(cached_version):
-            log.warning(
-                f'Cached webapp v{cached_version} is not compatible with this backend. '
-                'Downloading compatible version...'
-            )
-            need_download = True
-
-    if need_download:
-        log.info('Downloading webapp...')
-        if not manager.download_webapp(force=force_download):
-            # Download failed - check if we can fall back to cached version
-            if manager.is_cached():
-                cached_version = manager.get_cached_version()
-                log.warning(
-                    f'Download failed. Falling back to cached webapp v{cached_version} '
-                    '(may have compatibility issues)'
-                )
-            else:
-                raise RuntimeError(
-                    'Failed to download webapp and no cached version available. '
-                    'Check your internet connection.'
-                )
-    else:
-        info = manager.get_info()
-        if info:
-            log.info(f'Using cached webapp v{info.version}')
-            # Check for updates in background (for next run)
-            threading.Thread(
-                target=_check_for_update_background,
-                args=(manager,),
-                daemon=True
-            ).start()
+    log.info(f'UI: {ui_source} (v{ui_version})')
+    log.debug(f'Webapp path: {webapp_dir}')
 
     if not webapp_dir.exists():
         raise RuntimeError(f'Webapp directory not found: {webapp_dir}')
@@ -300,6 +289,69 @@ def start_webapp_server(
     controller.start(webapp_dir, open_browser=open_browser)
 
 
+def _resolve_webapp(
+    manager: WebappManager,
+    force_download: bool
+) -> tuple[str, str]:
+    """
+    Ensure the webapp is available and return its source and version.
+
+    Handles cache checks, compatibility validation, downloading, and
+    background update scheduling.
+
+    Args:
+        manager: WebappManager instance.
+        force_download: Force re-download even if cached.
+
+    Returns:
+        Tuple of (source_label, version_string).
+
+    Raises:
+        RuntimeError: If no webapp is available and download fails.
+    """
+    need_download = force_download or not manager.is_cached()
+
+    if not need_download:
+        cached_version = manager.get_cached_version()
+        if cached_version and not is_version_compatible(cached_version):
+            log.warning(
+                f'Cached webapp v{cached_version} is not compatible with this backend. '
+                'Downloading compatible version...'
+            )
+            need_download = True
+
+    if need_download:
+        source = 'Force re-downloaded' if force_download else 'Downloaded'
+        if manager.download_webapp(force=force_download):
+            return source, manager.get_cached_version() or 'unknown'
+
+        # Download failed — try fallback to cache
+        if manager.is_cached():
+            cached_version = manager.get_cached_version() or 'unknown'
+            log.warning(
+                f'Download failed. Falling back to cached webapp v{cached_version} '
+                '(may have compatibility issues)'
+            )
+            return 'Cached (download failed)', cached_version
+
+        raise RuntimeError(
+            'Failed to download webapp and no cached version available. '
+            'Check your internet connection.'
+        )
+
+    # Already cached and compatible
+    info = manager.get_info()
+    version = info.version if info else 'unknown'
+
+    # Check for updates in background (for next run)
+    threading.Thread(
+        target=_check_for_update_background,
+        args=(manager,),
+        daemon=True
+    ).start()
+    return 'Cached', version
+
+
 def _check_for_update_background(manager: WebappManager) -> None:
     """
     Check for webapp updates in background.
@@ -311,7 +363,7 @@ def _check_for_update_background(manager: WebappManager) -> None:
     """
     try:
         if manager.is_update_available():
-            log.info('Webapp update available, downloading for next run...')
+            log.debug('Webapp update available, downloading for next run...')
             manager.download_webapp(force=True)
     except Exception as e:  # pylint: disable=broad-exception-caught
         log.debug(f'Background update check failed: {e}')
@@ -329,8 +381,10 @@ def _open_browser(url: str, wait: float = 1.5) -> Optional[Popen]:
         Popen instance if PWA was opened, None otherwise
     """
     time.sleep(wait)
+    # Suppress noisy pwa_launcher logs
+    logging.getLogger('pwa_launcher').setLevel(logging.WARNING)
     try:
-        log.info(f'Opening browser: {url}')
+        log.debug(f'Opening browser: {url}')
         return open_pwa(url, auto_profile=False)
     except ChromiumNotFoundError:
         success = webbrowser.open(url)

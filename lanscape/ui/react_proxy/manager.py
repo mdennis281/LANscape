@@ -232,7 +232,7 @@ class WebappManager:
             True if download was successful, False otherwise.
         """
         if not force and self.is_cached() and not self.is_update_available():
-            log.info('Webapp is already up to date')
+            log.debug('Webapp is already up to date')
             return True
 
         release_info = self.get_compatible_release_info()
@@ -243,7 +243,7 @@ class WebappManager:
             )
             return False
 
-        log.info(f'Downloading webapp v{release_info["version"]}...')
+        log.debug(f'Downloading webapp v{release_info["version"]}...')
 
         try:
             # Download the zip file
@@ -278,7 +278,7 @@ class WebappManager:
                     'tag_name': release_info['tag_name']
                 }, f)
 
-            log.info(f'Webapp v{release_info["version"]} downloaded successfully')
+            log.debug(f'Webapp v{release_info["version"]} downloaded successfully')
             return True
 
         except requests.RequestException as e:
@@ -298,7 +298,7 @@ class WebappManager:
         if self.is_cached():
             # Check for updates in background but use cached version
             if self.is_update_available():
-                log.info('Webapp update available, downloading...')
+                log.debug('Webapp update available, downloading...')
                 self.download_webapp()
             return self.webapp_dir
 

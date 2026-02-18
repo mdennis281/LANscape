@@ -85,8 +85,7 @@ def start_webapp_mode():
         args.ws_port = get_valid_port(args.ws_port)
 
     log.info('Starting React webapp mode')
-    log.info(f'HTTP server will run on port {args.port}')
-    log.info(f'WebSocket server will run on port {args.ws_port}')
+    log.info(f'Reserving ports: {args.port} - UI | {args.ws_port} - WS')
 
     try:
         start_webapp_server(

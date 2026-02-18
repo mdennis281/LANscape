@@ -1,0 +1,74 @@
+name: Trigger UI Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Backend version that triggered the build"
+        required: true
+        type: string
+      is_prerelease:
+        description: "Whether this is a pre-release"
+        required: false
+        type: string
+        default: "false"
+      ui_branch:
+        description: "The lanscape-ui branch to build from"
+        required: false
+        type: string
+        default: "main"
+    secrets:
+      UI_BUILD_PAT:
+        description: "PAT with repo scope for cross-repo dispatch"
+        required: true
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Backend version to build the UI for"
+        required: true
+        type: string
+      is_prerelease:
+        description: "Whether this is a pre-release"
+        required: false
+        type: boolean
+        default: false
+      ui_branch:
+        description: "The lanscape-ui branch to build from"
+        required: false
+        type: string
+        default: "main"
+      electron:
+        description: "Also build Electron desktop apps"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger lanscape-ui build
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.UI_BUILD_PAT }}
+          repository: mdennis281/lanscape-ui
+          event-type: backend-release
+          client-payload: |
+            {
+              "backend_version": "${{ inputs.version }}",
+              "ui_branch": "${{ inputs.ui_branch }}",
+              "is_prerelease": "${{ inputs.is_prerelease }}",
+              "electron": "${{ github.event_name == 'workflow_dispatch' && inputs.electron || 'false' }}"
+            }
+
+      - name: Summary
+        run: |
+          echo "## 🚀 UI Build Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Version | \`${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI Branch | \`${{ inputs.ui_branch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-release | ${{ inputs.is_prerelease }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Electron | ${{ github.event_name == 'workflow_dispatch' && inputs.electron || 'false' }} |" >> $GITHUB_STEP_SUMMARY

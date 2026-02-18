@@ -76,7 +76,8 @@ def parse_version(version: str) -> Optional[Tuple[int, int, int, str]]:
     """
     # Handle common prefixes
     version = version.lstrip('v')
-    version = version.replace('releases/', '').replace('pre-releases/', '')
+    for prefix in ('releases/', 'pre-releases/', 'webapp/'):
+        version = version.replace(prefix, '')
 
     # Match semver pattern: major.minor.patch[-prerelease]
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$', version)

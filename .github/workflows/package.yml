@@ -82,3 +82,13 @@ jobs:
       branch: ${{ github.ref }}
       version: ${{ needs.determine-release.outputs.clean_version }}
     secrets: inherit
+
+  trigger-ui-build:
+    needs: [determine-release, publish]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' && needs.publish.result == 'success' }}
+    uses: ./.github/workflows/trigger-ui-build.yml
+    with:
+      version: ${{ needs.determine-release.outputs.clean_version }}
+      is_prerelease: ${{ needs.determine-release.outputs.is_prerelease }}
+    secrets:
+      UI_BUILD_PAT: ${{ secrets.UI_BUILD_PAT }}

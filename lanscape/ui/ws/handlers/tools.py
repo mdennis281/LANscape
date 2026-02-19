@@ -160,7 +160,6 @@ class ToolsHandler(BaseHandler):
             'ws_port': args.ws_port,
             'loglevel': args.loglevel,
             'persistent': args.persistent,
-            'webapp_update': args.webapp_update,
         }
         if args.logfile:
             runtime_args['logfile'] = args.logfile

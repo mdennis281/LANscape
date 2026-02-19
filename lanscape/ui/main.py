@@ -92,7 +92,6 @@ def start_webapp_mode():
             http_port=args.port,
             ws_port=args.ws_port,
             open_browser=True,
-            force_download=args.webapp_update,
             persistent=args.persistent
         )
     except KeyboardInterrupt:

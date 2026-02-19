@@ -1,4 +1,4 @@
-name: Trigger UI Build
+name: Build UI & Bundle Artifact
 
 on:
   workflow_call:
@@ -38,14 +38,9 @@ on:
         required: false
         type: string
         default: "main"
-      electron:
-        description: "Also build Electron desktop apps"
-        required: false
-        type: boolean
-        default: false
 
 jobs:
-  dispatch:
+  build-ui:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger lanscape-ui build
@@ -59,16 +54,104 @@ jobs:
               "backend_version": "${{ inputs.version }}",
               "ui_branch": "${{ inputs.ui_branch }}",
               "is_prerelease": "${{ inputs.is_prerelease }}",
-              "electron": "${{ github.event_name == 'workflow_dispatch' && inputs.electron || 'false' }}"
+              "electron": "false"
             }
+
+      - name: Wait for lanscape-ui build to complete
+        id: wait
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.UI_BUILD_PAT }}
+          script: |
+            const owner = 'mdennis281';
+            const repo = 'lanscape-ui';
+            const maxWait = 20 * 60 * 1000; // 20 minutes
+            const pollInterval = 30 * 1000;  // 30 seconds
+            const startTime = Date.now();
+
+            // Wait for the dispatch to be received
+            core.info('Waiting for lanscape-ui workflow to start...');
+            await new Promise(r => setTimeout(r, 15000));
+
+            // Find the triggered workflow run
+            let runId = null;
+            for (let attempt = 0; attempt < 20; attempt++) {
+              const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                owner, repo,
+                workflow_id: 'build.yml',
+                event: 'repository_dispatch',
+                per_page: 5,
+              });
+
+              const recent = runs.workflow_runs.find(r => {
+                const created = new Date(r.created_at).getTime();
+                return created > (startTime - 30000); // Created within last 30s of our trigger
+              });
+
+              if (recent) {
+                runId = recent.id;
+                core.info(`Found workflow run: ${runId} (status: ${recent.status})`);
+                break;
+              }
+
+              core.info(`Attempt ${attempt + 1}: Workflow not started yet, waiting...`);
+              await new Promise(r => setTimeout(r, 5000));
+            }
+
+            if (!runId) {
+              throw new Error('Could not find triggered workflow run after 100s');
+            }
+
+            // Poll until complete
+            core.info('Waiting for workflow to complete...');
+            while (true) {
+              if (Date.now() - startTime > maxWait) {
+                throw new Error('Timed out waiting for lanscape-ui build');
+              }
+
+              const { data: run } = await github.rest.actions.getWorkflowRun({
+                owner, repo, run_id: runId,
+              });
+
+              core.info(`Status: ${run.status} | Conclusion: ${run.conclusion || 'pending'}`);
+
+              if (run.status === 'completed') {
+                if (run.conclusion !== 'success') {
+                  throw new Error(`lanscape-ui build failed: ${run.conclusion}`);
+                }
+                core.info('lanscape-ui build completed successfully!');
+                break;
+              }
+
+              await new Promise(r => setTimeout(r, pollInterval));
+            }
+
+            core.setOutput('run_id', String(runId));
+
+      - name: Download webapp artifact from lanscape-ui
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.UI_BUILD_PAT }}
+          repo: mdennis281/lanscape-ui
+          run_id: ${{ steps.wait.outputs.run_id }}
+          name: webapp-dist
+          path: ./webapp-artifact
+
+      - name: Upload webapp artifact locally
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-dist
+          path: ./webapp-artifact/webapp-dist.zip
+          if-no-files-found: error
+          retention-days: 5
 
       - name: Summary
         run: |
-          echo "## 🚀 UI Build Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 UI Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Backend Version | \`${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| UI Branch | \`${{ inputs.ui_branch }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Pre-release | ${{ inputs.is_prerelease }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Electron | ${{ github.event_name == 'workflow_dispatch' && inputs.electron || 'false' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI Run ID | \`${{ steps.wait.outputs.run_id }}\` |" >> $GITHUB_STEP_SUMMARY

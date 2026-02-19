@@ -19,9 +19,9 @@ from subprocess import Popen
 
 from pwa_launcher import open_pwa, ChromiumNotFoundError
 
-from lanscape.ui.react_proxy.manager import WebappManager
-from lanscape.ui.react_proxy.version_compat import is_version_compatible
 from lanscape.ui.ws.server import WebSocketServer
+
+REACT_BUILD_DIR = Path(__file__).resolve().parent.parent / 'react_build'
 
 log = logging.getLogger('WebappServer')
 
@@ -249,35 +249,31 @@ def start_webapp_server(
     ws_port: int = 8766,
     host: str = '127.0.0.1',
     open_browser: bool = True,
-    force_download: bool = False,
     persistent: bool = False
 ) -> None:
     """
     Start the webapp server with both HTTP (static files) and WebSocket (API).
 
     This is the main entry point for running the React webapp with Python backend.
+    Serves the bundled React build from the package's react_build directory.
 
     Args:
         http_port: Port for the HTTP static file server (default: 5001)
         ws_port: Port for the WebSocket server (default: 8766)
         host: Host to bind to (default: 127.0.0.1)
         open_browser: Whether to open a browser window (default: True)
-        force_download: Force re-download of webapp even if cached (default: False)
         persistent: Don't auto-shutdown when clients disconnect (default: False)
     """
-    # Ensure webapp is available
-    manager = WebappManager()
+    webapp_dir = REACT_BUILD_DIR
 
-    webapp_dir = manager.get_webapp_dir()
+    if not webapp_dir.exists() or not any(webapp_dir.iterdir()):
+        raise RuntimeError(
+            f'Webapp build not found at: {webapp_dir}\n'
+            'The React UI build is missing from this installation. '
+            'Please reinstall the package or check your installation.'
+        )
 
-    # Determine UI source: cached, download, or fallback
-    ui_source, ui_version = _resolve_webapp(manager, force_download)
-
-    log.info(f'UI: {ui_source} (v{ui_version})')
-    log.debug(f'Webapp path: {webapp_dir}')
-
-    if not webapp_dir.exists():
-        raise RuntimeError(f'Webapp directory not found: {webapp_dir}')
+    log.info(f'UI: Bundled build at {webapp_dir}')
 
     # Create and start the controller
     controller = WebappServerController(
@@ -287,86 +283,6 @@ def start_webapp_server(
         persistent=persistent
     )
     controller.start(webapp_dir, open_browser=open_browser)
-
-
-def _resolve_webapp(
-    manager: WebappManager,
-    force_download: bool
-) -> tuple[str, str]:
-    """
-    Ensure the webapp is available and return its source and version.
-
-    Handles cache checks, compatibility validation, downloading, and
-    background update scheduling.
-
-    Args:
-        manager: WebappManager instance.
-        force_download: Force re-download even if cached.
-
-    Returns:
-        Tuple of (source_label, version_string).
-
-    Raises:
-        RuntimeError: If no webapp is available and download fails.
-    """
-    need_download = force_download or not manager.is_cached()
-
-    if not need_download:
-        cached_version = manager.get_cached_version()
-        if cached_version and not is_version_compatible(cached_version):
-            log.warning(
-                f'Cached webapp v{cached_version} is not compatible with this backend. '
-                'Downloading compatible version...'
-            )
-            need_download = True
-
-    if need_download:
-        source = 'Force re-downloaded' if force_download else 'Downloaded'
-        if manager.download_webapp(force=force_download):
-            return source, manager.get_cached_version() or 'unknown'
-
-        # Download failed — try fallback to cache
-        if manager.is_cached():
-            cached_version = manager.get_cached_version() or 'unknown'
-            log.warning(
-                f'Download failed. Falling back to cached webapp v{cached_version} '
-                '(may have compatibility issues)'
-            )
-            return 'Cached (download failed)', cached_version
-
-        raise RuntimeError(
-            'Failed to download webapp and no cached version available. '
-            'Check your internet connection.'
-        )
-
-    # Already cached and compatible
-    info = manager.get_info()
-    version = info.version if info else 'unknown'
-
-    # Check for updates in background (for next run)
-    threading.Thread(
-        target=_check_for_update_background,
-        args=(manager,),
-        daemon=True
-    ).start()
-    return 'Cached', version
-
-
-def _check_for_update_background(manager: WebappManager) -> None:
-    """
-    Check for webapp updates in background.
-
-    Downloads a new version if available, for use on next startup.
-
-    Args:
-        manager: WebappManager instance
-    """
-    try:
-        if manager.is_update_available():
-            log.debug('Webapp update available, downloading for next run...')
-            manager.download_webapp(force=True)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        log.debug(f'Background update check failed: {e}')
 
 
 def _open_browser(url: str, wait: float = 1.5) -> Optional[Popen]:

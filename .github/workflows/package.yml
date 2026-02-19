@@ -75,8 +75,8 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   publish:
-    needs: [determine-release, create-release]
-    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' }}
+    needs: [determine-release, create-release, trigger-ui-build]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' && needs.trigger-ui-build.result == 'success' }}
     uses: ./.github/workflows/pypi-publish.yml
     with:
       branch: ${{ github.ref }}
@@ -84,8 +84,8 @@ jobs:
     secrets: inherit
 
   trigger-ui-build:
-    needs: [determine-release, publish]
-    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' && needs.publish.result == 'success' }}
+    needs: [determine-release, create-release]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' }}
     uses: ./.github/workflows/trigger-ui-build.yml
     with:
       version: ${{ needs.determine-release.outputs.clean_version }}

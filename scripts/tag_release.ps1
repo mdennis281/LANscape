@@ -6,7 +6,7 @@ param(
     [string]$UIBranch = ""
 )
 
-if ($Version -like "*a*" -or $Version -like "*b*") {
+if ($Version -like "*a*" -or $Version -like "*b*" -or $Version -like "*rc*") {
     Write-Host "Pre-release version detected: $Version"
     $tag = "pre-releases/$Version"
 } else {

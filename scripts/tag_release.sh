@@ -24,7 +24,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if [[ "$VERSION" == *a* || "$VERSION" == *b* ]]; then
+if [[ "$VERSION" == *a* || "$VERSION" == *b* || "$VERSION" == *rc* ]]; then
     echo "Pre-release version detected: $VERSION"
     TAG="pre-releases/$VERSION"
 else

@@ -7,13 +7,21 @@ pip install lanscape
 python -m lanscape
 ```
 
-![PyPI Version](https://img.shields.io/pypi/v/lanscape)
+PyPi Stats: 
+
+![Version](https://img.shields.io/pypi/v/lanscape)
 ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
+
+Latest release: 
+
 ![Stable](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=releases%2F*&label=Stable)
 ![RC](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*rc*&label=RC)
 ![Beta](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*b*&label=Beta)
-![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest)
-![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging)
+
+Health: 
+
+![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest) 
+![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) 
 ![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 
 ---

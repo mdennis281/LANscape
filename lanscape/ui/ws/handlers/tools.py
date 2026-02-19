@@ -15,7 +15,7 @@ from lanscape.core.ip_parser import parse_ip_input
 from lanscape.core.errors import SubnetTooLargeError
 from lanscape.core.scan_config import get_default_configs_with_arp_fallback
 from lanscape.core.version_manager import (
-    get_installed_version, is_update_available, lookup_latest_version
+    get_installed_version, is_update_available, get_latest_version
 )
 from lanscape.core.runtime_args import parse_args
 from lanscape.ui.ws.handlers.base import BaseHandler
@@ -173,12 +173,10 @@ class ToolsHandler(BaseHandler):
 
         # Check for updates (safely)
         try:
-            if is_update_available():
-                result['update_available'] = True
-                result['latest_version'] = lookup_latest_version()
-            else:
-                result['update_available'] = False
-        except Exception:  # pylint: disable=broad-exception-caught
+            result['update_available'] = is_update_available()
+            result['latest_version'] = get_latest_version()
+        except Exception:
             result['update_available'] = False
+            result['latest_version'] = None
 
         return result

@@ -5,7 +5,7 @@ import traceback
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
-from lanscape.core.version_manager import get_installed_version, is_update_available
+from lanscape.core.version_manager import get_installed_version, is_update_available, get_latest_version
 from lanscape.ui.ws.server import run_server
 from lanscape.ui.react_proxy import start_webapp_server
 
@@ -47,7 +47,7 @@ def try_check_update():
         if is_update_available():
             log.info('An update is available!')
             log.info(
-                'Run "pip install --upgrade lanscape --no-cache" to suppress this message.')
+                f'Run "pip install lanscape=={get_latest_version()}" to suppress this message.')
     except BaseException:
         log.debug(traceback.format_exc())
         log.warning('Unable to check for updates.')

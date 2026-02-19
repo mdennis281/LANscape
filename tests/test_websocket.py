@@ -718,9 +718,9 @@ class TestToolsHandler:
     def test_handle_app_info(self, tools_handler):
         """Test getting app info."""
         with patch('lanscape.ui.ws.handlers.tools.get_installed_version') as mock_version, \
-             patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
-             patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
-             patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
+                patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
+                patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
+                patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
             mock_version.return_value = '1.2.3'
             mock_arp.return_value = True
             mock_update.return_value = False
@@ -743,10 +743,10 @@ class TestToolsHandler:
     def test_handle_app_info_with_update(self, tools_handler):
         """Test getting app info when update is available."""
         with patch('lanscape.ui.ws.handlers.tools.get_installed_version') as mock_version, \
-             patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
-             patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
-             patch('lanscape.ui.ws.handlers.tools.lookup_latest_version') as mock_latest, \
-             patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
+                patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
+                patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
+                patch('lanscape.ui.ws.handlers.tools.get_latest_version') as mock_latest, \
+                patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
             mock_version.return_value = '1.2.3'
             mock_arp.return_value = True
             mock_update.return_value = True

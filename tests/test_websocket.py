@@ -7,7 +7,7 @@ Tests cover:
 - Handler classes (ScanHandler, PortHandler, ToolsHandler)
 - WebSocket server functionality
 """
-# pylint: disable=protected-access,missing-class-docstring,too-many-locals,unsubscriptable-object
+# pylint: disable=protected-access,missing-class-docstring,too-many-locals,unsubscriptable-object,too-many-lines
 
 import asyncio
 import json

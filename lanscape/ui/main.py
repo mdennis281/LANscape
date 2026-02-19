@@ -5,7 +5,9 @@ import traceback
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
-from lanscape.core.version_manager import get_installed_version, is_update_available, get_latest_version
+from lanscape.core.version_manager import (
+    get_installed_version, is_update_available, get_latest_version
+)
 from lanscape.ui.ws.server import run_server
 from lanscape.ui.react_proxy import start_webapp_server
 

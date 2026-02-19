@@ -254,7 +254,7 @@ class WebappServerController:
                 log.warning(err)
         else:
             log.info('LANscape closed gracefully')
-            
+
     def _delayed_shutdown_check(self) -> None:
         """Check if clients reconnected during the shutdown delay."""
         time.sleep(2)  # Brief delay to allow for quick reconnects

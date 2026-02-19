@@ -98,7 +98,7 @@ class WebSocketServer:
         self.log.debug(f"Starting WebSocket server on ws://{self.host}:{self.port}")
 
         self._running = True
-        
+
         # Suppress noisy websockets library logs (connection open/close, server listening)
         logging.getLogger('websockets.server').setLevel(logging.WARNING)
         logging.getLogger('websockets').setLevel(logging.WARNING)

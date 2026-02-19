@@ -3,6 +3,7 @@ Tests for the react_proxy module - serving the bundled React UI.
 """
 import shutil
 import tempfile
+import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
@@ -170,4 +171,58 @@ class TestStartStaticServer:
         try:
             assert server.server_address[0] == '127.0.0.1'
         finally:
+            server.server_close()
+
+
+class TestCacheHeaders:
+    """Tests for cache-control headers on served files."""
+
+    @staticmethod
+    def _make_server(temp_webapp_dir):
+        """Start a test server and return (base_url, server, thread)."""
+        import threading  # pylint: disable=import-outside-toplevel
+        server = start_static_server(temp_webapp_dir, 0)
+        base_url = f'http://127.0.0.1:{server.server_address[1]}'
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return base_url, server
+
+    @staticmethod
+    def _get_headers(base_url: str, path: str) -> dict:
+        """Fetch a path and return the response headers as a dict."""
+        with urllib.request.urlopen(f'{base_url}{path}') as resp:
+            return dict(resp.headers)
+
+    def test_index_html_no_cache(self, temp_webapp_dir):
+        """Test that index.html has no-cache headers."""
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            headers = self._get_headers(base_url, '/index.html')
+            assert 'no-cache' in headers.get('Cache-Control', '')
+            assert 'no-store' in headers.get('Cache-Control', '')
+            assert headers.get('Pragma') == 'no-cache'
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_assets_immutable_cache(self, temp_webapp_dir):
+        """Test that /assets/* files have long-term immutable cache headers."""
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            headers = self._get_headers(base_url, '/assets/main.js')
+            cache_control = headers.get('Cache-Control', '')
+            assert 'immutable' in cache_control
+            assert 'max-age=31536000' in cache_control
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_spa_fallback_no_cache(self, temp_webapp_dir):
+        """Test that SPA fallback responses (unknown routes) have no-cache headers."""
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            headers = self._get_headers(base_url, '/some/random/route')
+            assert 'no-cache' in headers.get('Cache-Control', '')
+        finally:
+            server.shutdown()
             server.server_close()

@@ -53,10 +53,21 @@ class SPAHandler(SimpleHTTPRequestHandler):
         log.debug(f'{self.address_string()} - {fmt % args}')
 
     def end_headers(self):
-        """Add CORS headers for local development."""
+        """Add CORS and cache-control headers."""
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+        # Vite content-hashed assets are safe to cache long-term.
+        # Everything else (index.html, manifest, etc.) must be revalidated
+        # so the browser always picks up new builds.
+        if self.path.startswith('/assets/'):
+            self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+        else:
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+
         super().end_headers()
 
 

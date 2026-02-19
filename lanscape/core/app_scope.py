@@ -4,6 +4,7 @@ Resource and environment management utilities for Lanscape.
 """
 
 from pathlib import Path
+from importlib.metadata import version, PackageNotFoundError
 import json
 
 
@@ -80,13 +81,15 @@ class ResourceManager:
 
 def is_local_run() -> bool:
     """
-    Determine if the code is running locally or as an installed PyPI package.
-    Returns True if running locally, False if installed as a package.
-    """
-    module_path = Path(__file__).parent
+    Determine if the code is running locally or as an installed package.
 
-    package_folders = ["site-packages", "dist-packages"]
-    parts = [part in module_path.parts for part in package_folders]
-    if any(parts):
-        return False
-    return True  # Installed package
+    Returns ``True`` only when the package has **not** been installed at
+    all (i.e. running directly from source without ``pip install``).
+    Editable installs (``pip install -e .``) are treated as *installed*
+    because they register proper package metadata with a real version.
+    """
+    try:
+        version('lanscape')
+        return False  # metadata exists → installed (regular or editable)
+    except PackageNotFoundError:
+        return True   # no metadata → truly running from raw source

@@ -10,7 +10,9 @@ Provides handlers for:
 import traceback
 from typing import Any, Callable, Optional
 
-from lanscape.core.net_tools import get_all_network_subnets, is_arp_supported
+from lanscape.core.net_tools import (
+    get_all_network_subnets, is_arp_supported, smart_select_primary_subnet
+)
 from lanscape.core.ip_parser import parse_ip_input
 from lanscape.core.errors import SubnetTooLargeError
 from lanscape.core.scan_config import get_default_configs_with_arp_fallback
@@ -99,11 +101,18 @@ class ToolsHandler(BaseHandler):
         """
         List all network subnets on the system.
 
+        The primary subnet (as determined by :func:`smart_select_primary_subnet`)
+        is moved to the front of the list so the UI can default to it.
+
         Returns:
             List of subnet information or error dict
         """
         try:
-            return get_all_network_subnets()
+            subnets = get_all_network_subnets()
+            primary = smart_select_primary_subnet(subnets)
+            if primary:
+                subnets.sort(key=lambda s: s.get('subnet') != primary)
+            return subnets
         except Exception:
             return {'error': traceback.format_exc()}
 

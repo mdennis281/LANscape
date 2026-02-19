@@ -688,10 +688,28 @@ class TestToolsHandler:
         with patch('lanscape.ui.ws.handlers.tools.get_all_network_subnets') as mock:
             mock.return_value = [{"subnet": "192.168.1.0/24", "interface": "eth0"}]
 
-            result = tools_handler._handle_subnet_list({}, None)
+            with patch('lanscape.ui.ws.handlers.tools.smart_select_primary_subnet',
+                       return_value='192.168.1.0/24'):
+                result = tools_handler._handle_subnet_list({}, None)
 
             assert len(result) == 1
             assert result[0]["subnet"] == "192.168.1.0/24"
+
+    def test_handle_subnet_list_primary_sorted_first(self, tools_handler):
+        """Test that smart-selected primary subnet is first in the list."""
+        subnets = [
+            {"subnet": "172.17.0.0/16", "interface": "docker0", "address_cnt": 65534},
+            {"subnet": "192.168.1.0/24", "interface": "eth0", "address_cnt": 254},
+            {"subnet": "10.0.0.0/24", "interface": "wlan0", "address_cnt": 254},
+        ]
+        with patch('lanscape.ui.ws.handlers.tools.get_all_network_subnets',
+                   return_value=subnets):
+            with patch('lanscape.ui.ws.handlers.tools.smart_select_primary_subnet',
+                       return_value='192.168.1.0/24'):
+                result = tools_handler._handle_subnet_list({}, None)
+
+        assert len(result) == 3
+        assert result[0]["subnet"] == "192.168.1.0/24"
 
     def test_handle_config_defaults(self, tools_handler):
         """Test getting default configs."""

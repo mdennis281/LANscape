@@ -35,6 +35,19 @@ jobs:
           python -m pip install build twine
           python -m pip install .
 
+      - name: Download webapp artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp-dist
+          path: ./webapp-artifact
+
+      - name: Bundle React build into package
+        run: |
+          rm -rf lanscape/ui/react_build/*
+          unzip ./webapp-artifact/webapp-dist.zip -d lanscape/ui/react_build/
+          echo "Bundled React build contents:"
+          ls -la lanscape/ui/react_build/
+
       - name: Determine release version
         id: determine_version
         run: |

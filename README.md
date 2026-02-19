@@ -1,8 +1,11 @@
 # LANscape
-A python based local network scanner.
 
-![screenshot](https://github.com/user-attachments/assets/7d77741e-3bad-4b6b-a33f-6a392adde23f)
+A local network scanner with a built-in web UI. Discover devices, open ports, and running services on your network.
 
+```sh
+pip install lanscape
+python -m lanscape
+```
 
 PyPi Stats: 
 
@@ -12,8 +15,8 @@ PyPi Stats:
 Latest release: 
 
 ![Stable](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=releases%2F*&label=Stable)
+![RC](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*rc*&label=RC)
 ![Beta](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*b*&label=Beta)
-![Alpha](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*a*&label=Alpha)
 
 Health: 
 
@@ -21,46 +24,56 @@ Health:
 ![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) 
 ![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 
+---
 
-## Installation
-```sh
-pip install lanscape
-python -m lanscape
-```
+![LANscape UI](docs/img/lanscape-ui-main.jpg)
+
+<details>
+<summary>More screenshots</summary>
+
+![Scan Configuration](docs/img/lanscape-config.png)
+
+![Port Detail](docs/img/lanscape-port-detail.jpg)
+
+</details>
+
+---
 
 ## Flags
- - `--port <port number>` port of the flask app (default: automagic)
- - `--persistent` dont shutdown server when browser tab is closed (default: false)
- - `--reloader` essentially flask debug mode- good for local development (default: false)
- - `--logfile <path>` save log output to the given file path
- - `--loglevel <level>` set the logger's log level (default: INFO)
- - `--flask-logging` turn on flask logging (default: false)
 
-Examples:
-```shell
-python -m lanscape --reloader
-python -m lanscape --port 5002
-python -m lanscape --logfile /tmp/lanscape.log --loglevel DEBUG
+| Flag | Description |
+|------|-------------|
+| `--port <number>` | Port for the web UI (default: auto) |
+| `--ws-port <number>` | Port for the WebSocket server (default: 8766) |
+| `--ws-server` | Start WebSocket server only (no UI) |
+| `--persistent` | Don't auto-shutdown when the browser tab closes |
+| `--logfile <path>` | Write log output to a file |
+| `--loglevel <level>` | Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO) |
+| `--debug` | Shorthand for `--loglevel DEBUG` |
+
+```sh
+python -m lanscape
+python -m lanscape --port 8080
+python -m lanscape --debug --persistent
+python -m lanscape --logfile /tmp/lanscape.log --loglevel WARNING
+python -m lanscape --ws-server --ws-port 9000
 ```
 
 ## Troubleshooting
 
-### MAC Address / Manufacturer is inaccurate/unknown
-The program does an ARP lookup to determine the MAC address. This lookup
-can sometimes require admin-level permissions to retrieve accurate results.
-*Try elevating your shell before execution.*
+### MAC Address / Manufacturer is inaccurate or unknown
+LANscape does an ARP lookup to determine MAC addresses. This can require
+elevated permissions to get accurate results — try running your shell as admin.
 
-### The accuracy of the devices found is low
-I use a combination of ARP, ICMP & port testing to determine if a device is online. Sometimes the scan settings can use some tuning to maximize both speed and accuracy.
+### Scan accuracy seems low
+The scanner uses a combination of ARP, ICMP, and port probing to find devices.
+If results aren't great out of the box:
 
-Recommendations:
-
-  - Adjust scan configuration
-  - Configure ARP lookup [ARP lookup setup](./docs/arp-issues.md)
-  - Create a bug
-
+- Tweak the scan configuration preset (accessible from the gear icon)
+- Set up ARP lookup properly — see [ARP issues](./docs/arp-issues.md)
+- Open an issue if something still seems off
 
 ### Something else
-Feel free to submit a github issue detailing your experience.
+Feel free to [submit an issue](https://github.com/mdennis281/LANscape/issues) with details about what you're seeing.
 
 

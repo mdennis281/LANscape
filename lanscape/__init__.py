@@ -48,3 +48,17 @@ from lanscape.core.models import (
     ScanSummary,
     ScanListItem
 )
+
+# Webapp server for serving bundled React UI
+from lanscape.ui.react_proxy import (
+    start_webapp_server,
+    REACT_BUILD_DIR
+)
+
+# Version management
+from lanscape.core.version_manager import (
+    get_installed_version,
+    get_latest_version,
+    is_update_available,
+    lookup_latest_version
+)

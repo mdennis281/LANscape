@@ -45,10 +45,16 @@ jobs:
             echo "should_create_release=true" >> "$GITHUB_OUTPUT"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          # Check if it's an RC release (pre-releases/* with 'rc' in version)
+          elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"rc"* ]]; then
+            echo "✓ Release candidate detected"
+            echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           # Check if it's a beta release (pre-releases/* with 'b' in version)
           elif [[ "$TAG_NAME" == pre-releases/* ]] && [[ "$CLEAN_VERSION" == *"b"* ]]; then
             echo "✓ Beta release detected"
-            echo "should_create_release=true" >> "$GITHUB_OUTPUT"
+            echo "should_create_release=false" >> "$GITHUB_OUTPUT"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           # Check if it's an alpha release (pre-releases/* with 'a' in version)
@@ -75,10 +81,20 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   publish:
-    needs: [determine-release, create-release]
-    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' }}
+    needs: [determine-release, create-release, trigger-ui-build]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' && needs.trigger-ui-build.result == 'success' }}
     uses: ./.github/workflows/pypi-publish.yml
     with:
       branch: ${{ github.ref }}
       version: ${{ needs.determine-release.outputs.clean_version }}
     secrets: inherit
+
+  trigger-ui-build:
+    needs: [determine-release, create-release]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' }}
+    uses: ./.github/workflows/trigger-ui-build.yml
+    with:
+      version: ${{ needs.determine-release.outputs.clean_version }}
+      is_prerelease: ${{ needs.determine-release.outputs.is_prerelease }}
+    secrets:
+      UI_BUILD_PAT: ${{ secrets.UI_BUILD_PAT }}

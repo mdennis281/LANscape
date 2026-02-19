@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Optional
+from typing import Optional, Callable
 
 import websockets
 from websockets.server import WebSocketServerProtocol
@@ -38,17 +38,24 @@ class WebSocketServer:
     DEFAULT_HOST = '127.0.0.1'
     DEFAULT_PORT = 8766
 
-    def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        on_client_change: Optional[Callable[[int], None]] = None
+    ):
         """
         Initialize the WebSocket server.
 
         Args:
             host: Host to bind to (default: 127.0.0.1)
             port: Port to listen on (default: 8766)
+            on_client_change: Optional callback when client count changes
         """
         self.host = host
         self.port = port
         self.log = logging.getLogger('WebSocketServer')
+        self._on_client_change = on_client_change
 
         # Initialize handlers
         self._scan_handler = ScanHandler()
@@ -88,15 +95,20 @@ class WebSocketServer:
 
     async def start(self) -> None:
         """Start the WebSocket server."""
-        self.log.info(f"Starting WebSocket server on ws://{self.host}:{self.port}")
+        self.log.debug(f"Starting WebSocket server on ws://{self.host}:{self.port}")
 
         self._running = True
+
+        # Suppress noisy websockets library logs (connection open/close, server listening)
+        logging.getLogger('websockets.server').setLevel(logging.WARNING)
+        logging.getLogger('websockets').setLevel(logging.WARNING)
 
         # Minimal WebSocket server configuration - let the library handle everything
         self._server = await websockets.serve(
             self._handle_connection,
             self.host,
-            self.port
+            self.port,
+            logger=logging.getLogger('websockets.server'),
         )
 
         # Start the background update task
@@ -106,7 +118,7 @@ class WebSocketServer:
 
     async def stop(self) -> None:
         """Stop the WebSocket server."""
-        self.log.info("Stopping WebSocket server...")
+        self.log.debug("Stopping WebSocket server...")
         self._running = False
 
         if self._update_task:
@@ -128,7 +140,7 @@ class WebSocketServer:
                 self.log.debug(f"Error closing client {client_id}: {e}")
 
         self._clients.clear()
-        self.log.info("WebSocket server stopped")
+        self.log.debug("WebSocket server stopped")
 
     async def serve_forever(self) -> None:
         """Run the server until stopped."""
@@ -150,7 +162,8 @@ class WebSocketServer:
         """
         client_id = str(uuid.uuid4())
         self._clients[client_id] = websocket
-        self.log.info(f"Client connected: {client_id}")
+        self.log.debug(f"Client connected: {client_id}")
+        self._notify_client_change()
 
         # Send welcome message with client_id
         await self._send_event(
@@ -163,7 +176,7 @@ class WebSocketServer:
             async for message in websocket:
                 await self._handle_message(client_id, websocket, message)
         except websockets.ConnectionClosed:
-            self.log.info(f"Client disconnected: {client_id}")
+            self.log.debug(f"Client disconnected: {client_id}")
         except Exception as e:
             self.log.error(f"Error handling client {client_id}: {e}")
         finally:
@@ -362,6 +375,15 @@ class WebSocketServer:
         self._clients.pop(client_id, None)
         self._scan_handler.cleanup_client(client_id)
         self.log.debug(f"Cleaned up client: {client_id}")
+        self._notify_client_change()
+
+    def _notify_client_change(self) -> None:
+        """Notify the callback of client count changes."""
+        if self._on_client_change:
+            try:
+                self._on_client_change(len(self._clients))
+            except Exception as e:
+                self.log.debug(f"Error in client change callback: {e}")
 
 
 def run_server(host: str = WebSocketServer.DEFAULT_HOST,

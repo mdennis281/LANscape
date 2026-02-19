@@ -1,4 +1,3 @@
 recursive-include lanscape/resources *.json
 recursive-include lanscape/resources *.jsonc
-recursive-include lanscape/ui/templates *.html
-recursive-include lanscape/ui/static *
+recursive-include lanscape/ui/react_build *

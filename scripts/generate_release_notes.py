@@ -199,6 +199,7 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
     FORMAT YOUR RESPONSE AS:
 
     **Brief summary paragraph** highlighting the most significant changes and overall impact. You're not trying to sell what changed. Youre just relaying the facts.
+    **NOTE**: Not all releases will include information for every section. Only include sections that are relevant based on the changes in this release.
 
     ## 🆕 What's New
     - Major new features and capabilities (be specific about functionality)

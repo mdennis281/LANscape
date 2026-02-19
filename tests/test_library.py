@@ -5,7 +5,7 @@ Tests scan configuration, network discovery, and subnet selection functionality.
 
 import pytest
 
-from lanscape.core.net_tools import smart_select_primary_subnet
+from lanscape.core.net_tools import smart_select_primary_subnet, _is_deprioritized_subnet
 from lanscape.core.subnet_scan import ScanManager
 from lanscape.core.scan_config import ScanConfig, ScanType
 
@@ -73,6 +73,54 @@ def test_smart_select_primary_subnet():
     parts = subnet.split('/')
     assert len(parts) == 2
     assert int(parts[1]) <= 32  # Valid CIDR mask
+
+
+def test_smart_select_deprioritizes_virtual_networks():
+    """
+    Test that smart_select_primary_subnet deprioritizes virtual/system networks.
+    WSL, Docker, and loopback networks should be avoided when better options exist.
+    """
+    # Test with a mix of real and virtual subnets
+    mock_subnets = [
+        {"subnet": "172.27.64.0/20", "address_cnt": 4094},   # WSL - should be deprioritized
+        {"subnet": "192.168.1.0/24", "address_cnt": 254},    # Real LAN - should be selected
+        {"subnet": "172.17.0.0/16", "address_cnt": 65534},   # Docker - deprioritized & too large
+    ]
+    result = smart_select_primary_subnet(mock_subnets)
+    assert result == "192.168.1.0/24"
+
+    # Test that deprioritized subnet is still selected if it's the only option
+    wsl_only = [{"subnet": "172.27.64.0/20", "address_cnt": 4094}]
+    result = smart_select_primary_subnet(wsl_only)
+    assert result == "172.27.64.0/20"
+
+    # Test loopback deprioritization
+    loopback_mix = [
+        {"subnet": "127.0.0.0/8", "address_cnt": 16777214},
+        {"subnet": "10.0.0.0/24", "address_cnt": 254},
+    ]
+    result = smart_select_primary_subnet(loopback_mix)
+    assert result == "10.0.0.0/24"
+
+
+def test_is_deprioritized_subnet():
+    """Test the _is_deprioritized_subnet helper function."""
+    # WSL default
+    assert _is_deprioritized_subnet("172.27.64.0/20") is True
+    assert _is_deprioritized_subnet("172.27.70.0/24") is True  # Subset of WSL range
+
+    # Docker default
+    assert _is_deprioritized_subnet("172.17.0.0/16") is True
+    assert _is_deprioritized_subnet("172.17.0.0/24") is True  # Subset of Docker range
+
+    # Loopback
+    assert _is_deprioritized_subnet("127.0.0.0/8") is True
+    assert _is_deprioritized_subnet("127.0.0.1/32") is True
+
+    # Normal subnets should NOT be deprioritized
+    assert _is_deprioritized_subnet("192.168.1.0/24") is False
+    assert _is_deprioritized_subnet("10.0.0.0/24") is False
+    assert _is_deprioritized_subnet("172.16.0.0/24") is False  # Not in Docker/WSL range
 
 
 @pytest.mark.integration

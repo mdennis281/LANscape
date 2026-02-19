@@ -1,74 +1,46 @@
 """Main entry point for the LANscape application when running as a module."""
 import socket
-
-import time
 import logging
 import traceback
-import os
-from subprocess import Popen
-import webbrowser
-import requests
-
-from pwa_launcher import open_pwa, ChromiumNotFoundError
-
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
-from lanscape.core.version_manager import get_installed_version, is_update_available
-from lanscape.ui.app import start_webserver_daemon, start_webserver
+from lanscape.core.version_manager import (
+    get_installed_version, is_update_available, get_latest_version
+)
 from lanscape.ui.ws.server import run_server
+from lanscape.ui.react_proxy import start_webapp_server
+
 # do this so any logs generated on import are displayed
 args = parse_args()
-configure_logging(args.loglevel, args.logfile, args.flask_logging)
+configure_logging(args.loglevel, args.logfile)
 
 
 log = logging.getLogger('core')
-# determine if the execution is an instance of a flask reload
-# happens on file change with reloader enabled
-IS_FLASK_RELOAD = os.environ.get("WERKZEUG_RUN_MAIN")
 
 
 def main():
-    """core entry point for running lanscape as a module."""
+    """Core entry point for running lanscape as a module."""
     try:
         _main()
     except KeyboardInterrupt:
         log.info('Keyboard interrupt received, terminating...')
-        terminate()
     except Exception as e:
         log.critical(f'Unexpected error: {e}')
         log.debug(traceback.format_exc())
-        terminate()
 
 
 def _main():
-    if not IS_FLASK_RELOAD:
-        log.info(f'LANscape v{get_installed_version()}')
-        try_check_update()
+    log.info(f'LANscape v{get_installed_version()}')
+    try_check_update()
 
-    else:
-        log.info('Flask reloaded app.')
-
-    # Check if WebSocket server mode is requested
+    # Check if WebSocket server only mode is requested
     if args.ws_server:
         start_websocket_server()
         return
 
-    if was_port_explicit():
-        # Explicit port specified - validate it's available or error
-        validate_port_available(args.port, '--port')
-    else:
-        # No explicit port - auto-find an available one
-        args.port = get_valid_port(args.port)
-
-    try:
-        start_webserver_ui()
-        log.info('Exiting...')
-    except Exception as e:
-        # showing error in debug only because this is handled gracefully
-        log.critical(f'Failed to start app. Error: {e}')
-        log.debug('Failed to start. Traceback below')
-        log.debug(traceback.format_exc())
+    # Default: Start webapp mode (React UI + WebSocket backend)
+    start_webapp_mode()
 
 
 def try_check_update():
@@ -77,22 +49,20 @@ def try_check_update():
         if is_update_available():
             log.info('An update is available!')
             log.info(
-                'Run "pip install --upgrade lanscape --no-cache" to suppress this message.')
+                f'Run "pip install lanscape=={get_latest_version()}" to suppress this message.')
     except BaseException:
         log.debug(traceback.format_exc())
         log.warning('Unable to check for updates.')
 
 
 def start_websocket_server():
-    """Start the WebSocket server."""
+    """Start the WebSocket server only."""
     if was_ws_port_explicit():
-        # Explicit port specified - validate it's available or error
         validate_port_available(args.ws_port, '--ws-port')
     else:
-        # No explicit port - auto-find an available one
         args.ws_port = get_valid_port(args.ws_port)
+
     log.info(f'Starting WebSocket server on port {args.ws_port}')
-    log.info(f'React UI should connect to ws://localhost:{args.ws_port}')
 
     try:
         run_server(host='0.0.0.0', port=args.ws_port)
@@ -104,54 +74,34 @@ def start_websocket_server():
         raise
 
 
-def open_browser(url: str, wait=2) -> Popen | None:
-    """
-    Open a browser window to the specified
-    url after waiting for the server to start
-    """
-    try:
-        time.sleep(wait)
-        log.info(f'Starting UI - http://127.0.0.1:{args.port}')
-        return open_pwa(url, auto_profile=False)
-
-    except ChromiumNotFoundError:
-        success = webbrowser.open(url)
-        if success:
-            log.warning("Chromium browser not found. Falling back to default web browser.")
-        else:
-            log.warning(f"Cannot find any web browser. LANScape UI running on {url}")
-    except BaseException:
-        log.debug(traceback.format_exc())
-        log.info(f'Unable to open web browser, server running on {url}')
-    return None
-
-
-def start_webserver_ui():
-    """Start the web server and open the UI in a browser."""
-    uri = f'http://127.0.0.1:{args.port}'
-
-    # running reloader requires flask to run in main thread
-    # this decouples UI from main process
-    if args.reloader:
-        # determine if it was reloaded by flask debug reloader
-        # if it was, dont open the browser again
-        log.info('Opening UI as daemon')
-        if not IS_FLASK_RELOAD:
-            open_browser(uri)
-        start_webserver(args)
+def start_webapp_mode():
+    """Start the React webapp with WebSocket backend (default mode)."""
+    if was_port_explicit():
+        validate_port_available(args.port, '--port')
     else:
-        flask_thread = start_webserver_daemon(args)
-        proc = open_browser(uri)
-        if proc:
-            app_closed = proc.wait()
-        else:
-            app_closed = False
+        args.port = get_valid_port(args.port)
 
-        if not app_closed or args.persistent:
-            # not doing a direct join so i can still
-            # terminate the app with ctrl+c
-            while flask_thread.is_alive():
-                time.sleep(1)
+    if was_ws_port_explicit():
+        validate_port_available(args.ws_port, '--ws-port')
+    else:
+        args.ws_port = get_valid_port(args.ws_port)
+
+    log.info('Starting React webapp mode')
+    log.info(f'Reserving ports: {args.port} - UI | {args.ws_port} - WS')
+
+    try:
+        start_webapp_server(
+            http_port=args.port,
+            ws_port=args.ws_port,
+            open_browser=True,
+            persistent=args.persistent
+        )
+    except KeyboardInterrupt:
+        log.info('Webapp stopped by user')
+    except Exception as e:
+        log.critical(f'Webapp failed: {e}')
+        log.debug(traceback.format_exc())
+        raise
 
 
 def is_port_available(port: int) -> bool:
@@ -175,7 +125,6 @@ def validate_port_available(port: int, flag_name: str) -> None:
 def get_valid_port(port: int) -> int:
     """
     Get the first available port starting from the specified port.
-    Used when no explicit port is specified.
 
     Args:
         port: Starting port number to check
@@ -195,16 +144,6 @@ def get_valid_port(port: int) -> int:
     raise RuntimeError(
         f"No available port found between {start_port} and {max_port}"
     )
-
-
-def terminate():
-    """Send a request to shutdown flask if it's running."""
-    try:
-        log.info('Attempting flask shutdown')
-        requests.get(f'http://127.0.0.1:{args.port}/shutdown?type=core', timeout=2)
-    except requests.exceptions.RequestException:
-        # Flask server not running or already shut down - that's fine
-        pass
 
 
 if __name__ == "__main__":

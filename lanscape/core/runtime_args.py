@@ -9,11 +9,9 @@ from typing import Any, Dict, Optional
 @dataclass
 class RuntimeArgs:
     """Class representing runtime arguments for the application."""
-    reloader: bool = False
     port: int = 5001
     logfile: Optional[str] = None
     loglevel: str = 'INFO'
-    flask_logging: bool = False
     persistent: bool = False
     ws_server: bool = False
     ws_port: int = 8766
@@ -35,21 +33,17 @@ def parse_args() -> RuntimeArgs:
     """
     parser = argparse.ArgumentParser(description='LANscape')
 
-    parser.add_argument('--reloader', action='store_true',
-                        help='Use flask\'s reloader (helpful for local development)')
     parser.add_argument('--port', type=int, default=5001,
-                        help='Port to run the webserver on')
+                        help='Port to run the server on')
     parser.add_argument('--logfile', type=str, default=None,
                         help='Log output to the specified file path')
     parser.add_argument('--loglevel', default='INFO', help='Set the log level')
-    parser.add_argument('--flask-logging', action='store_true',
-                        help='Enable flask logging (disables click output)')
     parser.add_argument('--persistent', action='store_true',
-                        help='Don\'t exit after browser is closed')
+                        help='Don\'t auto-shutdown when browser closes')
     parser.add_argument('--debug', action='store_true',
-                        help='Shorthand debug mode (equivalent to "--loglevel DEBUG --reloader")')
+                        help='Shorthand debug mode (equivalent to "--loglevel DEBUG")')
     parser.add_argument('--ws-server', action='store_true',
-                        help='Start WebSocket server instead of Flask UI')
+                        help='Start WebSocket server only (no UI)')
     parser.add_argument('--ws-port', type=int, default=8766,
                         help='Port for WebSocket server (default: 8766)')
 
@@ -65,7 +59,6 @@ def parse_args() -> RuntimeArgs:
 
     if args.debug:
         args_dict['loglevel'] = 'DEBUG'
-        args_dict['reloader'] = True
 
     # Only pass arguments that exist in the Args dataclass
     filtered_args = {name: args_dict[name]

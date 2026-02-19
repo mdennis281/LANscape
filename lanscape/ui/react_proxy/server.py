@@ -162,13 +162,8 @@ class WebappServerController:
         if client_count > 0:
             self._had_connection = True
         elif self._had_connection and not self.persistent:
-            time.sleep(5)  # Brief delay to allow for quick reconnects
-            if self._client_count == 0:  # Check again after delay
-                # Had connections before, now zero - time to shutdown
-                log.info('All clients disconnected, shutting down...')
-                self._shutdown_event.set()
-            else:
-                log.debug('New client connected during shutdown delay, aborting shutdown')
+            threading.Thread(target=self._delayed_shutdown_check, daemon=True).start()
+
 
     def start(
         self,
@@ -259,6 +254,16 @@ class WebappServerController:
                 log.warning(err)
         else:
             log.info('LANscape closed gracefully')
+            
+    def _delayed_shutdown_check(self) -> None:
+        """Check if clients reconnected during the shutdown delay."""
+        time.sleep(2)  # Brief delay to allow for quick reconnects
+        if self._client_count == 0:  # Check again after delay
+            # Had connections before, now zero - time to shutdown
+            log.info('All clients disconnected, shutting down...')
+            self._shutdown_event.set()
+        else:
+            log.debug('New client connected during shutdown delay, aborting shutdown')
 
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments

@@ -78,7 +78,7 @@ jobs:
             for (let attempt = 0; attempt < 20; attempt++) {
               const { data: runs } = await github.rest.actions.listWorkflowRuns({
                 owner, repo,
-                workflow_id: 'build.yml',
+                workflow_id: 'webapp-build.yml',
                 event: 'repository_dispatch',
                 per_page: 5,
               });

@@ -123,6 +123,7 @@ class WebappServerController:
         self._shutdown_event = threading.Event()
         self._had_connection = False
         self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._client_count: int = 0
 
     def _run_ws_server(self, on_client_change: Callable[[int], None]) -> None:
         """
@@ -156,12 +157,18 @@ class WebappServerController:
         """
         log.debug(f'WebSocket clients: {client_count}')
 
+        self._client_count = client_count
+
         if client_count > 0:
             self._had_connection = True
         elif self._had_connection and not self.persistent:
-            # Had connections before, now zero - time to shutdown
-            log.info('All clients disconnected, shutting down...')
-            self._shutdown_event.set()
+            time.sleep(2)  # Brief delay to allow for quick reconnects
+            if self._client_count == 0:  # Check again after delay
+                # Had connections before, now zero - time to shutdown
+                log.info('All clients disconnected, shutting down...')
+                self._shutdown_event.set()
+            else:
+                log.debug('New client connected during shutdown delay, aborting shutdown')
 
     def start(
         self,
@@ -197,7 +204,7 @@ class WebappServerController:
                 daemon=True
             ).start()
 
-        log.info(f'Webapp available at {url}')
+        log.debug(f'Webapp available at {url}')
         if self.persistent:
             log.info('Running in persistent mode. Press Ctrl+C to stop.')
         else:
@@ -284,7 +291,7 @@ def start_webapp_server(
             'Please reinstall the package or check your installation.'
         )
 
-    log.info(f'UI: Bundled build at {webapp_dir}')
+    log.debug(f'UI: Bundled build at {webapp_dir}')
 
     # Create and start the controller
     controller = WebappServerController(

@@ -101,11 +101,11 @@ def is_port_available(port: int) -> bool:
     except OSError:
         pass
 
-    # Then check if we can bind to 0.0.0.0 (what the server uses)
+    # Then check if we can bind to the loopback interface
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(('0.0.0.0', port))
+            sock.bind(('127.0.0.1', port))
             return True
     except OSError:
         return False

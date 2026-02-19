@@ -39,6 +39,10 @@ on:
         type: string
         default: "main"
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build-ui:
     runs-on: ubuntu-latest

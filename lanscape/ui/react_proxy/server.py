@@ -162,7 +162,7 @@ class WebappServerController:
         if client_count > 0:
             self._had_connection = True
         elif self._had_connection and not self.persistent:
-            time.sleep(2)  # Brief delay to allow for quick reconnects
+            time.sleep(5)  # Brief delay to allow for quick reconnects
             if self._client_count == 0:  # Check again after delay
                 # Had connections before, now zero - time to shutdown
                 log.info('All clients disconnected, shutting down...')

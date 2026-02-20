@@ -4,6 +4,13 @@ LANscape includes a built-in WebSocket server that exposes all scanning, port ma
 
 ## Quick Start
 
+From module:
+```sh
+# start lanscape module without a UI
+python -m lanscape --ws-server
+```
+
+From the code:
 ```python
 from lanscape.ui.ws import WebSocketServer, run_server
 

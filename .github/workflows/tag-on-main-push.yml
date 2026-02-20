@@ -50,21 +50,21 @@ jobs:
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-  publish:
-    needs: [tag, create-release]
-    if: ${{ needs.tag.outputs.version != '' }}
-    uses: ./.github/workflows/pypi-publish.yml
-    with:
-      branch: ${{ github.ref_name }}
-      version: ${{ needs.tag.outputs.version }}
-    secrets: inherit
-
   trigger-ui-build:
-    needs: [tag, publish]
-    if: ${{ needs.tag.outputs.version != '' && needs.publish.result == 'success' }}
+    needs: [tag, create-release]
+    if: ${{ always() && needs.tag.outputs.version != '' }}
     uses: ./.github/workflows/trigger-ui-build.yml
     with:
       version: ${{ needs.tag.outputs.version }}
       is_prerelease: "false"
     secrets:
       UI_BUILD_PAT: ${{ secrets.UI_BUILD_PAT }}
+
+  publish:
+    needs: [tag, create-release, trigger-ui-build]
+    if: ${{ always() && needs.tag.outputs.version != '' && needs.trigger-ui-build.result == 'success' }}
+    uses: ./.github/workflows/pypi-publish.yml
+    with:
+      branch: ${{ github.ref_name }}
+      version: ${{ needs.tag.outputs.version }}
+    secrets: inherit

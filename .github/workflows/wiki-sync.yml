@@ -1,0 +1,146 @@
+name: Sync Docs to Wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/library/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout wiki
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Flatten docs into wiki
+        run: |
+          # Clean existing wiki content (preserve _Sidebar, _Footer, Home if they exist)
+          cd wiki
+          find . -maxdepth 1 -name '*.md' ! -name '_Sidebar.md' ! -name '_Footer.md' ! -name 'Home.md' -delete
+          cd ..
+
+          DOCS="docs/library"
+
+          # Map: source path -> wiki page name (flat, no subfolders)
+          declare -A FILE_MAP
+
+          # Root-level docs
+          FILE_MAP["$DOCS/overview.md"]="Library-Overview"
+          FILE_MAP["$DOCS/net-tools.md"]="net_tools"
+          FILE_MAP["$DOCS/port-manager.md"]="PortManager"
+
+          # Scanner
+          FILE_MAP["$DOCS/scanner/scan-manager.md"]="ScanManager"
+          FILE_MAP["$DOCS/scanner/subnet-scanner.md"]="SubnetScanner"
+          FILE_MAP["$DOCS/scanner/scanner-results.md"]="ScannerResults"
+
+          # Config
+          FILE_MAP["$DOCS/config/scan-config.md"]="ScanConfig"
+          FILE_MAP["$DOCS/config/sub-configs.md"]="Sub-Configs"
+          FILE_MAP["$DOCS/config/enums.md"]="Enums"
+
+          # Models
+          FILE_MAP["$DOCS/models/overview.md"]="Models"
+
+          # Build reverse map: relative link target -> wiki page name
+          # This handles all the cross-references between docs
+          declare -A LINK_MAP
+          LINK_MAP["scanner/scan-manager.md"]="ScanManager"
+          LINK_MAP["scanner/subnet-scanner.md"]="SubnetScanner"
+          LINK_MAP["scanner/scanner-results.md"]="ScannerResults"
+          LINK_MAP["config/scan-config.md"]="ScanConfig"
+          LINK_MAP["config/sub-configs.md"]="Sub-Configs"
+          LINK_MAP["config/enums.md"]="Enums"
+          LINK_MAP["models/overview.md"]="Models"
+          LINK_MAP["port-manager.md"]="PortManager"
+          LINK_MAP["net-tools.md"]="net_tools"
+          LINK_MAP["overview.md"]="Library-Overview"
+
+          # Also handle relative links from subdirectories (../ prefixed)
+          LINK_MAP["../config/scan-config.md"]="ScanConfig"
+          LINK_MAP["../config/sub-configs.md"]="Sub-Configs"
+          LINK_MAP["../config/enums.md"]="Enums"
+          LINK_MAP["../models/overview.md"]="Models"
+          LINK_MAP["../scanner/scan-manager.md"]="ScanManager"
+          LINK_MAP["../scanner/subnet-scanner.md"]="SubnetScanner"
+          LINK_MAP["../scanner/scanner-results.md"]="ScannerResults"
+          LINK_MAP["../port-manager.md"]="PortManager"
+          LINK_MAP["../net-tools.md"]="net_tools"
+
+          # Same-directory links (no path prefix)
+          LINK_MAP["scan-manager.md"]="ScanManager"
+          LINK_MAP["subnet-scanner.md"]="SubnetScanner"
+          LINK_MAP["scanner-results.md"]="ScannerResults"
+          LINK_MAP["scan-config.md"]="ScanConfig"
+          LINK_MAP["sub-configs.md"]="Sub-Configs"
+          LINK_MAP["enums.md"]="Enums"
+
+          # Copy and rewrite each file
+          for src in "${!FILE_MAP[@]}"; do
+            dest="wiki/${FILE_MAP[$src]}.md"
+            cp "$src" "$dest"
+
+            # Rewrite markdown links: [text](old-path.md) -> [text](Wiki-Page)
+            # and [text](old-path.md#anchor) -> [text](Wiki-Page#anchor)
+            for link_target in "${!LINK_MAP[@]}"; do
+              wiki_page="${LINK_MAP[$link_target]}"
+              # Escape dots and slashes for sed
+              escaped_target=$(echo "$link_target" | sed 's/[.\/]/\\&/g')
+              # Replace links with anchors: (path.md#anchor) -> (Wiki-Page#anchor)
+              sed -i "s|]($escaped_target#|]($wiki_page#|g" "$dest"
+              # Replace links without anchors: (path.md) -> (Wiki-Page)
+              sed -i "s|]($escaped_target)|]($wiki_page)|g" "$dest"
+            done
+          done
+
+          echo "Wiki pages generated:"
+          ls -1 wiki/*.md
+
+      - name: Generate sidebar
+        run: |
+          cat > wiki/_Sidebar.md << 'EOF'
+          ### 📖 Library Documentation
+
+          **[Overview](Library-Overview)**
+
+          **Scanning**
+          - [ScanManager](ScanManager)
+          - [SubnetScanner](SubnetScanner)
+          - [ScannerResults](ScannerResults)
+
+          **Configuration**
+          - [ScanConfig](ScanConfig)
+          - [Sub-Configs](Sub-Configs)
+          - [Enums](Enums)
+
+          **Reference**
+          - [Models](Models)
+          - [PortManager](PortManager)
+          - [net_tools](net_tools)
+          EOF
+
+      - name: Push to wiki
+        run: |
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No wiki changes to push"
+          else
+            git commit -m "Sync library docs from main @ $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+            echo "Wiki updated successfully"
+          fi

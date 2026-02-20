@@ -40,6 +40,7 @@ jobs:
           FILE_MAP["$DOCS/overview.md"]="Library-Overview"
           FILE_MAP["$DOCS/net-tools.md"]="net_tools"
           FILE_MAP["$DOCS/port-manager.md"]="PortManager"
+          FILE_MAP["$DOCS/websocket-server.md"]="WebSocket-Server"
 
           # Scanner
           FILE_MAP["$DOCS/scanner/scan-manager.md"]="ScanManager"
@@ -67,6 +68,7 @@ jobs:
           LINK_MAP["port-manager.md"]="PortManager"
           LINK_MAP["net-tools.md"]="net_tools"
           LINK_MAP["overview.md"]="Library-Overview"
+          LINK_MAP["websocket-server.md"]="WebSocket-Server"
 
           # Also handle relative links from subdirectories (../ prefixed)
           LINK_MAP["../config/scan-config.md"]="ScanConfig"
@@ -78,6 +80,7 @@ jobs:
           LINK_MAP["../scanner/scanner-results.md"]="ScannerResults"
           LINK_MAP["../port-manager.md"]="PortManager"
           LINK_MAP["../net-tools.md"]="net_tools"
+          LINK_MAP["../websocket-server.md"]="WebSocket-Server"
 
           # Same-directory links (no path prefix)
           LINK_MAP["scan-manager.md"]="ScanManager"
@@ -108,6 +111,51 @@ jobs:
           echo "Wiki pages generated:"
           ls -1 wiki/*.md
 
+      - name: Generate home page
+        run: |
+          cat > wiki/Home.md << 'EOF'
+          # LANscape Wiki
+
+          LANscape is a Python library for scanning your local network — discovering devices, testing ports, and identifying services.
+
+          ```bash
+          pip install lanscape
+          ```
+
+          ```python
+          from lanscape import ScanManager, ScanConfig, net_tools
+
+          sm = ScanManager()
+          subnet = net_tools.smart_select_primary_subnet()
+
+          config = ScanConfig(subnet=subnet, port_list="medium")
+          scan = sm.new_scan(config)
+          sm.wait_until_complete(scan.uid)
+
+          for device in scan.results.to_results().devices:
+              print(f"{device.ip} - {device.hostname} - Ports: {device.ports}")
+          ```
+
+          ## 📖 Documentation
+
+          | Topic | Description |
+          |-------|-------------|
+          | **[Library Overview](Library-Overview)** | Full guide — architecture, presets, and examples |
+          | **[ScanManager](ScanManager)** | Create, track, and terminate scans |
+          | **[SubnetScanner](SubnetScanner)** | The scan engine under the hood |
+          | **[ScannerResults](ScannerResults)** | Export results as structured data or summaries |
+          | **[ScanConfig](ScanConfig)** | Configure subnets, ports, threads, and strategies |
+          | **[Sub-Configs](Sub-Configs)** | Fine-tune Ping, ARP, Poke, Port, and Service scanning |
+          | **[Enums](Enums)** | `ScanType`, `ServiceScanStrategy`, and other enumerations |
+          | **[Models](Models)** | Pydantic models — `DeviceResult`, `ScanResults`, etc. |
+          | **[PortManager](PortManager)** | CRUD operations for port lists |
+          | **[net_tools](net_tools)** | Subnet detection, ARP support, and network helpers |
+          | **[WebSocket Server](WebSocket-Server)** | Real-time WebSocket API — protocol, actions, events |
+
+          ---
+          *Auto-synced from [`docs/library`](https://github.com/mdennis281/LANscape/tree/main/docs/library)*
+          EOF
+
       - name: Generate sidebar
         run: |
           cat > wiki/_Sidebar.md << 'EOF'
@@ -129,6 +177,7 @@ jobs:
           - [Models](Models)
           - [PortManager](PortManager)
           - [net_tools](net_tools)
+          - [WebSocket Server](WebSocket-Server)
           EOF
 
       - name: Push to wiki

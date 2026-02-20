@@ -2,6 +2,7 @@
 
 import ipaddress
 import logging
+import platform
 import re
 import socket
 import struct
@@ -188,14 +189,80 @@ class Device(BaseModel):
         return self.macs
 
     @job_tracker
-    def _get_hostname(self):
-        """Get the hostname of a network device given its IP address."""
+    def _get_hostname(self) -> Optional[str]:
+        """Get the hostname of a network device given its IP address.
+
+        Tries multiple resolution methods:
+        1. Reverse DNS (socket.gethostbyaddr) — works everywhere when PTR records exist
+        2. mDNS via avahi-resolve (Linux/macOS) — resolves .local hostnames
+        3. NetBIOS via nmblookup (Linux) — resolves Windows-style hostnames
+        """
+        # 1. Standard reverse DNS lookup
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
-            return hostname
-        except socket.herror as e:
-            self.caught_errors.append(DeviceError(e))
+            if hostname:
+                return hostname
+        except socket.herror:
+            pass
+
+        # On Windows, gethostbyaddr already chains through NetBIOS/LLMNR/mDNS
+        if platform.system() == 'Windows':
             return None
+
+        # 2. mDNS via avahi-resolve (common on Linux)
+        hostname = self._resolve_mdns()
+        if hostname:
+            return hostname
+
+        # 3. NetBIOS via nmblookup (resolves Windows device names from Linux)
+        hostname = self._resolve_netbios()
+        if hostname:
+            return hostname
+
+        return None
+
+    def _resolve_mdns(self) -> Optional[str]:
+        """Attempt mDNS hostname resolution via avahi-resolve-address."""
+        try:
+            result = subprocess.run(
+                ['avahi-resolve-address', self.ip],
+                capture_output=True, text=True, timeout=3, check=False
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # Output format: "192.168.1.5\tdevice.local"
+                parts = result.stdout.strip().split('\t')
+                if len(parts) >= 2 and parts[1]:
+                    return parts[1].rstrip('.')
+        except FileNotFoundError:
+            pass  # avahi-resolve not installed
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            pass
+        return None
+
+    def _resolve_netbios(self) -> Optional[str]:
+        """Attempt NetBIOS hostname resolution via nmblookup."""
+        try:
+            result = subprocess.run(
+                ['nmblookup', '-A', self.ip],
+                capture_output=True, text=True, timeout=3, check=False
+            )
+            if result.returncode == 0 and result.stdout:
+                # Look for the <00> unique name entry (machine name)
+                for line in result.stdout.splitlines():
+                    line = line.strip()
+                    if '<00>' in line and 'UNIQUE' in line.upper():
+                        name = line.split()[0].strip()
+                        if name and name != '*':
+                            return name
+        except FileNotFoundError:
+            pass  # nmblookup (samba-common) not installed
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            pass
+        return None
 
     @job_tracker
     def _get_manufacturer(self, mac_addr=None):

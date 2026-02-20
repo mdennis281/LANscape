@@ -164,7 +164,6 @@ class WebappServerController:
         elif self._had_connection and not self.persistent:
             threading.Thread(target=self._delayed_shutdown_check, daemon=True).start()
 
-
     def start(
         self,
         webapp_dir: Path,

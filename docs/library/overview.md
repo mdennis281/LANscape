@@ -45,6 +45,7 @@ for device in results.devices:
 | [`PortManager`](port-manager.md) | CRUD operations for port lists |
 | [Models](models/overview.md) | Pydantic models for devices and scan results |
 | [`net_tools`](net-tools.md) | Network utility functions (subnet detection, ARP support check) |
+| [WebSocket Server](websocket-server.md) | Real-time WebSocket API — protocol, actions, events, and delta updates |
 
 ## Architecture Overview
 

@@ -1,0 +1,108 @@
+# LANscape Library Documentation
+
+LANscape is a Python library for scanning your local network — discovering devices, testing ports, and identifying services.
+
+## Installation
+
+```bash
+pip install lanscape
+```
+
+## Quick Start
+
+```python
+from lanscape import ScanManager, ScanConfig, net_tools
+
+# Create a scan manager (singleton)
+sm = ScanManager()
+
+# Auto-detect your primary subnet
+subnet = net_tools.smart_select_primary_subnet()
+
+# Configure and run a scan
+config = ScanConfig(subnet=subnet, port_list="medium")
+scan = sm.new_scan(config)
+
+# Wait for completion
+sm.wait_until_complete(scan.uid)
+
+# Get results
+results = scan.results.to_results()
+for device in results.devices:
+    print(f"{device.ip} - {device.hostname} - Ports: {device.ports}")
+```
+
+## Module Map
+
+| Module | Description |
+|--------|-------------|
+| [`ScanManager`](scanner/scan-manager.md) | Singleton that creates, tracks, and terminates scans |
+| [`SubnetScanner`](scanner/subnet-scanner.md) | The scan engine — runs device discovery and port scanning |
+| [`ScannerResults`](scanner/scanner-results.md) | Result container with export helpers (`to_results()`, `to_summary()`, etc.) |
+| [`ScanConfig`](config/scan-config.md) | Main scan configuration (subnet, ports, threads, sub-configs) |
+| [Sub-Configs](config/sub-configs.md) | `PingConfig`, `ArpConfig`, `PokeConfig`, `ArpCacheConfig`, `PortScanConfig`, `ServiceScanConfig` |
+| [`ScanType` / `ServiceScanStrategy`](config/enums.md) | Enumerations for scan modes and service detection strategies |
+| [`PortManager`](port-manager.md) | CRUD operations for port lists |
+| [Models](models/overview.md) | Pydantic models for devices and scan results |
+| [`net_tools`](net-tools.md) | Network utility functions (subnet detection, ARP support check) |
+
+## Architecture Overview
+
+```
+ScanManager (singleton)
+  └─ SubnetScanner (one per scan)
+       ├─ Device Discovery  — find alive hosts via ICMP / ARP / Poke
+       ├─ Port Scanning     — test configured ports on each alive device
+       ├─ Service Detection  — identify what's running on open ports
+       └─ ScannerResults
+            ├─ to_results()   → ScanResults  (full device list + metadata)
+            ├─ to_summary()   → ScanSummary  (ports & services found)
+            └─ get_metadata() → ScanMetadata (progress & status)
+```
+
+## Default Presets
+
+LANscape ships with three built-in presets available via `DEFAULT_CONFIGS`:
+
+| Preset | Port List | Scan Strategy | Thread Profile | Notes |
+|--------|-----------|---------------|----------------|-------|
+| `balanced` | `medium` | `ICMP_THEN_ARP` | CPU defaults | Good all-around choice |
+| `accurate` | `large` | `ICMP_THEN_ARP` + `ARP_LOOKUP` | Conservative (5/64/64) | Slower but thorough |
+| `fast` | `small` | `POKE_THEN_ARP` | Aggressive (20/256/512) | Quick overview |
+
+```python
+from lanscape.core.scan_config import DEFAULT_CONFIGS
+
+config = DEFAULT_CONFIGS['fast']
+config.subnet = "192.168.1.0/24"
+```
+
+## Full Example
+
+```python
+from lanscape import ScanManager, ScanConfig, ScanType, PokeConfig, net_tools
+
+sm = ScanManager()
+
+config = ScanConfig(
+    subnet=net_tools.smart_select_primary_subnet(),
+    port_list="medium",
+    lookup_type=[ScanType.POKE_THEN_ARP],
+    poke_config=PokeConfig(timeout=0.25, attempts=4),
+)
+
+try:
+    scan = sm.new_scan(config)
+    scan.debug_active_scan()  # Live progress in terminal
+except KeyboardInterrupt:
+    scan.terminate()
+
+# Export results
+results = scan.results.to_results()
+for device in results.devices:
+    services = ", ".join(device.services.keys()) or "none"
+    print(f"{device.ip:16s} {device.hostname or '':20s} ports={device.ports}  services={services}")
+
+# JSON export
+print(results.model_dump_json(indent=2))
+```

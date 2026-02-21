@@ -23,7 +23,6 @@ from zeroconf import (
     Zeroconf,
 )
 
-from lanscape.core.net_tools import get_ip_address, get_primary_interface
 from lanscape.core.version_manager import get_installed_version
 
 log = logging.getLogger('Discovery')
@@ -31,37 +30,18 @@ log = logging.getLogger('Discovery')
 SERVICE_TYPE = '_lanscape._tcp.local.'
 
 
-def _get_lan_interfaces() -> list[str]:
-    """
-    Return the primary LAN IPv4 address to bind mDNS to.
-
-    Delegates to :func:`net_tools.get_primary_interface` /
-    :func:`net_tools.get_ip_address` so the same interface-selection
-    heuristics used for network scanning are reused here.
-
-    Returns an empty list as a fallback so the caller can let Zeroconf
-    use its own defaults.
-    """
-    try:
-        iface = get_primary_interface()
-        if iface:
-            ip = get_ip_address(iface)
-            if ip:
-                log.debug('mDNS using primary interface %s (%s)', iface, ip)
-                return [ip]
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
-    return []
-
-
 def _best_lan_address(addresses: list[str]) -> str | None:
     """
     Pick the most suitable address from a list returned by
     ``ServiceInfo.parsed_addresses()``.
 
-    Prefers a private LAN IPv4 address (10/172.16-31/192.168) that is not
-    loopback or link-local, then any non-loopback IPv4, then first as a
-    last resort.
+    mDNS records can contain addresses from every interface on the host
+    (LAN, VPN, Docker bridges, Hyper-V adapters, etc.).  This function
+    picks the most useful one for a LAN app:
+
+    1. Private IPv4 (10/172.16-31/192.168), not loopback, not link-local
+    2. Any non-loopback IPv4
+    3. First address as a last resort
     """
     for addr in addresses:
         try:
@@ -125,13 +105,12 @@ class DiscoveryService:
 
     def start(self) -> None:
         """Register this instance and start browsing for others."""
-        lan_ifaces = _get_lan_interfaces()
-        if lan_ifaces:
-            log.debug('mDNS binding to LAN interfaces: %s', lan_ifaces)
-            self._zeroconf = Zeroconf(interfaces=lan_ifaces)
-        else:
-            log.debug('mDNS binding to default interfaces (no LAN IFs detected)')
-            self._zeroconf = Zeroconf()
+        # Bind to all interfaces — this is standard mDNS behaviour (RFC 6762).
+        # Restricting to one interface breaks discovery when the OS picks the
+        # wrong primary interface (VPN up, multiple NICs, etc.).
+        # Address selection is handled in _best_lan_address(); unreachable
+        # entries are filtered by the frontend's WebSocket probe.
+        self._zeroconf = Zeroconf()
 
         # Advertise ourselves
         self._register_service()

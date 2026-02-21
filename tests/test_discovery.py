@@ -9,7 +9,81 @@ from lanscape.ui.react_proxy.discovery import (
     DiscoveredInstance,
     DiscoveryService,
     SERVICE_TYPE,
+    _get_local_addresses,
 )
+
+
+class TestGetLocalAddresses:
+    """Tests for the _get_local_addresses helper."""
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_returns_private_ipv4(self, mock_psutil):
+        """Test that private LAN IPv4 addresses are collected."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock()
+        mock_addr.family = socket.AF_INET
+        mock_addr.address = '192.168.1.100'
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        result = _get_local_addresses()
+        assert socket.inet_aton('192.168.1.100') in result
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_loopback(self, mock_psutil):
+        """Test that loopback addresses are excluded."""
+        mock_psutil.net_if_stats.return_value = {
+            'lo': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock()
+        mock_addr.family = socket.AF_INET
+        mock_addr.address = '127.0.0.1'
+        mock_psutil.net_if_addrs.return_value = {'lo': [mock_addr]}
+
+        result = _get_local_addresses()
+        assert result == []
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_virtual_interfaces(self, mock_psutil):
+        """Test that virtual adapter interfaces are excluded."""
+        mock_psutil.net_if_stats.return_value = {
+            'VMnet8': MagicMock(isup=True),
+            'docker0': MagicMock(isup=True),
+        }
+        mock_vm_addr = MagicMock(family=socket.AF_INET, address='172.16.0.1')
+        mock_dk_addr = MagicMock(family=socket.AF_INET, address='172.17.0.1')
+        mock_psutil.net_if_addrs.return_value = {
+            'VMnet8': [mock_vm_addr],
+            'docker0': [mock_dk_addr],
+        }
+
+        result = _get_local_addresses()
+        assert result == []
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_down_interfaces(self, mock_psutil):
+        """Test that down interfaces are excluded."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=False),
+        }
+        mock_addr = MagicMock(family=socket.AF_INET, address='192.168.1.50')
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        result = _get_local_addresses()
+        assert result == []
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_link_local(self, mock_psutil):
+        """Test that link-local addresses are excluded."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(family=socket.AF_INET, address='169.254.1.1')
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        result = _get_local_addresses()
+        assert result == []
 
 
 class TestDiscoveredInstance:
@@ -112,13 +186,15 @@ class TestDiscoveryServiceGetInstances:
 class TestDiscoveryServiceLifecycle:
     """Tests for start / stop lifecycle with mocked zeroconf."""
 
+    @patch('lanscape.ui.react_proxy.discovery._get_local_addresses')
     @patch('lanscape.ui.react_proxy.discovery.ServiceBrowser')
     @patch('lanscape.ui.react_proxy.discovery.Zeroconf')
     @patch('lanscape.ui.react_proxy.discovery.get_installed_version', return_value='1.0.0')
     def test_start_registers_and_browses(
-        self, _mock_version, mock_zc_cls, mock_browser_cls
+        self, _mock_version, mock_zc_cls, mock_browser_cls, mock_addrs
     ):
         """Test that start() registers the service and creates a browser."""
+        mock_addrs.return_value = [socket.inet_aton('192.168.1.10')]
         mock_zc = mock_zc_cls.return_value
 
         svc = DiscoveryService(ws_port=8766, http_port=5001, service_name='Test')
@@ -127,17 +203,38 @@ class TestDiscoveryServiceLifecycle:
         mock_zc.register_service.assert_called_once()
         registered_info = mock_zc.register_service.call_args[0][0]
         assert SERVICE_TYPE in registered_info.type
+        # Verify addresses are passed to ServiceInfo
+        assert registered_info.addresses is not None
+        assert socket.inet_aton('192.168.1.10') in registered_info.addresses
 
         mock_browser_cls.assert_called_once()
         assert mock_browser_cls.call_args[0][1] == SERVICE_TYPE
 
+    @patch('lanscape.ui.react_proxy.discovery._get_local_addresses')
+    @patch('lanscape.ui.react_proxy.discovery.ServiceBrowser')
+    @patch('lanscape.ui.react_proxy.discovery.Zeroconf')
+    @patch('lanscape.ui.react_proxy.discovery.get_installed_version', return_value='1.0.0')
+    def test_start_registers_and_browses_no_addrs(
+        self, _mock_version, mock_zc_cls, _mock_browser_cls, mock_addrs
+    ):
+        """Test that start() still registers even with no local addresses."""
+        mock_addrs.return_value = []
+        mock_zc = mock_zc_cls.return_value
+
+        svc = DiscoveryService(ws_port=8766, http_port=5001, service_name='Test')
+        svc.start()
+
+        mock_zc.register_service.assert_called_once()
+
+    @patch('lanscape.ui.react_proxy.discovery._get_local_addresses')
     @patch('lanscape.ui.react_proxy.discovery.ServiceBrowser')
     @patch('lanscape.ui.react_proxy.discovery.Zeroconf')
     @patch('lanscape.ui.react_proxy.discovery.get_installed_version', return_value='1.0.0')
     def test_stop_unregisters_and_closes(
-        self, _mock_version, mock_zc_cls, _mock_browser_cls
+        self, _mock_version, mock_zc_cls, _mock_browser_cls, mock_addrs
     ):
         """Test that stop() unregisters the service and closes zeroconf."""
+        mock_addrs.return_value = [socket.inet_aton('10.0.0.1')]
         mock_zc = mock_zc_cls.return_value
 
         svc = DiscoveryService(ws_port=8766, http_port=5001, service_name='Test')

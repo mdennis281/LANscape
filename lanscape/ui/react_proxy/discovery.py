@@ -15,6 +15,7 @@ import socket
 import threading
 from typing import Optional
 
+import psutil
 from pydantic import BaseModel
 from zeroconf import (
     ServiceBrowser,
@@ -28,6 +29,39 @@ from lanscape.core.version_manager import get_installed_version
 log = logging.getLogger('Discovery')
 
 SERVICE_TYPE = '_lanscape._tcp.local.'
+
+
+def _get_local_addresses() -> list[bytes]:
+    """
+    Collect all private-LAN IPv4 addresses from up, non-virtual interfaces.
+
+    Returns the addresses as packed 4-byte ``bytes`` suitable for passing
+    to ``ServiceInfo(addresses=...)``.
+    """
+    result: list[bytes] = []
+    stats = psutil.net_if_stats()
+    virtual_names = ('loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth')
+
+    for iface, addrs in psutil.net_if_addrs().items():
+        # Skip down interfaces
+        iface_stats = stats.get(iface)
+        if not iface_stats or not iface_stats.isup:
+            continue
+        # Skip common virtual interfaces
+        if any(v in iface.lower() for v in virtual_names):
+            continue
+
+        for addr in addrs:
+            if addr.family != socket.AF_INET:
+                continue
+            try:
+                ip = ipaddress.ip_address(addr.address)
+                if ip.is_private and not ip.is_loopback and not ip.is_link_local:
+                    result.append(socket.inet_aton(str(ip)))
+            except (ValueError, OSError):
+                continue
+
+    return result
 
 
 def _best_lan_address(addresses: list[str]) -> str | None:
@@ -167,12 +201,20 @@ class DiscoveryService:
             'hostname': hostname,
         }
 
+        # Gather all private-LAN addresses so the mDNS response includes
+        # A records. Without this, remote browsers see the SRV record but
+        # can never resolve the host address.
+        local_addrs = _get_local_addresses()
+        if not local_addrs:
+            log.warning('No private LAN addresses found; mDNS may not work')
+
         self._service_info = ServiceInfo(
             SERVICE_TYPE,
             name=f'{self._service_name}.{SERVICE_TYPE}',
             port=self._ws_port,
             properties=properties,
             server=f'{hostname}.local.',
+            addresses=local_addrs or None,
         )
 
         assert self._zeroconf is not None

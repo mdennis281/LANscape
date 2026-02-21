@@ -39,7 +39,7 @@ Write-Host "    RC       : $lastRC"
 Write-Host ""
 
 if ($Version -eq "") {
-    $Version = Read-Host "Enter new version to tag (e.g. v1.2.3, v1.2.0a1, v1.2.0b2, v1.2.0rc1)"
+    $Version = Read-Host "Enter new version to tag"
 }
 
 if ($Version -eq "") {

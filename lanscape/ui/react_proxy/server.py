@@ -11,7 +11,7 @@ import os
 import threading
 import time
 import webbrowser
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from functools import partial
 from typing import Optional, Callable
@@ -100,9 +100,13 @@ class SPAHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-def start_static_server(directory: Path, port: int, host: str = '127.0.0.1') -> HTTPServer:
+def start_static_server(directory: Path, port: int, host: str = '127.0.0.1') -> ThreadingHTTPServer:
     """
     Start the static file HTTP server.
+
+    Each incoming connection is handled in its own thread so that concurrent
+    requests (assets, /api/discover, service-worker fetches) never block each
+    other.
 
     Args:
         directory: Directory containing static files to serve
@@ -110,10 +114,11 @@ def start_static_server(directory: Path, port: int, host: str = '127.0.0.1') -> 
         host: Host to bind to (default: 127.0.0.1)
 
     Returns:
-        The HTTPServer instance
+        The ThreadingHTTPServer instance
     """
     handler = partial(SPAHandler, directory=str(directory))
-    server = HTTPServer((host, port), handler)
+    server = ThreadingHTTPServer((host, port), handler)
+    server.daemon_threads = True  # Don't block shutdown on in-flight requests
     log.debug(f'Static server binding on http://{host}:{port}')
     return server
 
@@ -147,7 +152,7 @@ class WebappServerController:
         self.host = host
         self.persistent = persistent
 
-        self._http_server: Optional[HTTPServer] = None
+        self._http_server: Optional[ThreadingHTTPServer] = None
         self._ws_server: Optional[WebSocketServer] = None
         self._discovery: Optional[DiscoveryService] = None
         self._shutdown_event = threading.Event()
@@ -218,18 +223,25 @@ class WebappServerController:
         # Start HTTP server
         self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
 
-        # Start mDNS discovery (advertise + browse)
-        try:
-            self._discovery = DiscoveryService(
-                ws_port=self.ws_port,
-                http_port=self.http_port,
-            )
-            self._discovery.start()
-            # Make the discovery service accessible from the handler class
-            SPAHandler.discovery = self._discovery
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            log.warning('mDNS discovery unavailable: %s', exc)
-            self._discovery = None
+        # Start mDNS discovery in a background thread.
+        # Zeroconf() + register_service() can block on Windows (multicast socket
+        # setup, network announcements) and would delay the HTTP loop if run
+        # inline here.  The handler checks `discovery is not None` before use,
+        # so returning [] from /api/discover during the brief init window is safe.
+        def _start_discovery() -> None:
+            try:
+                discovery = DiscoveryService(
+                    ws_port=self.ws_port,
+                    http_port=self.http_port,
+                )
+                discovery.start()
+                self._discovery = discovery
+                SPAHandler.discovery = discovery
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                log.warning('mDNS discovery unavailable: %s', exc)
+                self._discovery = None
+
+        threading.Thread(target=_start_discovery, daemon=True, name='mDNS-init').start()
 
         url = f'http://{self.host}:{self.http_port}?ws-server=localhost:{self.ws_port}'
 

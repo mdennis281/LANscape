@@ -19,8 +19,10 @@ from subprocess import Popen
 
 from pwa_launcher import open_pwa, ChromiumNotFoundError
 
+import socket as _socket
+
 from lanscape.ui.ws.server import WebSocketServer
-from lanscape.ui.react_proxy.discovery import DiscoveryService
+from lanscape.ui.react_proxy.discovery import DiscoveryService, get_local_address_strings
 
 REACT_BUILD_DIR = Path(__file__).resolve().parent.parent / 'react_build'
 
@@ -241,17 +243,18 @@ class WebappServerController:
 
         threading.Thread(target=_start_discovery, daemon=True, name='mDNS-init').start()
 
-        url = f'http://{self.host}:{self.http_port}?ws-server=localhost:{self.ws_port}'
+        # Build the localhost URL for the local browser (no ws-server param;
+        # the frontend will discover the backend via mDNS or same-origin default).
+        local_url = f'http://localhost:{self.http_port}'
 
         # Open browser
         if open_browser:
             threading.Thread(
                 target=_open_browser,
-                args=(url,),
+                args=(local_url, 1.5, self.http_port),
                 daemon=True
             ).start()
 
-        log.debug(f'Webapp available at {url}')
         if self.persistent:
             log.info('Running in persistent mode. Press Ctrl+C to stop.')
         else:
@@ -373,13 +376,32 @@ def start_webapp_server(
     controller.start(webapp_dir, open_browser=open_browser)
 
 
-def _open_browser(url: str, wait: float = 1.5) -> Optional[Popen]:
+def _format_listen_urls(http_port: int) -> str:
+    """Build a multi-line string listing every reachable URL for this server."""
+    urls: list[str] = [f'http://localhost:{http_port}']
+    for addr in get_local_address_strings():
+        urls.append(f'http://{addr}:{http_port}')
+    try:
+        hostname = _socket.gethostname()
+        if hostname:
+            urls.append(f'http://{hostname.lower()}:{http_port}')
+    except OSError:
+        pass
+    return '\n'.join(f'  - {u}' for u in urls)
+
+
+def _open_browser(
+    url: str,
+    wait: float = 1.5,
+    http_port: int = 5001,
+) -> Optional[Popen]:
     """
     Open a browser window to the specified URL.
 
     Args:
         url: URL to open
         wait: Seconds to wait before opening (default: 1.5)
+        http_port: The HTTP port (used to display accessible URLs on failure)
 
     Returns:
         Popen instance if PWA was opened, None otherwise
@@ -395,8 +417,13 @@ def _open_browser(url: str, wait: float = 1.5) -> Optional[Popen]:
         if success:
             log.warning('Chromium not found, using default browser')
         else:
-            log.warning(f'Could not open browser. Webapp running at {url}')
+            listen_urls = _format_listen_urls(http_port)
+            log.warning(
+                'Could not open browser. Webapp running at:\n%s',
+                listen_urls,
+            )
     except Exception as e:
         log.debug(f'Browser open failed: {e}')
-        log.info(f'Open your browser to: {url}')
+        listen_urls = _format_listen_urls(http_port)
+        log.info('Open your browser to:\n%s', listen_urls)
     return None

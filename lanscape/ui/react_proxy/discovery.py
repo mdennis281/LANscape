@@ -81,6 +81,14 @@ def _get_local_addresses() -> list[bytes]:
     return result
 
 
+def get_local_address_strings() -> list[str]:
+    """
+    Return human-readable private-LAN IPv4 addresses from up, non-virtual
+    interfaces.  Suitable for display in log messages.
+    """
+    return [socket.inet_ntoa(addr) for addr in _get_local_addresses()]
+
+
 def _get_local_subnets() -> list[ipaddress.IPv4Network]:
     """
     Return the subnets of every address that ``_get_local_addresses`` would

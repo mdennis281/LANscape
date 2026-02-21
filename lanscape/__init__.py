@@ -55,6 +55,7 @@ from lanscape.ui.react_proxy import (
     REACT_BUILD_DIR,
     DiscoveryService,
     DiscoveredInstance,
+    get_local_address_strings,
 )
 
 # Version management

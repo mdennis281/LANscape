@@ -52,7 +52,9 @@ from lanscape.core.models import (
 # Webapp server for serving bundled React UI
 from lanscape.ui.react_proxy import (
     start_webapp_server,
-    REACT_BUILD_DIR
+    REACT_BUILD_DIR,
+    DiscoveryService,
+    DiscoveredInstance,
 )
 
 # Version management

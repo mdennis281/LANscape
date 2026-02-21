@@ -20,6 +20,7 @@ from subprocess import Popen
 from pwa_launcher import open_pwa, ChromiumNotFoundError
 
 from lanscape.ui.ws.server import WebSocketServer
+from lanscape.ui.react_proxy.discovery import DiscoveryService
 
 REACT_BUILD_DIR = Path(__file__).resolve().parent.parent / 'react_build'
 
@@ -31,14 +32,23 @@ class SPAHandler(SimpleHTTPRequestHandler):
     HTTP handler for Single Page Application.
 
     Serves static files and falls back to index.html for client-side routing.
+    Also exposes ``/api/discover`` which returns mDNS-discovered backends.
     """
+
+    # Set by the controller so every request handler can access it.
+    discovery: Optional['DiscoveryService'] = None
 
     def __init__(self, *args, directory: str = None, **kwargs):
         self.spa_directory = directory
         super().__init__(*args, directory=directory, **kwargs)
 
     def do_GET(self):
-        """Handle GET requests with SPA fallback."""
+        """Handle GET requests with API routes and SPA fallback."""
+        # --- API routes --------------------------------------------------
+        if self.path == '/api/discover':
+            return self._handle_discover()
+
+        # --- Static / SPA -----------------------------------------------
         # Get the requested file path
         path = self.translate_path(self.path)
 
@@ -47,6 +57,25 @@ class SPAHandler(SimpleHTTPRequestHandler):
             self.path = '/index.html'  # pylint: disable=attribute-defined-outside-init
 
         return super().do_GET()
+
+    # -----------------------------------------------------------------
+    # API endpoint handlers
+    # -----------------------------------------------------------------
+
+    def _handle_discover(self) -> None:
+        """Return JSON list of mDNS-discovered LANscape instances."""
+        body = '[]'
+        if self.discovery is not None:
+            body = self.discovery.get_instances_json()
+
+        payload = body.encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(payload)))
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(payload)
 
     def log_message(self, fmt, *args):  # pylint: disable=arguments-renamed,arguments-differ
         """Override to use our logger instead of stderr."""
@@ -120,6 +149,7 @@ class WebappServerController:
 
         self._http_server: Optional[HTTPServer] = None
         self._ws_server: Optional[WebSocketServer] = None
+        self._discovery: Optional[DiscoveryService] = None
         self._shutdown_event = threading.Event()
         self._had_connection = False
         self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -188,6 +218,19 @@ class WebappServerController:
         # Start HTTP server
         self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
 
+        # Start mDNS discovery (advertise + browse)
+        try:
+            self._discovery = DiscoveryService(
+                ws_port=self.ws_port,
+                http_port=self.http_port,
+            )
+            self._discovery.start()
+            # Make the discovery service accessible from the handler class
+            SPAHandler.discovery = self._discovery
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            log.warning('mDNS discovery unavailable: %s', exc)
+            self._discovery = None
+
         url = f'http://{self.host}:{self.http_port}?ws-server=localhost:{self.ws_port}'
 
         # Open browser
@@ -218,6 +261,14 @@ class WebappServerController:
         """Shutdown all servers and validate port closure."""
         log.debug('Shutting down webapp server...')
         errors = []
+
+        # Stop mDNS discovery
+        if self._discovery:
+            try:
+                self._discovery.stop()
+                SPAHandler.discovery = None
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                errors.append(f'mDNS discovery: {e}')
 
         # Stop HTTP server
         if self._http_server:

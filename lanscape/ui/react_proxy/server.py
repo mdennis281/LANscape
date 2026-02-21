@@ -269,7 +269,7 @@ class WebappServerController:
 
     def _shutdown(self) -> None:
         """Shutdown all servers and validate port closure."""
-        log.debug('Shutting down webapp server...')
+        log.info('Shutting down...')
         errors = []
 
         # Stop mDNS discovery
@@ -283,22 +283,27 @@ class WebappServerController:
         # Stop HTTP server
         if self._http_server:
             try:
+                log.info('Stopping HTTP server (port %d)...', self.http_port)
                 self._http_server.server_close()
+                log.debug('HTTP server stopped')
             except Exception as e:  # pylint: disable=broad-exception-caught
                 errors.append(f'HTTP server (port {self.http_port}): {e}')
 
         # Stop WebSocket server
         if self._ws_server and self._ws_loop:
             try:
+                log.info('Stopping WebSocket server (port %d)...', self.ws_port)
                 asyncio.run_coroutine_threadsafe(
                     self._ws_server.stop(),
                     self._ws_loop
                 )
+                log.debug('WebSocket server stopped')
             except Exception as e:  # pylint: disable=broad-exception-caught
                 errors.append(f'WebSocket server (port {self.ws_port}): {e}')
 
         # Validate ports are released
         import socket as _socket  # pylint: disable=import-outside-toplevel
+        log.debug('Waiting for OS to release ports...')
         time.sleep(0.3)  # Brief wait for OS to release ports
 
         for port_num, label in [

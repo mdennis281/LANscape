@@ -44,9 +44,7 @@
         {
             "label": "Tag and Push Release",
             "type": "shell",
-            "args": [
-                "${input:releaseVersion}"
-            ],
+            "args": [],
             "problemMatcher": [],
             "group": "build",
             "windows": {
@@ -244,11 +242,5 @@
         }
     ],
 
-    "inputs": [
-        {
-            "id": "releaseVersion",
-            "type": "promptString",
-            "description": "Enter release version (e.g. v1.2.3):"
-        }
-    ]
+    "inputs": []
 }

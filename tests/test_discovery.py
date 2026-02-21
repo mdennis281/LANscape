@@ -1,6 +1,7 @@
 """
 Tests for mDNS discovery module.
 """
+import ipaddress
 import json
 import socket
 from unittest.mock import MagicMock, patch
@@ -9,7 +10,9 @@ from lanscape.ui.react_proxy.discovery import (
     DiscoveredInstance,
     DiscoveryService,
     SERVICE_TYPE,
+    _best_lan_address,
     _get_local_addresses,
+    _get_local_subnets,
 )
 
 
@@ -84,6 +87,104 @@ class TestGetLocalAddresses:
 
         result = _get_local_addresses()
         assert result == []
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_zerotier_interface(self, mock_psutil):
+        """Test that ZeroTier overlay interfaces are excluded."""
+        mock_psutil.net_if_stats.return_value = {
+            'ZeroTier One [abc123]': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(family=socket.AF_INET, address='10.69.69.69')
+        mock_psutil.net_if_addrs.return_value = {
+            'ZeroTier One [abc123]': [mock_addr]
+        }
+
+        result = _get_local_addresses()
+        assert result == []
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_ics_subnet(self, mock_psutil):
+        """Test that Windows ICS (192.168.137.x) addresses are excluded."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(family=socket.AF_INET, address='192.168.137.1')
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        result = _get_local_addresses()
+        assert result == []
+
+
+class TestGetLocalSubnets:
+    """Tests for the _get_local_subnets helper."""
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_returns_subnet_from_interface(self, mock_psutil):
+        """Test that subnets are correctly derived from interface info."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(
+            family=socket.AF_INET,
+            address='10.0.4.1',
+            netmask='255.255.240.0',
+        )
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        result = _get_local_subnets()
+        assert len(result) == 1
+        assert result[0] == ipaddress.ip_network('10.0.0.0/20')
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_virtual_interfaces(self, mock_psutil):
+        """Test that virtual interfaces are excluded from subnets."""
+        mock_psutil.net_if_stats.return_value = {
+            'ZeroTier One [x]': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(
+            family=socket.AF_INET,
+            address='10.69.69.69',
+            netmask='255.255.255.0',
+        )
+        mock_psutil.net_if_addrs.return_value = {
+            'ZeroTier One [x]': [mock_addr]
+        }
+
+        result = _get_local_subnets()
+        assert result == []
+
+
+class TestBestLanAddress:
+    """Tests for _best_lan_address subnet-aware selection."""
+
+    def test_prefers_same_subnet(self):
+        """Test that an address on the same subnet is preferred."""
+        subnets = [ipaddress.ip_network('10.0.0.0/20')]
+        # ZeroTier first, ICS second, real LAN last
+        addrs = ['10.69.69.3', '192.168.137.1', '10.0.11.221']
+        assert _best_lan_address(addrs, subnets) == '10.0.11.221'
+
+    def test_falls_back_to_private(self):
+        """Test fallback to any private address when no subnet match."""
+        subnets = [ipaddress.ip_network('172.16.0.0/24')]  # different subnet
+        addrs = ['10.0.4.1', '10.69.69.69']
+        assert _best_lan_address(addrs, subnets) == '10.0.4.1'
+
+    def test_skips_ics_in_fallback(self):
+        """Test that ICS addresses are skipped in fallback."""
+        subnets = []  # no local subnets
+        addrs = ['192.168.137.1', '10.0.11.221']
+        assert _best_lan_address(addrs, subnets) == '10.0.11.221'
+
+    def test_empty_returns_none(self):
+        """Test that empty address list returns None."""
+        assert _best_lan_address([], []) is None
+
+    def test_last_resort_returns_first(self):
+        """Test that a non-private address is returned as last resort."""
+        subnets = []
+        addrs = ['8.8.8.8']
+        assert _best_lan_address(addrs, subnets) == '8.8.8.8'
 
 
 class TestDiscoveredInstance:
@@ -327,8 +428,8 @@ class TestDiscoveryServiceBrowseCallback:
 
         assert svc.get_instances() == []
 
-    def test_none_info_skips(self):
-        """Test that a None service info is ignored."""
+    def test_none_info_retries_then_skips(self):
+        """Test that a None service info is retried 3 times then skipped."""
         from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
         svc = self._make_service()
         mock_zc = MagicMock()
@@ -340,6 +441,27 @@ class TestDiscoveryServiceBrowseCallback:
         )
 
         assert svc.get_instances() == []
+        # Verify it retried 3 times
+        assert mock_zc.get_service_info.call_count == 3
+
+    def test_retry_succeeds_on_second_attempt(self):
+        """Test that a service is resolved when retry succeeds."""
+        from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
+        svc = self._make_service()
+        mock_zc = MagicMock()
+        # First call returns None, second succeeds
+        mock_zc.get_service_info.side_effect = [
+            None, self._make_mock_info()
+        ]
+
+        svc._on_service_state_change(  # pylint: disable=protected-access
+            mock_zc, SERVICE_TYPE, 'test._lanscape._tcp.local.',
+            ServiceStateChange.Added,
+        )
+
+        instances = svc.get_instances()
+        assert len(instances) == 1
+        assert mock_zc.get_service_info.call_count == 2
 
 
 class TestServiceType:

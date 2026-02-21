@@ -18,6 +18,7 @@ from typing import Optional
 import psutil
 from pydantic import BaseModel
 from zeroconf import (
+    IPVersion,
     ServiceBrowser,
     ServiceInfo,
     ServiceStateChange,
@@ -31,6 +32,20 @@ log = logging.getLogger('Discovery')
 SERVICE_TYPE = '_lanscape._tcp.local.'
 
 
+# Interface name substrings that indicate non-LAN adapters.
+# Covers: loopback, VMware, VirtualBox, Docker, Hyper-V/WSL,
+# ZeroTier, Tailscale, WireGuard, TUN/TAP, Cisco VPN.
+_VIRTUAL_IFACE_NAMES = (
+    'loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth',
+    'vethernet', 'zerotier', 'tailscale', 'tun', 'tap',
+    'wg', 'utun', 'virbr', 'br-', 'ham',
+)
+
+# Subnet prefixes that are almost never a real LAN:
+# 192.168.137.0/24 = Windows ICS (Internet Connection Sharing).
+_ICS_NETWORK = ipaddress.ip_network('192.168.137.0/24')
+
+
 def _get_local_addresses() -> list[bytes]:
     """
     Collect all private-LAN IPv4 addresses from up, non-virtual interfaces.
@@ -40,15 +55,14 @@ def _get_local_addresses() -> list[bytes]:
     """
     result: list[bytes] = []
     stats = psutil.net_if_stats()
-    virtual_names = ('loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth')
 
     for iface, addrs in psutil.net_if_addrs().items():
         # Skip down interfaces
         iface_stats = stats.get(iface)
         if not iface_stats or not iface_stats.isup:
             continue
-        # Skip common virtual interfaces
-        if any(v in iface.lower() for v in virtual_names):
+        # Skip common virtual / overlay interfaces
+        if any(v in iface.lower() for v in _VIRTUAL_IFACE_NAMES):
             continue
 
         for addr in addrs:
@@ -56,7 +70,9 @@ def _get_local_addresses() -> list[bytes]:
                 continue
             try:
                 ip = ipaddress.ip_address(addr.address)
-                if ip.is_private and not ip.is_loopback and not ip.is_link_local:
+                if (ip.is_private and not ip.is_loopback
+                        and not ip.is_link_local
+                        and ip not in _ICS_NETWORK):
                     result.append(socket.inet_aton(str(ip)))
             except (ValueError, OSError):
                 continue
@@ -64,28 +80,81 @@ def _get_local_addresses() -> list[bytes]:
     return result
 
 
-def _best_lan_address(addresses: list[str]) -> str | None:
+def _get_local_subnets() -> list[ipaddress.IPv4Network]:
+    """
+    Return the subnets of every address that ``_get_local_addresses`` would
+    include.  Used by ``_best_lan_address`` to prefer same-subnet peers.
+    """
+    subnets: list[ipaddress.IPv4Network] = []
+    stats = psutil.net_if_stats()
+
+    for iface, addrs in psutil.net_if_addrs().items():
+        iface_stats = stats.get(iface)
+        if not iface_stats or not iface_stats.isup:
+            continue
+        if any(v in iface.lower() for v in _VIRTUAL_IFACE_NAMES):
+            continue
+
+        for addr in addrs:
+            if addr.family != socket.AF_INET or not addr.netmask:
+                continue
+            try:
+                ip = ipaddress.ip_address(addr.address)
+                if (ip.is_private and not ip.is_loopback
+                        and not ip.is_link_local
+                        and ip not in _ICS_NETWORK):
+                    net = ipaddress.ip_network(
+                        f'{addr.address}/{addr.netmask}', strict=False
+                    )
+                    subnets.append(net)
+            except (ValueError, OSError):
+                continue
+
+    return subnets
+
+
+def _best_lan_address(
+    addresses: list[str],
+    local_subnets: list[ipaddress.IPv4Network] | None = None,
+) -> str | None:
     """
     Pick the most suitable address from a list returned by
     ``ServiceInfo.parsed_addresses()``.
 
     mDNS records can contain addresses from every interface on the host
-    (LAN, VPN, Docker bridges, Hyper-V adapters, etc.).  This function
-    picks the most useful one for a LAN app:
+    (LAN, VPN, Docker bridges, Hyper-V adapters, etc.).  Selection order:
 
-    1. Private IPv4 (10/172.16-31/192.168), not loopback, not link-local
-    2. Any non-loopback IPv4
-    3. First address as a last resort
+    1. Private IPv4 on the **same subnet** as one of our own LAN interfaces
+    2. Any private IPv4 (not loopback, not link-local, not ICS)
+    3. Any non-loopback IPv4
+    4. First address as a last resort
     """
+    if local_subnets is None:
+        local_subnets = _get_local_subnets()
+
+    # Pass 1 — same subnet as one of our own LAN interfaces
     for addr in addresses:
         try:
             ip = ipaddress.ip_address(addr)
-            if (ip.version == 4 and ip.is_private
-                    and not ip.is_loopback and not ip.is_link_local):
+            if ip.version != 4:
+                continue
+            if any(ip in subnet for subnet in local_subnets):
                 return str(ip)
         except ValueError:
             continue
 
+    # Pass 2 — any private, non-overlay IPv4
+    for addr in addresses:
+        try:
+            ip = ipaddress.ip_address(addr)
+            if (ip.version == 4 and ip.is_private
+                    and not ip.is_loopback and not ip.is_link_local
+                    and ip not in _ICS_NETWORK):
+                return str(ip)
+        except ValueError:
+            continue
+
+    # Pass 3 — any non-loopback IPv4
     for addr in addresses:
         try:
             ip = ipaddress.ip_address(addr)
@@ -126,6 +195,7 @@ class DiscoveryService:
         self._browser: Optional[ServiceBrowser] = None
         self._service_info: Optional[ServiceInfo] = None
 
+        self._local_subnets: list[ipaddress.IPv4Network] = []
         self._lock = threading.Lock()
         self._instances: dict[str, DiscoveredInstance] = {}
 
@@ -139,12 +209,12 @@ class DiscoveryService:
 
     def start(self) -> None:
         """Register this instance and start browsing for others."""
-        # Bind to all interfaces — this is standard mDNS behaviour (RFC 6762).
-        # Restricting to one interface breaks discovery when the OS picks the
-        # wrong primary interface (VPN up, multiple NICs, etc.).
-        # Address selection is handled in _best_lan_address(); unreachable
-        # entries are filtered by the frontend's WebSocket probe.
-        self._zeroconf = Zeroconf()
+        # IPv4-only reduces noise and speeds up resolution.
+        self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+
+        # Cache our own subnets so _best_lan_address can prefer same-subnet
+        # peers without re-scanning interfaces on every callback.
+        self._local_subnets = _get_local_subnets()
 
         # Advertise ourselves
         self._register_service()
@@ -239,9 +309,23 @@ class DiscoveryService:
                     del self._instances[name]
             return
 
-        # Added or Updated
-        info = zeroconf.get_service_info(service_type, name)
+        # Added or Updated — resolve with retries.  Remote hosts sometimes
+        # need more than one attempt (especially across subnets or on busy
+        # networks where the first mDNS response is lost).
+        info: Optional[ServiceInfo] = None
+        for attempt in range(3):
+            info = zeroconf.get_service_info(
+                service_type, name, timeout=4000,
+            )
+            if info is not None:
+                break
+            log.debug(
+                'get_service_info attempt %d/3 timed out for %s',
+                attempt + 1, name,
+            )
+
         if info is None:
+            log.debug('Could not resolve mDNS record: %s', name)
             return
 
         props = {
@@ -250,12 +334,12 @@ class DiscoveryService:
             for k, v in (info.properties or {}).items()
         }
 
-        # Resolve host address — prefer a private LAN IP over VPN / virtual
-        # adapter addresses that mDNS may also include in the record.
+        # Resolve host address — prefer an IP on the same subnet as one of
+        # our own LAN interfaces, then fall back to any private IPv4.
         addresses = info.parsed_addresses()
         if not addresses:
             return
-        host = _best_lan_address(addresses)
+        host = _best_lan_address(addresses, self._local_subnets)
         if host is None:
             return
 
@@ -275,7 +359,7 @@ class DiscoveryService:
             self._instances[name] = instance
 
         log.debug(
-            'mDNS service %s: %s (%s:%d)',
+            'mDNS service %s: %s (%s:%d, from %s)',
             'updated' if state_change == ServiceStateChange.Updated else 'discovered',
-            name, host, instance.ws_port,
+            name, host, instance.ws_port, addresses,
         )

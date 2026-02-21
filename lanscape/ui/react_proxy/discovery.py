@@ -8,6 +8,7 @@ HTTP proxy so the frontend can offer a server picker.
 Service type: ``_lanscape._tcp.local.``
 """
 
+import errno
 import ipaddress
 import json
 import logging
@@ -208,9 +209,15 @@ class DiscoveryService:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        """Register this instance and start browsing for others."""
-        # IPv4-only reduces noise and speeds up resolution.
-        self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+        """Register this instance and start browsing for others.
+
+        On macOS (and some BSDs) the system mDNS daemon (``mDNSResponder``)
+        holds port 5353 exclusively, preventing Zeroconf from binding its
+        multicast listen socket.  When that happens we fall back to
+        **unicast mode** — service browsing and registration still work but
+        responses arrive as unicast rather than multicast.
+        """
+        self._zeroconf = self._create_zeroconf()
 
         # Cache our own subnets so _best_lan_address can prefer same-subnet
         # peers without re-scanning interfaces on every callback.
@@ -226,6 +233,25 @@ class DiscoveryService:
             handlers=[self._on_service_state_change],
         )
         log.info('mDNS discovery started (service=%s)', self._service_name)
+
+    def _create_zeroconf(self) -> Zeroconf:
+        """Create a Zeroconf instance, falling back to unicast mode.
+
+        Returns a ``Zeroconf`` instance.  First tries the default multicast
+        mode (binds port 5353).  If that fails with ``EADDRINUSE`` — common
+        on macOS where ``mDNSResponder`` already owns the port — retries in
+        unicast mode which uses an ephemeral port instead.
+        """
+        try:
+            return Zeroconf(ip_version=IPVersion.V4Only)
+        except OSError as exc:
+            if exc.errno != errno.EADDRINUSE:
+                raise
+            log.warning(
+                'Port 5353 in use (likely system mDNS daemon); '
+                'falling back to unicast mode'
+            )
+            return Zeroconf(ip_version=IPVersion.V4Only, unicast=True)
 
     def stop(self) -> None:
         """Unregister and close mDNS resources."""

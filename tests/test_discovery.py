@@ -1,6 +1,7 @@
 """
 Tests for mDNS discovery module.
 """
+import errno
 import ipaddress
 import json
 import socket
@@ -349,6 +350,47 @@ class TestDiscoveryServiceLifecycle:
         """Test that calling stop() without start() doesn't raise."""
         svc = DiscoveryService(ws_port=8766, http_port=5001)
         svc.stop()  # Should not raise
+
+    @patch('lanscape.ui.react_proxy.discovery._get_local_addresses')
+    @patch('lanscape.ui.react_proxy.discovery.ServiceBrowser')
+    @patch('lanscape.ui.react_proxy.discovery.Zeroconf')
+    @patch('lanscape.ui.react_proxy.discovery.get_installed_version', return_value='1.0.0')
+    def test_start_falls_back_to_unicast_on_eaddrinuse(
+        self, _mock_version, mock_zc_cls, _mock_browser_cls, mock_addrs
+    ):
+        """Test that start() falls back to unicast mode when port 5353 is in use."""
+        mock_addrs.return_value = [socket.inet_aton('192.168.1.10')]
+        mock_zc_unicast = MagicMock()
+        # First call (normal) raises EADDRINUSE, second call (unicast) succeeds
+        mock_zc_cls.side_effect = [
+            OSError(errno.EADDRINUSE, 'Address already in use'),
+            mock_zc_unicast,
+        ]
+
+        svc = DiscoveryService(ws_port=8766, http_port=5001, service_name='Test')
+        svc.start()
+
+        # Verify Zeroconf was called twice: once normal, once unicast
+        assert mock_zc_cls.call_count == 2
+        first_call = mock_zc_cls.call_args_list[0]
+        second_call = mock_zc_cls.call_args_list[1]
+        assert first_call.kwargs.get('unicast', False) is False
+        assert second_call.kwargs.get('unicast') is True
+
+        # Service should still be registered and browser created
+        mock_zc_unicast.register_service.assert_called_once()
+
+    @patch('lanscape.ui.react_proxy.discovery.Zeroconf')
+    def test_start_reraises_non_eaddrinuse(self, mock_zc_cls):
+        """Test that start() re-raises OSError if not EADDRINUSE."""
+        mock_zc_cls.side_effect = OSError(errno.EACCES, 'Permission denied')
+
+        svc = DiscoveryService(ws_port=8766, http_port=5001)
+        try:
+            svc.start()
+            assert False, 'Expected OSError'  # pragma: no cover
+        except OSError as exc:
+            assert exc.errno == errno.EACCES
 
 
 class TestDiscoveryServiceBrowseCallback:

@@ -94,7 +94,8 @@ def start_webapp_mode():
             http_port=args.port,
             ws_port=args.ws_port,
             open_browser=True,
-            persistent=args.persistent
+            persistent=args.persistent,
+            mdns_enabled=args.mdns_enabled,
         )
     except KeyboardInterrupt:
         log.info('Webapp stopped by user')

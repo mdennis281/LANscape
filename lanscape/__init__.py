@@ -56,6 +56,8 @@ from lanscape.ui.react_proxy import (
     REACT_BUILD_DIR,
     DiscoveryService,
     DiscoveredInstance,
+    DiscoverResponse,
+    build_default_route,
     get_local_address_strings,
 )
 

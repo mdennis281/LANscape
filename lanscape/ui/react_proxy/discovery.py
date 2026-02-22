@@ -184,6 +184,24 @@ class DiscoveredInstance(BaseModel):
     hostname: str
 
 
+class DiscoverResponse(BaseModel):
+    """Response payload for the /api/discover endpoint."""
+    mdns_enabled: bool
+    default_route: str
+    instances: list[DiscoveredInstance]
+
+
+def build_default_route(http_port: int) -> str:
+    """Build the default connection URL for this server.
+
+    Prefers a private LAN address so remote browsers on the same network
+    can reach the server.  Falls back to ``localhost``.
+    """
+    addrs = get_local_address_strings()
+    host = addrs[0] if addrs else 'localhost'
+    return f'http://{host}:{http_port}'
+
+
 class DiscoveryService:
     """
     Manages mDNS advertisement of *this* instance and browsing for others.

@@ -9,11 +9,13 @@ from unittest.mock import MagicMock, patch
 
 from lanscape.ui.react_proxy.discovery import (
     DiscoveredInstance,
+    DiscoverResponse,
     DiscoveryService,
     SERVICE_TYPE,
     _best_lan_address,
     _get_local_addresses,
     _get_local_subnets,
+    build_default_route,
 )
 
 
@@ -514,3 +516,81 @@ class TestServiceType:
         assert SERVICE_TYPE == '_lanscape._tcp.local.'
         assert SERVICE_TYPE.startswith('_')
         assert SERVICE_TYPE.endswith('.')
+
+
+class TestDiscoverResponse:
+    """Tests for the DiscoverResponse Pydantic model."""
+
+    def test_defaults(self):
+        """Test creating a response with no instances."""
+        resp = DiscoverResponse(
+            mdns_enabled=True,
+            default_route='http://localhost:5001',
+            instances=[],
+        )
+        assert resp.mdns_enabled is True
+        assert resp.default_route == 'http://localhost:5001'
+        assert resp.instances == []
+
+    def test_with_instances(self):
+        """Test creating a response with discovered instances."""
+        inst = DiscoveredInstance(
+            host='10.0.0.5',
+            ws_port=8766,
+            http_port=5001,
+            version='2.0.0',
+            hostname='my-server',
+        )
+        resp = DiscoverResponse(
+            mdns_enabled=True,
+            default_route='http://10.0.0.5:5001',
+            instances=[inst],
+        )
+        assert len(resp.instances) == 1
+        assert resp.instances[0].host == '10.0.0.5'
+
+    def test_json_round_trip(self):
+        """Test JSON serialization round-trip."""
+        resp = DiscoverResponse(
+            mdns_enabled=False,
+            default_route='http://localhost:9999',
+            instances=[],
+        )
+        data = json.loads(resp.model_dump_json())
+        assert data['mdns_enabled'] is False
+        assert data['default_route'] == 'http://localhost:9999'
+        assert data['instances'] == []
+
+    def test_mdns_disabled_flag(self):
+        """Test that mdns_enabled=False is preserved."""
+        resp = DiscoverResponse(
+            mdns_enabled=False,
+            default_route='http://localhost:5001',
+            instances=[],
+        )
+        assert resp.mdns_enabled is False
+
+
+class TestBuildDefaultRoute:
+    """Tests for the build_default_route helper."""
+
+    @patch('lanscape.ui.react_proxy.discovery.get_local_address_strings')
+    def test_uses_first_lan_address(self, mock_addrs):
+        """Test that the first LAN address is preferred."""
+        mock_addrs.return_value = ['10.0.12.14', '192.168.1.5']
+        result = build_default_route(5001)
+        assert result == 'http://10.0.12.14:5001'
+
+    @patch('lanscape.ui.react_proxy.discovery.get_local_address_strings')
+    def test_falls_back_to_localhost(self, mock_addrs):
+        """Test fallback to localhost when no LAN addresses exist."""
+        mock_addrs.return_value = []
+        result = build_default_route(8080)
+        assert result == 'http://localhost:8080'
+
+    @patch('lanscape.ui.react_proxy.discovery.get_local_address_strings')
+    def test_custom_port(self, mock_addrs):
+        """Test that custom port is included in the route."""
+        mock_addrs.return_value = ['192.168.1.100']
+        result = build_default_route(9999)
+        assert result == 'http://192.168.1.100:9999'

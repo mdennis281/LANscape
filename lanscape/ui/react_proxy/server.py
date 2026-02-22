@@ -90,7 +90,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
         # Vite content-hashed assets are safe to cache long-term.
         # Everything else (index.html, manifest, etc.) must be revalidated
         # so the browser always picks up new builds.
-        if self.path.startswith('/assets/'):
+        if hasattr(self, 'path') and self.path.startswith('/assets/'):
             self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
         else:
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')

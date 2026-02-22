@@ -39,6 +39,7 @@ from lanscape.core.models import (
     ScanStage,
     DeviceErrorInfo,
     DeviceResult,
+    ProbeResponseInfo,
     ServiceInfo,
     ScanErrorInfo,
     ScanWarningInfo,

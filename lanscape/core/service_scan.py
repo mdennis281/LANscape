@@ -275,6 +275,17 @@ SERVICE_MATCHERS = [
 
 
 @dataclass
+class ProbeResponse:
+    """A single probe's request/response pair."""
+    request: Optional[str] = None
+    response: Optional[str] = None
+    response_bytes: Optional[bytes] = None
+    is_tls: bool = False
+    service: str = 'Unknown'
+    weight: int = 0
+
+
+@dataclass
 class ServiceScanResult:
     """Result of a service scan probe."""
     service: str
@@ -283,6 +294,7 @@ class ServiceScanResult:
     probes_sent: int = 0
     probes_received: int = 0
     is_tls: bool = False
+    all_responses: List['ProbeResponse'] = field(default_factory=list)
 
 
 @dataclass
@@ -294,6 +306,7 @@ class ProbeResult:
     probes_sent: int = 0
     probes_received: int = 0
     is_tls: bool = False
+    all_responses: List[ProbeResponse] = field(default_factory=list)
 
 
 async def _try_probe(  # pylint: disable=too-many-locals,too-many-arguments
@@ -449,17 +462,20 @@ async def _multi_probe_generic(  # pylint: disable=too-many-locals,too-many-bran
     ip: str, port: int, cfg: ServiceScanConfig
 ) -> ProbeResult:
     """
-    Run a small set of generic probes in parallel and return the first non-empty response.
-    If TLS is detected, will retry with SSL wrapper.
-    Returns ProbeResult with response and probe statistics.
+    Run probes in parallel and collect responses.
+
+    In AGGRESSIVE mode every probe runs to completion so the caller can
+    pick the highest-weight match.  In LAZY / BASIC mode the first
+    meaningful response still short-circuits for speed.
+
+    Returns ProbeResult with the best response plus *all* collected
+    probe/response pairs in ``all_responses``.
     """
+    aggressive = cfg.lookup_type == ServiceScanStrategy.AGGRESSIVE
     probes = get_port_probes(port, cfg.lookup_type)
     probes_sent = len(probes)
     probes_received = 0
-    response_found = None
-    response_bytes_found = None
-    request_used = None
-    is_tls = False
+    collected: List[ProbeResponse] = []
 
     semaphore = asyncio.Semaphore(cfg.max_concurrent_probes)
 
@@ -476,6 +492,9 @@ async def _multi_probe_generic(  # pylint: disable=too-many-locals,too-many-bran
         for p in probes
     ]
 
+    # Track whether we already have a usable response (for early-exit modes)
+    found_first = False
+
     try:
         for fut in asyncio.as_completed(tasks, timeout=cfg.timeout):
             try:
@@ -490,48 +509,74 @@ async def _multi_probe_generic(  # pylint: disable=too-many-locals,too-many-bran
                 continue
 
             probes_received += 1
-            if not decoded_str or not decoded_str.strip() or response_found is not None:
+            if not decoded_str or not decoded_str.strip():
                 continue
 
-            # Found a meaningful response - check for TLS and escalate if needed
+            # Check for TLS and escalate if needed
             escalation = await _handle_tls_escalation(
                 ip, port, raw_bytes, decoded_str, payload, cfg.timeout
             )
-            response_found, response_bytes_found, request_used, is_tls = escalation
+            esc_response, esc_bytes, esc_request, esc_tls = escalation
 
-            # Cancel remaining tasks since we found a good response
-            for t in tasks:
-                if not t.done():
-                    t.cancel()
-            break
+            collected.append(ProbeResponse(
+                request=_format_request(esc_request, payload),
+                response=esc_response,
+                response_bytes=esc_bytes,
+                is_tls=esc_tls,
+            ))
+
+            # In non-aggressive modes, stop after the first good response
+            if not aggressive and not found_first:
+                found_first = True
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                break
     except asyncio.TimeoutError:
         pass
     finally:
-        # Ensure remaining tasks are cancelled and awaited to suppress warnings
         for t in tasks:
             if not t.done():
                 t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Format the request for display
-    request_display = None
-    if request_used is not None:
-        if isinstance(request_used, bytes):
-            request_display = request_used.decode('utf-8', errors='replace')
-        else:
-            request_display = str(request_used)
-    elif response_found is not None:
-        # Response came from banner grab (None payload)
-        request_display = "(banner grab - no request sent)"
+    # Pick the best response by weight
+    best: Optional[ProbeResponse] = None
+    for entry in collected:
+        svc, weight = _identify_service(
+            entry.response or '',
+            response_bytes=entry.response_bytes,
+            is_tls=entry.is_tls,
+        )
+        entry.service = svc
+        entry.weight = weight
+        if best is None or weight > best.weight:
+            best = entry
+
+    is_tls = best.is_tls if best else False
 
     return ProbeResult(
-        response=response_found,
-        response_bytes=response_bytes_found,
-        request=request_display,
+        response=best.response if best else None,
+        response_bytes=best.response_bytes if best else None,
+        request=best.request if best else None,
         probes_sent=probes_sent,
         probes_received=probes_received,
-        is_tls=is_tls
+        is_tls=is_tls,
+        all_responses=collected,
     )
+
+
+def _format_request(
+    request: Optional[Union[str, bytes]],
+    fallback_payload: Optional[Union[str, bytes]] = None,
+) -> Optional[str]:
+    """Format a request payload into a display string."""
+    value = request if request is not None else fallback_payload
+    if value is None:
+        return '(banner grab - no request sent)'
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='replace')
+    return str(value)
 
 
 # Port-specific binary probes for protocols that need special handling
@@ -711,8 +756,12 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
             )
 
         try:
-            # Run multiple generic probes concurrently and take first useful response
             probe_result = await _multi_probe_generic(ip, port, cfg)
+
+            # Clean up all collected responses for storage
+            for entry in probe_result.all_responses:
+                if entry.response:
+                    entry.response = _clean_response(entry.response)
 
             if not probe_result.response:
                 # Check if we got TLS without readable response
@@ -721,20 +770,22 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
                         service="HTTPS", response=None, request=None,
                         probes_sent=probe_result.probes_sent,
                         probes_received=probe_result.probes_received,
-                        is_tls=True
+                        is_tls=True,
+                        all_responses=probe_result.all_responses,
                     )
                 return ServiceScanResult(
                     service="Unknown", response=None, request=None,
                     probes_sent=probe_result.probes_sent,
-                    probes_received=probe_result.probes_received
+                    probes_received=probe_result.probes_received,
+                    all_responses=probe_result.all_responses,
                 )
 
             log.debug(f"Service scan response from {ip}:{port} - {probe_result.response}")
 
-            # Clean up response for storage (limit length, strip control chars)
             cleaned_response = _clean_response(probe_result.response)
 
-            # Use weighted matching to identify the service
+            # The best service was already identified inside _multi_probe_generic
+            # via per-entry _identify_service calls.  Re-derive from the top entry.
             service_name, weight = _identify_service(
                 probe_result.response,
                 response_bytes=probe_result.response_bytes,
@@ -749,7 +800,8 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
                 request=probe_result.request,
                 probes_sent=probe_result.probes_sent,
                 probes_received=probe_result.probes_received,
-                is_tls=probe_result.is_tls
+                is_tls=probe_result.is_tls,
+                all_responses=probe_result.all_responses,
             )
         except asyncio.TimeoutError:
             log.warning(f"Timeout scanning {ip}:{port}")

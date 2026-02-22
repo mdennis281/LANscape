@@ -36,7 +36,9 @@ from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, run_once, timeout_enforcer
 from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, ScanType
-from lanscape.core.models import DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo
+from lanscape.core.models import (
+    DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo, ProbeResponseInfo
+)
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -94,7 +96,7 @@ def _parse_mdns_ptr_response(data: bytes) -> Optional[str]:
         return None
 
     flags = struct.unpack('>H', data[2:4])[0]
-    if not (flags & 0x8000):  # QR bit must be set (response)
+    if not flags & 0x8000:  # QR bit must be set (response)
         return None
 
     qdcount = struct.unpack('>H', data[4:6])[0]
@@ -120,9 +122,7 @@ def _parse_mdns_ptr_response(data: bytes) -> Optional[str]:
 
         if rtype == 12:  # PTR
             hostname, _ = _dns_name_decode(data, offset)
-            if hostname:
-                return hostname.rstrip('.')
-            return None
+            return hostname.rstrip('.') if hostname else None
         offset += rdlength
 
     return None
@@ -134,7 +134,7 @@ def _parse_nbstat_response(data: bytes) -> Optional[str]:
     Scans the name table for a ``<00>`` suffix entry with the UNIQUE flag
     (GROUP bit 0x8000 clear) and returns the trimmed ASCII name.
     """
-    if len(data) < 57:  # minimum viable NBSTAT response
+    if len(data) < 43:  # minimum viable NBSTAT response (header + ptr + RR meta + 1 name)
         return None
 
     # Skip header (12 bytes)
@@ -171,7 +171,7 @@ def _parse_nbstat_response(data: bytes) -> Optional[str]:
         offset += 18
 
         # Suffix 0x00 = Workstation Service; GROUP bit clear = unique name
-        if suffix == 0x00 and not (flags & 0x8000):
+        if suffix == 0x00 and not flags & 0x8000:
             name = name_bytes.decode('ascii', errors='ignore').strip()
             if name and name != '*':
                 return name
@@ -306,7 +306,16 @@ class Device(BaseModel):
             response=result.response,
             probes_sent=result.probes_sent,
             probes_received=result.probes_received,
-            is_tls=result.is_tls
+            is_tls=result.is_tls,
+            all_responses=[
+                ProbeResponseInfo(
+                    request=pr.request,
+                    response=pr.response,
+                    service=pr.service,
+                    weight=pr.weight,
+                    is_tls=pr.is_tls,
+                ) for pr in result.all_responses
+            ],
         ))
 
     def get_mac(self):

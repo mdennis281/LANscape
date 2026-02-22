@@ -27,6 +27,7 @@ class ScanHandler(BaseHandler):
     - scan.start_sync: Start a scan and wait for completion
     - scan.get: Get full scan results
     - scan.get_delta: Get only changed results since last request
+    - scan.get_port_detail: Get service detail for a specific port on a device
     - scan.summary: Get scan summary/progress
     - scan.terminate: Stop a running scan
     - scan.subscribe: Subscribe to real-time scan updates
@@ -52,6 +53,7 @@ class ScanHandler(BaseHandler):
         self.register('start_sync', self._handle_start_sync)
         self.register('get', self._handle_get)
         self.register('get_delta', self._handle_get_delta)
+        self.register('get_port_detail', self._handle_get_port_detail)
         self.register('summary', self._handle_summary)
         self.register('terminate', self._handle_terminate)
         self.register('subscribe', self._handle_subscribe)
@@ -178,6 +180,90 @@ class ScanHandler(BaseHandler):
         delta['metadata']['percent_complete'] = scan.calc_percent_complete()
 
         return delta
+
+    def _handle_get_port_detail(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Get service detail for a specific port on a device.
+
+        Params:
+            scan_id: The scan ID
+            ip: Device IP address
+            port: Port number
+
+        Returns:
+            Dict with port, service, probe stats, and response groups
+        """
+        scan_id = self._get_param(params, 'scan_id', required=True)
+        port = int(self._get_param(params, 'port', required=True))
+
+        device = self._find_device(
+            scan_id, self._get_param(params, 'ip', required=True)
+        )
+
+        # Collect all service_info entries for this port
+        infos = [si for si in device.service_info if si.port == port]
+        if not infos:
+            return {
+                'port': port, 'service': 'Unknown',
+                'probes_sent': 0, 'probes_received': 0,
+                'is_tls': False, 'responses': []
+            }
+
+        return self._build_port_detail(port, infos)
+
+    def _find_device(self, scan_id: str, ip: str) -> Any:
+        """Look up a Device by scan_id and IP, raising on miss."""
+        scan = self._scan_manager.get_scan(scan_id)
+        if scan is None:
+            raise ValueError(f"Scan not found: {scan_id}")
+        for dev in scan.results.devices:
+            if dev.ip == ip:
+                return dev
+        raise ValueError(f"Device not found: {ip}")
+
+    @staticmethod
+    def _build_port_detail(port: int, infos: list) -> dict:
+        """Build the port-detail response dict from ServiceInfo entries."""
+        responses = []
+        total_sent = 0
+        total_recv = 0
+        is_tls = False
+
+        for info in infos:
+            is_tls = is_tls or info.is_tls
+            total_sent += info.probes_sent
+            total_recv += info.probes_received
+
+            if info.all_responses:
+                # Use the detailed per-probe data when available
+                for pr in info.all_responses:
+                    responses.append({
+                        'response': pr.response,
+                        'service': pr.service,
+                        'probes': [pr.request] if pr.request else [],
+                        'is_tls': pr.is_tls,
+                    })
+            else:
+                # Fallback for older scan data without all_responses
+                responses.append({
+                    'response': info.response,
+                    'service': info.service,
+                    'probes': [info.request] if info.request else [],
+                    'is_tls': info.is_tls,
+                })
+
+        return {
+            'port': port,
+            'service': infos[-1].service,
+            'probes_sent': total_sent,
+            'probes_received': total_recv,
+            'is_tls': is_tls,
+            'responses': responses,
+        }
 
     def _handle_summary(
         self,

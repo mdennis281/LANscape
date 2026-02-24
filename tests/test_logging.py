@@ -88,3 +88,17 @@ def test_parse_args_logfile_path():
     with patch('sys.argv', ['prog', '--logfile', '/tmp/custom.log']):
         args = parse_args()
     assert args.logfile == '/tmp/custom.log'
+
+
+def test_parse_args_mdns_off():
+    """Test that --mdns-off flag sets mdns_enabled to False."""
+    with patch('sys.argv', ['prog', '--mdns-off']):
+        args = parse_args()
+    assert args.mdns_enabled is False
+
+
+def test_parse_args_mdns_default():
+    """Test that mdns_enabled defaults to True."""
+    with patch('sys.argv', ['prog']):
+        args = parse_args()
+    assert args.mdns_enabled is True

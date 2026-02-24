@@ -81,6 +81,65 @@ class WebSocketServer:
         # Background tasks
         self._update_task: Optional[asyncio.Task] = None
 
+    # ------------------------------------------------------------------
+    # Public accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def running(self) -> bool:
+        """Whether the server is currently running."""
+        return self._running
+
+    @property
+    def handlers(self) -> list:
+        """All registered handler instances."""
+        return list(self._handlers)
+
+    @property
+    def scan_handler(self) -> ScanHandler:
+        """The scan action handler."""
+        return self._scan_handler
+
+    @property
+    def port_handler(self) -> PortHandler:
+        """The port action handler."""
+        return self._port_handler
+
+    @property
+    def tools_handler(self) -> ToolsHandler:
+        """The tools action handler."""
+        return self._tools_handler
+
+    @property
+    def clients(self) -> dict[str, WebSocketServerProtocol]:
+        """Currently connected clients."""
+        return self._clients
+
+    def cleanup_client(self, client_id: str) -> None:
+        """
+        Remove a client and clean up its subscriptions.
+
+        Args:
+            client_id: The client identifier to remove
+        """
+        self._cleanup_client(client_id)
+
+    async def handle_message(
+        self,
+        client_id: str,
+        websocket: WebSocketServerProtocol,
+        message: str,
+    ) -> None:
+        """
+        Public wrapper for message handling.
+
+        Args:
+            client_id: The client identifier
+            websocket: The WebSocket connection
+            message: The raw message string
+        """
+        await self._handle_message(client_id, websocket, message)
+
     def get_actions(self) -> list[str]:
         """
         Get all supported actions.

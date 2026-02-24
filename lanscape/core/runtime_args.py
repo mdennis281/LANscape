@@ -15,6 +15,7 @@ class RuntimeArgs:
     persistent: bool = False
     ws_server: bool = False
     ws_port: int = 8766
+    mdns_enabled: bool = True
 
 
 def was_port_explicit() -> bool:
@@ -46,6 +47,8 @@ def parse_args() -> RuntimeArgs:
                         help='Start WebSocket server only (no UI)')
     parser.add_argument('--ws-port', type=int, default=8766,
                         help='Port for WebSocket server (default: 8766)')
+    parser.add_argument('--mdns-off', action='store_true',
+                        help='Disable mDNS service discovery')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -59,6 +62,10 @@ def parse_args() -> RuntimeArgs:
 
     if args.debug:
         args_dict['loglevel'] = 'DEBUG'
+
+    # --mdns-off -> mdns_enabled=False
+    if args_dict.pop('mdns_off', False):
+        args_dict['mdns_enabled'] = False
 
     # Only pass arguments that exist in the Args dataclass
     filtered_args = {name: args_dict[name]

@@ -2,6 +2,7 @@
 
 import ipaddress
 import logging
+import platform
 import re
 import socket
 import struct
@@ -35,10 +36,147 @@ from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, run_once, timeout_enforcer
 from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, ScanType
-from lanscape.core.models import DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo
+from lanscape.core.models import (
+    DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo, ProbeResponseInfo
+)
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
+
+
+# ---------------------------------------------------------------------------
+# Pure-Python hostname resolution helpers (no external tools required)
+# ---------------------------------------------------------------------------
+
+def _dns_name_decode(data: bytes, offset: int) -> tuple:
+    """Decode a DNS-encoded name from *data* starting at *offset*.
+
+    Handles label-compression pointers (RFC 1035 §4.1.4).
+    Returns ``(name_str, next_offset)`` where *next_offset* is the byte
+    immediately after the name field in the original (non-jumped) stream.
+    """
+    labels: list = []
+    max_offset = offset
+    jumped = False
+    seen: set = set()
+
+    while offset < len(data):
+        if offset in seen:
+            break  # prevent infinite pointer loops
+        seen.add(offset)
+
+        length = data[offset]
+        if length == 0:
+            if not jumped:
+                max_offset = offset + 1
+            break
+
+        if (length & 0xC0) == 0xC0:  # pointer
+            if not jumped:
+                max_offset = offset + 2
+            pointer = ((length & 0x3F) << 8) | data[offset + 1]
+            offset = pointer
+            jumped = True
+            continue
+
+        offset += 1
+        labels.append(data[offset:offset + length].decode('ascii', errors='ignore'))
+        offset += length
+
+    return '.'.join(labels), max_offset
+
+
+def _parse_mdns_ptr_response(data: bytes) -> Optional[str]:
+    """Extract the hostname from an mDNS PTR response packet.
+
+    Returns the first PTR RDATA value with any trailing dot stripped,
+    or ``None`` when the packet is not a valid PTR response.
+    """
+    if len(data) < 12:
+        return None
+
+    flags = struct.unpack('>H', data[2:4])[0]
+    if not flags & 0x8000:  # QR bit must be set (response)
+        return None
+
+    qdcount = struct.unpack('>H', data[4:6])[0]
+    ancount = struct.unpack('>H', data[6:8])[0]
+    if ancount == 0:
+        return None
+
+    # Skip question section
+    offset = 12
+    for _ in range(qdcount):
+        _, offset = _dns_name_decode(data, offset)
+        offset += 4  # QTYPE + QCLASS
+
+    # Walk answer records looking for a PTR
+    for _ in range(ancount):
+        _, offset = _dns_name_decode(data, offset)
+        if offset + 10 > len(data):
+            return None
+        rtype = struct.unpack('>H', data[offset:offset + 2])[0]
+        offset += 8  # TYPE(2) + CLASS(2) + TTL(4)
+        rdlength = struct.unpack('>H', data[offset:offset + 2])[0]
+        offset += 2
+
+        if rtype == 12:  # PTR
+            hostname, _ = _dns_name_decode(data, offset)
+            return hostname.rstrip('.') if hostname else None
+        offset += rdlength
+
+    return None
+
+
+def _parse_nbstat_response(data: bytes) -> Optional[str]:
+    """Extract the machine name from a NetBIOS NBSTAT response.
+
+    Scans the name table for a ``<00>`` suffix entry with the UNIQUE flag
+    (GROUP bit 0x8000 clear) and returns the trimmed ASCII name.
+    """
+    if len(data) < 43:  # minimum viable NBSTAT response (header + ptr + RR meta + 1 name)
+        return None
+
+    # Skip header (12 bytes)
+    offset = 12
+
+    # Skip answer RR name (may be a label or a compression pointer)
+    while offset < len(data):
+        length = data[offset]
+        if length == 0:
+            offset += 1
+            break
+        if (length & 0xC0) == 0xC0:
+            offset += 2
+            break
+        offset += 1 + length
+
+    # TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) = 10
+    if offset + 10 > len(data):
+        return None
+    offset += 10
+
+    if offset >= len(data):
+        return None
+    num_names = data[offset]
+    offset += 1
+
+    # Each entry: 15-byte name + 1-byte suffix + 2-byte flags = 18 bytes
+    for _ in range(num_names):
+        if offset + 18 > len(data):
+            break
+        name_bytes = data[offset:offset + 15]
+        suffix = data[offset + 15]
+        flags = struct.unpack('>H', data[offset + 16:offset + 18])[0]
+        offset += 18
+
+        # Suffix 0x00 = Workstation Service; GROUP bit clear = unique name
+        if suffix == 0x00 and not flags & 0x8000:
+            name = name_bytes.decode('ascii', errors='ignore').strip()
+            if name and name != '*':
+                return name
+
+    return None
 
 
 class Device(BaseModel):
@@ -168,7 +306,16 @@ class Device(BaseModel):
             response=result.response,
             probes_sent=result.probes_sent,
             probes_received=result.probes_received,
-            is_tls=result.is_tls
+            is_tls=result.is_tls,
+            all_responses=[
+                ProbeResponseInfo(
+                    request=pr.request,
+                    response=pr.response,
+                    service=pr.service,
+                    weight=pr.weight,
+                    is_tls=pr.is_tls,
+                ) for pr in result.all_responses
+            ],
         ))
 
     def get_mac(self):
@@ -188,14 +335,104 @@ class Device(BaseModel):
         return self.macs
 
     @job_tracker
-    def _get_hostname(self):
-        """Get the hostname of a network device given its IP address."""
+    def _get_hostname(self) -> Optional[str]:
+        """Get the hostname of a network device given its IP address.
+
+        Tries multiple resolution methods:
+        1. Reverse DNS (socket.gethostbyaddr) — works everywhere when PTR records exist
+        2. mDNS multicast PTR query (Linux/macOS) — resolves .local hostnames
+        3. NetBIOS NBSTAT query (Linux/macOS) — resolves Windows-style hostnames
+        """
+        # 1. Standard reverse DNS lookup
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
-            return hostname
-        except socket.herror as e:
-            self.caught_errors.append(DeviceError(e))
+            if hostname:
+                return hostname
+        except socket.herror:
+            pass
+
+        # On Windows, gethostbyaddr already chains through NetBIOS/LLMNR/mDNS
+        if platform.system() == 'Windows':
             return None
+
+        # 2. mDNS multicast PTR query (no avahi-utils dependency)
+        hostname = self._resolve_mdns()
+        if hostname:
+            return hostname
+
+        # 3. NetBIOS NBSTAT query (no samba-common dependency)
+        hostname = self._resolve_netbios()
+        if hostname:
+            return hostname
+
+        return None
+
+    def _resolve_mdns(self) -> Optional[str]:
+        """Resolve hostname via mDNS multicast PTR query (pure Python)."""
+        reversed_ip = '.'.join(reversed(self.ip.split('.')))
+        qname = f"{reversed_ip}.in-addr.arpa"
+
+        # Encode DNS query name
+        name_bytes = b''
+        for label in qname.split('.'):
+            name_bytes += bytes([len(label)]) + label.encode('ascii')
+        name_bytes += b'\x00'
+
+        request = (
+            b'\x00\x00'  # Transaction ID (0 for mDNS)
+            b'\x00\x00'  # Flags: standard query
+            b'\x00\x01'  # QDCOUNT: 1
+            b'\x00\x00'  # ANCOUNT: 0
+            b'\x00\x00'  # NSCOUNT: 0
+            b'\x00\x00'  # ARCOUNT: 0
+        ) + name_bytes + (
+            b'\x00\x0c'  # Type: PTR
+            b'\x80\x01'  # Class: IN + unicast-response bit
+        )
+
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(2.0)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+            sock.sendto(request, ('224.0.0.251', 5353))
+            data, _ = sock.recvfrom(1500)
+            return _parse_mdns_ptr_response(data)
+        except (socket.timeout, OSError):
+            return None
+        finally:
+            if sock:
+                sock.close()
+
+    def _resolve_netbios(self) -> Optional[str]:
+        """Resolve hostname via NetBIOS NBSTAT query (pure Python)."""
+        # NBSTAT request for wildcard name '*'
+        request = (
+            b'\xa5\x6c'       # Transaction ID
+            b'\x00\x00'       # Flags: standard query
+            b'\x00\x01'       # QDCOUNT: 1
+            b'\x00\x00'       # ANCOUNT: 0
+            b'\x00\x00'       # NSCOUNT: 0
+            b'\x00\x00'       # ARCOUNT: 0
+            b'\x20'           # Name length: 32
+            b'CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'  # '*' NetBIOS-encoded
+            b'\x00'           # Name terminator
+            b'\x00\x21'       # Type: NBSTAT
+            b'\x00\x01'       # Class: IN
+        )
+
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(2.0)
+            sock.sendto(request, (self.ip, 137))
+            data, _ = sock.recvfrom(1500)
+            return _parse_nbstat_response(data)
+        except (socket.timeout, OSError):
+            return None
+        finally:
+            if sock:
+                sock.close()
 
     @job_tracker
     def _get_manufacturer(self, mac_addr=None):

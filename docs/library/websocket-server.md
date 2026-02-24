@@ -289,6 +289,58 @@ List all scans (active and completed).
 
 ---
 
+#### `scan.get_port_detail`
+
+Get detailed service-probe results for a specific port on a discovered device. Returns every probe/response pair collected during the service scan, useful for inspecting *how* a service was identified.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scan_id` | `string` | yes | The scan ID |
+| `ip` | `string` | yes | Device IP address |
+| `port` | `int` | yes | Port number to inspect |
+
+**Response data:**
+
+```json
+{
+  "port": 443,
+  "service": "HTTPS",
+  "probes_sent": 5,
+  "probes_received": 2,
+  "is_tls": true,
+  "responses": [
+    {
+      "response": "HTTP/1.1 200 OK...",
+      "service": "HTTPS",
+      "probes": ["GET / HTTP/1.1..."],
+      "is_tls": true
+    }
+  ]
+}
+```
+
+| Response field | Type | Description |
+|----------------|------|-------------|
+| `port` | `int` | The requested port |
+| `service` | `string` | Best-match service name |
+| `probes_sent` | `int` | Total probes sent across all attempts |
+| `probes_received` | `int` | Total responses received |
+| `is_tls` | `bool` | Whether any probe detected TLS |
+| `responses` | `array` | Individual probe/response groups (see below) |
+
+Each entry in `responses`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `response` | `string \| null` | Raw response text |
+| `service` | `string` | Service identified for this response |
+| `probes` | `string[]` | Probe payloads that produced this response |
+| `is_tls` | `bool` | Whether TLS was used for this probe |
+
+If the port has no service info (e.g. it was open but unprobed), `responses` will be an empty array with zeroed counters.
+
+---
+
 ### Port Actions
 
 #### `port.list`
@@ -598,3 +650,76 @@ server = WebSocketServer(
     on_client_change=lambda count: print(f"{count} clients connected")
 )
 ```
+
+---
+
+## HTTP API
+
+When running the built-in web server (`start_webapp_server`), a lightweight HTTP API is available alongside the WebSocket server.
+
+### `GET /api/discover`
+
+Returns connection info for this server and any other LANscape instances discovered on the local network via mDNS.
+
+**Response:**
+
+```json
+{
+  "mdns_enabled": true,
+  "default_route": "http://192.168.1.50:5001",
+  "instances": [
+    {
+      "host": "192.168.1.100",
+      "ws_port": 8766,
+      "http_port": 5001,
+      "version": "3.1.0",
+      "hostname": "server-2"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mdns_enabled` | `bool` | Whether mDNS discovery is active on this server |
+| `default_route` | `string` | Preferred connection URL for this server (uses LAN IP when available) |
+| `instances` | `array` | Other LANscape instances found via mDNS (empty when mDNS is disabled or no peers found) |
+
+Each instance entry:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `host` | `string` | IP address of the discovered instance |
+| `ws_port` | `int` | WebSocket port |
+| `http_port` | `int` | HTTP port |
+| `version` | `string` | LANscape version running on that instance |
+| `hostname` | `string` | Machine hostname |
+
+---
+
+## mDNS Discovery
+
+The server can advertise itself on the local network and discover other LANscape instances using mDNS/DNS-SD (service type `_lanscape._tcp.local.`). This is managed by the `DiscoveryService` class.
+
+mDNS is **enabled by default**. Disable it with the `--mdns-off` CLI flag:
+
+```bash
+python -m lanscape --mdns-off
+```
+
+When disabled, `/api/discover` still responds but with `mdns_enabled: false` and an empty `instances` list.
+
+---
+
+## CLI Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--port` | `5001` | HTTP server port |
+| `--ws-port` | `8766` | WebSocket server port |
+| `--loglevel` | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
+| `--debug` | — | Shorthand for `--loglevel DEBUG` |
+| `--persistent` | — | Don't auto-shutdown when browser closes |
+| `--ws-server` | — | Start WebSocket server only (no UI) |
+| `--mdns-off` | — | Disable mDNS service discovery |
+| `--logfile` | — | Log output to the specified file path |

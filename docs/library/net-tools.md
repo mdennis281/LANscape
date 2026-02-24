@@ -2,7 +2,7 @@
 
 `lanscape.net_tools`
 
-Network utility functions for discovering subnets on your machine and checking ARP support before scanning.
+Network utility functions for discovering subnets on your machine, checking ARP support, and hostname resolution.
 
 ## Import
 
@@ -121,3 +121,19 @@ sm.wait_until_complete(scan.uid)
 for device in scan.results.to_results().devices:
     print(f"{device.ip} - {device.hostname} - {device.ports}")
 ```
+
+---
+
+## Hostname Resolution
+
+During a scan, LANscape resolves hostnames using a multi-strategy approach. This happens automatically — no configuration needed.
+
+| Method | Platform | Description |
+|--------|----------|-------------|
+| Reverse DNS | All | Standard `gethostbyaddr` lookup (PTR records) |
+| mDNS PTR query | Linux / macOS | Pure-Python multicast DNS query to `224.0.0.251:5353` — resolves `.local` hostnames without requiring `avahi-utils` |
+| NetBIOS NBSTAT | Linux / macOS | Pure-Python NetBIOS name query on port 137 — resolves Windows-style hostnames without requiring `samba-common` |
+
+On **Windows**, the system resolver already chains through NetBIOS, LLMNR, and mDNS, so only reverse DNS is used.
+
+On **Linux and macOS**, if reverse DNS fails, LANscape tries mDNS then NetBIOS as fallbacks. Both are implemented in pure Python with no external dependencies.

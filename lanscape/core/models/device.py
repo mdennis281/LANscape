@@ -26,6 +26,15 @@ class DeviceErrorInfo(BaseModel):
         )
 
 
+class ProbeResponseInfo(BaseModel):
+    """A single probe request/response pair."""
+    request: Optional[str] = Field(default=None, description="Probe payload sent")
+    response: Optional[str] = Field(default=None, description="Response received")
+    service: str = Field(default='Unknown', description="Service identified for this response")
+    weight: int = Field(default=0, description="Match confidence weight")
+    is_tls: bool = Field(default=False, description="Whether TLS/SSL was used")
+
+
 class ServiceInfo(BaseModel):
     """Information about a service discovered on a port."""
     port: int = Field(description="Port number")
@@ -35,6 +44,10 @@ class ServiceInfo(BaseModel):
     probes_sent: int = Field(default=0, description="Number of probes sent")
     probes_received: int = Field(default=0, description="Number of responses received")
     is_tls: bool = Field(default=False, description="Whether TLS/SSL was detected")
+    all_responses: List[ProbeResponseInfo] = Field(
+        default_factory=list,
+        description="All probe/response pairs collected during scan"
+    )
 
 
 class DeviceResult(BaseModel):

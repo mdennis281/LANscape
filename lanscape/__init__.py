@@ -39,6 +39,7 @@ from lanscape.core.models import (
     ScanStage,
     DeviceErrorInfo,
     DeviceResult,
+    ProbeResponseInfo,
     ServiceInfo,
     ScanErrorInfo,
     ScanWarningInfo,
@@ -52,7 +53,12 @@ from lanscape.core.models import (
 # Webapp server for serving bundled React UI
 from lanscape.ui.react_proxy import (
     start_webapp_server,
-    REACT_BUILD_DIR
+    REACT_BUILD_DIR,
+    DiscoveryService,
+    DiscoveredInstance,
+    DiscoverResponse,
+    build_default_route,
+    get_local_address_strings,
 )
 
 # Version management

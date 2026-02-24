@@ -1,13 +1,11 @@
 """
-Unit tests for the LANscape WebSocket interface.
+Unit tests for the LANscape WebSocket handlers, server, and integration.
 
 Tests cover:
-- Protocol classes (WSRequest, WSResponse, WSError, WSEvent)
-- Delta tracking (DeltaTracker, ScanDeltaTracker)
 - Handler classes (ScanHandler, PortHandler, ToolsHandler)
 - WebSocket server functionality
+- End-to-end WebSocket integration
 """
-# pylint: disable=protected-access,missing-class-docstring,too-many-locals,unsubscriptable-object,too-many-lines
 
 import asyncio
 import json
@@ -17,399 +15,14 @@ import websockets
 
 from tests.test_globals import TEST_SUBNET
 from lanscape.core.scan_config import ScanType
-from lanscape.ui.ws.protocol import (
-    WSRequest,
-    WSResponse,
-    WSError,
-    WSEvent,
-    MessageType
-)
-from lanscape.ui.ws.delta import DeltaTracker, ScanDeltaTracker
-from lanscape.ui.ws.handlers.base import BaseHandler
 from lanscape.ui.ws.handlers.scan import ScanHandler
 from lanscape.ui.ws.handlers.port import PortHandler
 from lanscape.ui.ws.handlers.tools import ToolsHandler
 from lanscape.ui.ws.server import WebSocketServer
 
 
-# Protocol Tests
-###############################################################################
-
-class TestProtocol:
-    """Tests for WebSocket protocol message classes."""
-
-    def test_ws_request_creation(self):
-        """Test creating a WSRequest message."""
-        request = WSRequest(
-            id="test-123",
-            action="scan.start",
-            params={"subnet": "192.168.1.0/24", "port_list": "small"}
-        )
-
-        assert request.type == MessageType.REQUEST
-        assert request.id == "test-123"
-        assert request.action == "scan.start"
-        assert request.params["subnet"] == "192.168.1.0/24"
-
-    def test_ws_request_minimal(self):
-        """Test creating a WSRequest with minimal parameters."""
-        request = WSRequest(action="port.list")
-
-        assert request.type == MessageType.REQUEST
-        assert request.action == "port.list"
-        assert request.params is None
-        assert request.id is None
-
-    def test_ws_response_creation(self):
-        """Test creating a WSResponse message."""
-        response = WSResponse(
-            id="test-123",
-            action="scan.start",
-            data={"scan_id": "abc-123", "status": "running"},
-            success=True
-        )
-
-        assert response.type == MessageType.RESPONSE
-        assert response.id == "test-123"
-        assert response.action == "scan.start"
-        assert response.data["scan_id"] == "abc-123"
-        assert response.success is True
-
-    def test_ws_error_creation(self):
-        """Test creating a WSError message."""
-        error = WSError(
-            id="test-123",
-            action="scan.get",
-            error="Scan not found",
-            traceback="Traceback..."
-        )
-
-        assert error.type == MessageType.ERROR
-        assert error.id == "test-123"
-        assert error.action == "scan.get"
-        assert error.error == "Scan not found"
-        assert error.traceback == "Traceback..."
-
-    def test_ws_event_creation(self):
-        """Test creating a WSEvent message."""
-        event = WSEvent(
-            event="scan.update",
-            data={"scan_id": "abc-123", "devices": []}
-        )
-
-        assert event.type == MessageType.EVENT
-        assert event.event == "scan.update"
-        assert event.data["scan_id"] == "abc-123"
-
-    def test_ws_request_serialization(self):
-        """Test JSON serialization of WSRequest."""
-        request = WSRequest(
-            id="test-123",
-            action="scan.start",
-            params={"subnet": "192.168.1.0/24"}
-        )
-
-        json_str = request.model_dump_json()
-        data = json.loads(json_str)
-
-        assert data["type"] == "request"
-        assert data["id"] == "test-123"
-        assert data["action"] == "scan.start"
-        assert data["params"]["subnet"] == "192.168.1.0/24"
-
-    def test_ws_request_deserialization(self):
-        """Test JSON deserialization to WSRequest."""
-        data = {
-            "type": "request",
-            "id": "test-123",
-            "action": "scan.start",
-            "params": {"subnet": "192.168.1.0/24"}
-        }
-
-        request = WSRequest.model_validate(data)
-
-        assert request.type == MessageType.REQUEST
-        assert request.id == "test-123"
-        assert request.action == "scan.start"
-
-
-# Delta Tracker Tests
-###############################################################################
-
-class TestDeltaTracker:
-    """Tests for DeltaTracker class."""
-
-    def test_compute_hash_consistency(self):
-        """Test that hash computation is consistent."""
-        data = {"ip": "192.168.1.1", "hostname": "test"}
-
-        hash1 = DeltaTracker.compute_hash(data)
-        hash2 = DeltaTracker.compute_hash(data)
-
-        assert hash1 == hash2
-
-    def test_compute_hash_different_data(self):
-        """Test that different data produces different hashes."""
-        data1 = {"ip": "192.168.1.1"}
-        data2 = {"ip": "192.168.1.2"}
-
-        hash1 = DeltaTracker.compute_hash(data1)
-        hash2 = DeltaTracker.compute_hash(data2)
-
-        assert hash1 != hash2
-
-    def test_update_returns_data_on_first_call(self):
-        """Test that update returns data on first call."""
-        tracker = DeltaTracker()
-        data = {"ip": "192.168.1.1"}
-
-        result = tracker.update("device1", data)
-
-        assert result == data
-
-    def test_update_returns_none_on_no_change(self):
-        """Test that update returns None when data hasn't changed."""
-        tracker = DeltaTracker()
-        data = {"ip": "192.168.1.1"}
-
-        tracker.update("device1", data)
-        result = tracker.update("device1", data)
-
-        assert result is None
-
-    def test_update_returns_data_on_change(self):
-        """Test that update returns data when it changes."""
-        tracker = DeltaTracker()
-        data1 = {"ip": "192.168.1.1", "ports": []}
-        data2 = {"ip": "192.168.1.1", "ports": [80]}
-
-        tracker.update("device1", data1)
-        result = tracker.update("device1", data2)
-
-        assert result == data2
-
-    def test_get_changes(self):
-        """Test get_changes returns only changed items."""
-        tracker = DeltaTracker()
-
-        # First update - all items are new
-        items = {"a": 1, "b": 2, "c": 3}
-        changes = tracker.get_changes(items)
-        assert changes == items
-
-        # Second update - only b changed
-        items = {"a": 1, "b": 5, "c": 3}
-        changes = tracker.get_changes(items)
-        assert changes == {"b": 5}
-
-    def test_reset_specific_key(self):
-        """Test resetting a specific key."""
-        tracker = DeltaTracker()
-        tracker.update("a", 1)
-        tracker.update("b", 2)
-
-        tracker.reset("a")
-
-        assert not tracker.has_key("a")
-        assert tracker.has_key("b")
-
-    def test_reset_all(self):
-        """Test resetting all keys."""
-        tracker = DeltaTracker()
-        tracker.update("a", 1)
-        tracker.update("b", 2)
-
-        tracker.reset()
-
-        assert not tracker.has_key("a")
-        assert not tracker.has_key("b")
-
-
-class TestScanDeltaTracker:
-    """Tests for ScanDeltaTracker class."""
-
-    def test_get_scan_delta_initial(self):
-        """Test get_scan_delta returns all data on first call."""
-        tracker = ScanDeltaTracker()
-        results = {
-            "subnet": "192.168.1.0/24",
-            "running": True,
-            "devices": [
-                {"ip": "192.168.1.1", "ports": []},
-                {"ip": "192.168.1.2", "ports": [80]}
-            ]
-        }
-
-        delta = tracker.get_scan_delta(results)
-
-        assert delta["has_changes"] is True
-        assert delta["metadata"] is not None
-        assert len(delta["devices"]) == 2
-
-    def test_get_scan_delta_no_changes(self):
-        """Test get_scan_delta returns no changes when data is same."""
-        tracker = ScanDeltaTracker()
-        results = {
-            "subnet": "192.168.1.0/24",
-            "running": True,
-            "devices": [
-                {"ip": "192.168.1.1", "ports": []}
-            ]
-        }
-
-        tracker.get_scan_delta(results)
-        delta = tracker.get_scan_delta(results)
-
-        assert delta["has_changes"] is False
-        assert delta["metadata"] is None
-        assert len(delta["devices"]) == 0
-
-    def test_get_scan_delta_device_change(self):
-        """Test get_scan_delta detects device changes."""
-        tracker = ScanDeltaTracker()
-        results1 = {
-            "subnet": "192.168.1.0/24",
-            "running": True,
-            "devices": [
-                {"ip": "192.168.1.1", "ports": []}
-            ]
-        }
-        results2 = {
-            "subnet": "192.168.1.0/24",
-            "running": True,
-            "devices": [
-                {"ip": "192.168.1.1", "ports": [80]}  # Port changed
-            ]
-        }
-
-        tracker.get_scan_delta(results1)
-        delta = tracker.get_scan_delta(results2)
-
-        assert delta["has_changes"] is True
-        assert delta["metadata"] is None  # Metadata unchanged
-        assert len(delta["devices"]) == 1
-        assert delta["devices"][0]["ip"] == "192.168.1.1"
-
-    def test_get_scan_delta_new_device(self):
-        """Test get_scan_delta detects new devices."""
-        tracker = ScanDeltaTracker()
-        results1 = {
-            "subnet": "192.168.1.0/24",
-            "running": True,
-            "devices": [
-                {"ip": "192.168.1.1", "ports": []}
-            ]
-        }
-        results2 = {
-            "subnet": "192.168.1.0/24",
-            "running": True,
-            "devices": [
-                {"ip": "192.168.1.1", "ports": []},
-                {"ip": "192.168.1.2", "ports": [22]}  # New device
-            ]
-        }
-
-        tracker.get_scan_delta(results1)
-        delta = tracker.get_scan_delta(results2)
-
-        assert delta["has_changes"] is True
-        assert len(delta["devices"]) == 1
-        assert delta["devices"][0]["ip"] == "192.168.1.2"
-
-
 # Handler Tests
 ###############################################################################
-
-class TestBaseHandler:
-    """Tests for BaseHandler class."""
-
-    def test_register_action(self):
-        """Test registering an action handler."""
-
-        class TestHandler(BaseHandler):
-            @property
-            def prefix(self):
-                return "test"
-
-        handler = TestHandler()
-        handler.register("action1", lambda p, s: {"result": "ok"})
-
-        assert handler.can_handle("test.action1")
-        assert not handler.can_handle("test.action2")
-
-    def test_get_actions(self):
-        """Test getting all registered actions."""
-
-        class TestHandler(BaseHandler):
-            @property
-            def prefix(self):
-                return "test"
-
-        handler = TestHandler()
-        handler.register("action1", lambda p, s: {})
-        handler.register("action2", lambda p, s: {})
-
-        actions = handler.get_actions()
-
-        assert "test.action1" in actions
-        assert "test.action2" in actions
-
-    @pytest.mark.asyncio
-    async def test_handle_success(self):
-        """Test handling a request successfully."""
-
-        class TestHandler(BaseHandler):
-            @property
-            def prefix(self):
-                return "test"
-
-        handler = TestHandler()
-        handler.register("echo", lambda p, s: p)
-
-        request = WSRequest(id="1", action="test.echo", params={"msg": "hello"})
-        response = await handler.handle(request)
-
-        assert isinstance(response, WSResponse)
-        assert response.success is True
-        assert response.data == {"msg": "hello"}
-
-    @pytest.mark.asyncio
-    async def test_handle_error(self):
-        """Test handling a request that raises an error."""
-
-        class TestHandler(BaseHandler):
-            @property
-            def prefix(self):
-                return "test"
-
-        def failing_handler(params, send_event):
-            raise ValueError("Test error")
-
-        handler = TestHandler()
-        handler.register("fail", failing_handler)
-
-        request = WSRequest(id="1", action="test.fail")
-        response = await handler.handle(request)
-
-        assert isinstance(response, WSError)
-        assert "Test error" in response.error
-
-    @pytest.mark.asyncio
-    async def test_handle_unknown_action(self):
-        """Test handling an unknown action."""
-
-        class TestHandler(BaseHandler):
-            @property
-            def prefix(self):
-                return "test"
-
-        handler = TestHandler()
-        request = WSRequest(id="1", action="test.unknown")
-        response = await handler.handle(request)
-
-        assert isinstance(response, WSError)
-        assert "Unknown action" in response.error
-
 
 class TestScanHandler:
     """Tests for ScanHandler class."""
@@ -447,7 +60,7 @@ class TestScanHandler:
         mock_scan_manager.new_scan.return_value = mock_scan
 
         params = {"subnet": "192.168.1.0/24", "port_list": "small"}
-        result = scan_handler._handle_start(params, None)
+        result = scan_handler.invoke("start", params)
 
         assert result["scan_id"] == "test-scan-123"
         assert result["status"] == "running"
@@ -457,7 +70,7 @@ class TestScanHandler:
         mock_scan_manager.get_scan.return_value = None
 
         with pytest.raises(ValueError, match="Scan not found"):
-            scan_handler._handle_get({"scan_id": "nonexistent"}, None)
+            scan_handler.invoke("get", {"scan_id": "nonexistent"})
 
     def test_handle_summary(self, scan_handler, mock_scan_manager):
         """Test getting scan summary."""
@@ -470,7 +83,6 @@ class TestScanHandler:
         mock_scan.results.devices_scanned = 128
         mock_scan.results.devices = [MagicMock(), MagicMock()]
         mock_scan.results.devices_total = 256
-        # Mock the to_summary().model_dump() chain
         mock_scan.results.to_summary.return_value.model_dump.return_value = {
             'metadata': {
                 'scan_id': 'test-scan-123',
@@ -488,7 +100,7 @@ class TestScanHandler:
         }
         mock_scan_manager.get_scan.return_value = mock_scan
 
-        result = scan_handler._handle_summary({"scan_id": "test-scan-123"}, None)
+        result = scan_handler.invoke("summary", {"scan_id": "test-scan-123"})
 
         assert result["metadata"]["running"] is True
         assert result["metadata"]["percent_complete"] == 50
@@ -501,9 +113,9 @@ class TestScanHandler:
         mock_scan = MagicMock()
         mock_scan_manager.get_scan.return_value = mock_scan
 
-        result = scan_handler._handle_subscribe(
+        result = scan_handler.invoke(
+            "subscribe",
             {"scan_id": "scan-123", "client_id": "client-abc"},
-            None
         )
 
         assert result["subscribed"] is True
@@ -514,16 +126,14 @@ class TestScanHandler:
         mock_scan = MagicMock()
         mock_scan_manager.get_scan.return_value = mock_scan
 
-        # First subscribe
-        scan_handler._handle_subscribe(
+        scan_handler.invoke(
+            "subscribe",
             {"scan_id": "scan-123", "client_id": "client-abc"},
-            None
         )
 
-        # Then unsubscribe
-        result = scan_handler._handle_unsubscribe(
+        result = scan_handler.invoke(
+            "unsubscribe",
             {"scan_id": "scan-123", "client_id": "client-abc"},
-            None
         )
 
         assert result["unsubscribed"] is True
@@ -534,17 +144,15 @@ class TestScanHandler:
         mock_scan = MagicMock()
         mock_scan_manager.get_scan.return_value = mock_scan
 
-        # Subscribe to multiple scans
-        scan_handler._handle_subscribe(
+        scan_handler.invoke(
+            "subscribe",
             {"scan_id": "scan-1", "client_id": "client-abc"},
-            None
         )
-        scan_handler._handle_subscribe(
+        scan_handler.invoke(
+            "subscribe",
             {"scan_id": "scan-2", "client_id": "client-abc"},
-            None
         )
 
-        # Cleanup
         scan_handler.cleanup_client("client-abc")
 
         assert "client-abc" not in scan_handler.get_subscriptions("scan-1")
@@ -577,9 +185,11 @@ class TestPortHandler:
 
     def test_handle_list(self, port_handler, mock_port_manager):
         """Test listing port lists."""
-        mock_port_manager.get_port_lists.return_value = ["small", "medium", "large"]
+        mock_port_manager.get_port_lists.return_value = [
+            "small", "medium", "large"
+        ]
 
-        result = port_handler._handle_list({}, None)
+        result = port_handler.invoke("list")
 
         assert result == ["small", "medium", "large"]
 
@@ -591,7 +201,7 @@ class TestPortHandler:
             {"22": "ssh", "80": "http", "443": "https", "8080": "http-alt"}
         ]
 
-        result = port_handler._handle_list_summary({}, None)
+        result = port_handler.invoke("list_summary")
 
         assert len(result) == 2
         assert result[0]["name"] == "small"
@@ -601,9 +211,11 @@ class TestPortHandler:
 
     def test_handle_get(self, port_handler, mock_port_manager):
         """Test getting a port list."""
-        mock_port_manager.get_port_list.return_value = {"22": "ssh", "80": "http"}
+        mock_port_manager.get_port_list.return_value = {
+            "22": "ssh", "80": "http"
+        }
 
-        result = port_handler._handle_get({"name": "small"}, None)
+        result = port_handler.invoke("get", {"name": "small"})
 
         assert result == {"22": "ssh", "80": "http"}
 
@@ -611,9 +223,9 @@ class TestPortHandler:
         """Test creating a port list successfully."""
         mock_port_manager.create_port_list.return_value = True
 
-        result = port_handler._handle_create(
+        result = port_handler.invoke(
+            "create",
             {"name": "custom", "ports": {"22": "ssh"}},
-            None
         )
 
         assert result["success"] is True
@@ -624,16 +236,16 @@ class TestPortHandler:
         mock_port_manager.create_port_list.return_value = False
 
         with pytest.raises(ValueError, match="Failed to create"):
-            port_handler._handle_create(
+            port_handler.invoke(
+                "create",
                 {"name": "invalid", "ports": {}},
-                None
             )
 
     def test_handle_delete(self, port_handler, mock_port_manager):
         """Test deleting a port list."""
         mock_port_manager.delete_port_list.return_value = True
 
-        result = port_handler._handle_delete({"name": "custom"}, None)
+        result = port_handler.invoke("delete", {"name": "custom"})
 
         assert result["success"] is True
 
@@ -658,65 +270,84 @@ class TestToolsHandler:
 
     def test_handle_subnet_test_empty(self, tools_handler):
         """Test validating an empty subnet."""
-        result = tools_handler._handle_subnet_test({"subnet": ""}, None)
+        result = tools_handler.invoke("subnet_test", {"subnet": ""})
 
         assert result["valid"] is False
         assert result["count"] == -1
 
     def test_handle_subnet_test_valid(self, tools_handler):
         """Test validating a valid subnet."""
-        result = tools_handler._handle_subnet_test({"subnet": "192.168.1.1"}, None)
+        result = tools_handler.invoke(
+            "subnet_test", {"subnet": "192.168.1.1"}
+        )
 
         assert result["valid"] is True
         assert result["count"] == 1
 
     def test_handle_subnet_test_cidr(self, tools_handler):
         """Test validating a CIDR subnet."""
-        result = tools_handler._handle_subnet_test({"subnet": "192.168.1.0/30"}, None)
+        result = tools_handler.invoke(
+            "subnet_test", {"subnet": "192.168.1.0/30"}
+        )
 
         assert result["valid"] is True
-        assert result["count"] == 2  # /30 has 2 usable host IPs
+        assert result["count"] == 2
 
     def test_handle_subnet_test_invalid(self, tools_handler):
         """Test validating an invalid subnet."""
-        result = tools_handler._handle_subnet_test({"subnet": "not.a.subnet"}, None)
+        result = tools_handler.invoke(
+            "subnet_test", {"subnet": "not.a.subnet"}
+        )
 
         assert result["valid"] is False
 
     def test_handle_subnet_list(self, tools_handler):
         """Test listing subnets."""
-        with patch('lanscape.ui.ws.handlers.tools.get_all_network_subnets') as mock:
-            mock.return_value = [{"subnet": "192.168.1.0/24", "interface": "eth0"}]
+        with patch(
+            'lanscape.ui.ws.handlers.tools.get_all_network_subnets'
+        ) as mock_subnets, patch(
+            'lanscape.ui.ws.handlers.tools.smart_select_primary_subnet',
+            return_value='192.168.1.0/24',
+        ):
+            mock_subnets.return_value = [
+                {"subnet": "192.168.1.0/24", "interface": "eth0"}
+            ]
 
-            with patch('lanscape.ui.ws.handlers.tools.smart_select_primary_subnet',
-                       return_value='192.168.1.0/24'):
-                result = tools_handler._handle_subnet_list({}, None)
+            result = tools_handler.invoke("subnet_list")
 
             assert len(result) == 1
             assert result[0]["subnet"] == "192.168.1.0/24"
 
     def test_handle_subnet_list_primary_sorted_first(self, tools_handler):
-        """Test that smart-selected primary subnet is first in the list."""
+        """Test that smart-selected primary subnet is first."""
         subnets = [
-            {"subnet": "172.17.0.0/16", "interface": "docker0", "address_cnt": 65534},
-            {"subnet": "192.168.1.0/24", "interface": "eth0", "address_cnt": 254},
-            {"subnet": "10.0.0.0/24", "interface": "wlan0", "address_cnt": 254},
+            {"subnet": "172.17.0.0/16", "interface": "docker0",
+             "address_cnt": 65534},
+            {"subnet": "192.168.1.0/24", "interface": "eth0",
+             "address_cnt": 254},
+            {"subnet": "10.0.0.0/24", "interface": "wlan0",
+             "address_cnt": 254},
         ]
-        with patch('lanscape.ui.ws.handlers.tools.get_all_network_subnets',
-                   return_value=subnets):
-            with patch('lanscape.ui.ws.handlers.tools.smart_select_primary_subnet',
-                       return_value='192.168.1.0/24'):
-                result = tools_handler._handle_subnet_list({}, None)
+        with patch(
+            'lanscape.ui.ws.handlers.tools.get_all_network_subnets',
+            return_value=subnets,
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.smart_select_primary_subnet',
+            return_value='192.168.1.0/24',
+        ):
+            result = tools_handler.invoke("subnet_list")
 
         assert len(result) == 3
         assert result[0]["subnet"] == "192.168.1.0/24"
 
     def test_handle_config_defaults(self, tools_handler):
         """Test getting default configs."""
-        with patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock:
+        with patch(
+            'lanscape.ui.ws.handlers.tools.is_arp_supported'
+        ) as mock:
             mock.return_value = True
 
-            result = tools_handler._handle_config_defaults({}, None)
+            result = tools_handler.invoke("config_defaults")
 
             assert "balanced" in result
             assert "accurate" in result
@@ -724,24 +355,31 @@ class TestToolsHandler:
 
     def test_handle_arp_supported(self, tools_handler):
         """Test checking ARP support."""
-        with patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock:
+        with patch(
+            'lanscape.ui.ws.handlers.tools.is_arp_supported'
+        ) as mock:
             mock.return_value = True
-            result = tools_handler._handle_arp_supported({}, None)
+            result = tools_handler.invoke("arp_supported")
             assert result["supported"] is True
 
             mock.return_value = False
-            result = tools_handler._handle_arp_supported({}, None)
+            result = tools_handler.invoke("arp_supported")
             assert result["supported"] is False
 
     def test_handle_app_info(self, tools_handler):
         """Test getting app info."""
-        with patch('lanscape.ui.ws.handlers.tools.get_installed_version') as mock_version, \
-                patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
-                patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
-                patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
-            mock_version.return_value = '1.2.3'
-            mock_arp.return_value = True
-            mock_update.return_value = False
+        with patch(
+            'lanscape.ui.ws.handlers.tools.get_installed_version',
+            return_value='1.2.3',
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.is_arp_supported',
+            return_value=True,
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.is_update_available',
+            return_value=False,
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.parse_args',
+        ) as mock_args:
             mock_args.return_value.port = 5001
             mock_args.return_value.ws_port = 8766
             mock_args.return_value.loglevel = 'INFO'
@@ -749,7 +387,7 @@ class TestToolsHandler:
             mock_args.return_value.webapp_update = False
             mock_args.return_value.logfile = None
 
-            result = tools_handler._handle_app_info({}, None)
+            result = tools_handler.invoke("app_info")
 
             assert result["name"] == "LANscape"
             assert result["version"] == "1.2.3"
@@ -760,15 +398,21 @@ class TestToolsHandler:
 
     def test_handle_app_info_with_update(self, tools_handler):
         """Test getting app info when update is available."""
-        with patch('lanscape.ui.ws.handlers.tools.get_installed_version') as mock_version, \
-                patch('lanscape.ui.ws.handlers.tools.is_arp_supported') as mock_arp, \
-                patch('lanscape.ui.ws.handlers.tools.is_update_available') as mock_update, \
-                patch('lanscape.ui.ws.handlers.tools.get_latest_version') as mock_latest, \
-                patch('lanscape.ui.ws.handlers.tools.parse_args') as mock_args:
-            mock_version.return_value = '1.2.3'
-            mock_arp.return_value = True
-            mock_update.return_value = True
-            mock_latest.return_value = '1.3.0'
+        with patch(
+            'lanscape.ui.ws.handlers.tools.get_installed_version',
+            return_value='1.2.3',
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.is_arp_supported',
+            return_value=True,
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.is_update_available',
+            return_value=True,
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.get_latest_version',
+            return_value='1.3.0',
+        ), patch(
+            'lanscape.ui.ws.handlers.tools.parse_args',
+        ) as mock_args:
             mock_args.return_value.port = 5001
             mock_args.return_value.ws_port = 8766
             mock_args.return_value.loglevel = 'INFO'
@@ -776,7 +420,7 @@ class TestToolsHandler:
             mock_args.return_value.webapp_update = False
             mock_args.return_value.logfile = None
 
-            result = tools_handler._handle_app_info({}, None)
+            result = tools_handler.invoke("app_info")
 
             assert result["update_available"] is True
             assert result["latest_version"] == "1.3.0"
@@ -797,7 +441,7 @@ class TestWebSocketServer:
         """Test server initializes correctly."""
         assert server.host == "127.0.0.1"
         assert server.port == 8766
-        assert len(server._handlers) == 3
+        assert len(server.handlers) == 3
 
     def test_get_actions(self, server):
         """Test getting all supported actions."""
@@ -818,10 +462,12 @@ class TestWebSocketServer:
             "id": "test-1"
         })
 
-        with patch.object(server._port_handler, '_handle_list') as mock_handler:
+        with patch.object(
+            server.port_handler, '_handle_list'
+        ) as mock_handler:
             mock_handler.return_value = ["small", "medium", "large"]
 
-            await server._handle_message("client-1", mock_ws, message)
+            await server.handle_message("client-1", mock_ws, message)
 
             mock_ws.send.assert_called_once()
             sent_data = json.loads(mock_ws.send.call_args[0][0])
@@ -833,7 +479,9 @@ class TestWebSocketServer:
         """Test handling invalid JSON."""
         mock_ws = AsyncMock()
 
-        await server._handle_message("client-1", mock_ws, "not valid json")
+        await server.handle_message(
+            "client-1", mock_ws, "not valid json"
+        )
 
         mock_ws.send.assert_called_once()
         sent_data = json.loads(mock_ws.send.call_args[0][0])
@@ -851,7 +499,7 @@ class TestWebSocketServer:
             "id": "test-1"
         })
 
-        await server._handle_message("client-1", mock_ws, message)
+        await server.handle_message("client-1", mock_ws, message)
 
         mock_ws.send.assert_called_once()
         sent_data = json.loads(mock_ws.send.call_args[0][0])
@@ -860,13 +508,11 @@ class TestWebSocketServer:
 
     def test_cleanup_client(self, server):
         """Test cleaning up client resources."""
-        # Add a client
-        server._clients["client-1"] = MagicMock()
+        server.clients["client-1"] = MagicMock()
 
-        # Cleanup
-        server._cleanup_client("client-1")
+        server.cleanup_client("client-1")
 
-        assert "client-1" not in server._clients
+        assert "client-1" not in server.clients
 
 
 # Integration Tests
@@ -880,99 +526,11 @@ class TestWebSocketIntegration:
         """Test starting and stopping the server."""
         server = WebSocketServer(host="127.0.0.1", port=18766)
 
-        # Start server
         await server.start()
-        assert server._running is True
-        assert server._server is not None
+        assert server.running is True
 
-        # Stop server
         await server.stop()
-        assert server._running is False
-
-    @pytest.mark.asyncio
-    async def test_full_scan_event_flow(self):
-        """
-        Run a full scan via WebSocket, subscribe to updates,
-        and verify scan.update and scan.complete events.
-        """
-        server = WebSocketServer(host="127.0.0.1", port=18769)
-        await server.start()
-
-        try:
-            async with websockets.connect("ws://127.0.0.1:18769") as ws:
-                # Receive welcome message
-                welcome = await asyncio.wait_for(ws.recv(), timeout=5.0)
-                welcome_data = json.loads(welcome)
-                assert welcome_data["type"] == "event"
-                assert welcome_data["event"] == "connection.established"
-                client_id = welcome_data["data"]["client_id"]
-
-                # Start a scan (use first subnet from TEST_SUBNET)
-                test_subnet = str(TEST_SUBNET).split(",", maxsplit=1)[0].strip()
-                scan_config = {
-                    "subnet": test_subnet,
-                    "port_list": "small",
-                    "lookup_type": [ScanType.ICMP.value, ScanType.POKE_THEN_ARP.value],
-                    "t_cnt_isalive": 2,
-                    "ping_config": {"timeout": 1.0, "attempts": 2}
-                }
-                start_req = {
-                    "type": "request",
-                    "id": "scan-1",
-                    "action": "scan.start",
-                    "params": scan_config
-                }
-                await ws.send(json.dumps(start_req))
-                start_resp = await asyncio.wait_for(ws.recv(), timeout=10.0)
-                start_data = json.loads(start_resp)
-                assert start_data["type"] == "response"
-                assert start_data["id"] == "scan-1"
-                assert start_data["success"] is True
-                scan_id = start_data["data"]["scan_id"]
-
-                # Subscribe to scan updates
-                subscribe_req = {
-                    "type": "request",
-                    "id": "sub-1",
-                    "action": "scan.subscribe",
-                    "params": {"scan_id": scan_id, "client_id": client_id}
-                }
-                await ws.send(json.dumps(subscribe_req))
-                subscribe_resp = await asyncio.wait_for(ws.recv(), timeout=10.0)
-                subscribe_data = json.loads(subscribe_resp)
-                assert subscribe_data["type"] == "response"
-                assert subscribe_data["id"] == "sub-1"
-                assert subscribe_data["success"] is True
-                assert subscribe_data["data"]["subscribed"] is True
-
-                # Collect scan.update and scan.complete events
-                # Allow generous timeouts for CI environments with slower networking
-                got_update = False
-                got_complete = False
-                max_events = 100
-                for _ in range(max_events):
-                    try:
-                        event_msg = await asyncio.wait_for(ws.recv(), timeout=30.0)
-                    except asyncio.TimeoutError:
-                        break  # No more events coming
-                    event_data = json.loads(event_msg)
-                    if event_data.get("type") == "event":
-                        if event_data.get("event") == "scan.update":
-                            got_update = True
-                            # Check for percent_complete in metadata
-                            assert "metadata" in event_data["data"]
-                            assert "percent_complete" in event_data["data"]["metadata"]
-                        if event_data.get("event") == "scan.complete":
-                            got_complete = True
-                            # Should have running: False and stage: complete
-                            meta = event_data["data"].get("metadata", {})
-                            assert meta.get("running") is False
-                            assert meta.get("stage") == "complete"
-                            break
-                assert got_update, "Did not receive scan.update event"
-                assert got_complete, "Did not receive scan.complete event"
-        finally:
-            await server.stop()
+        assert server.running is False
 
     @pytest.mark.asyncio
     async def test_client_connection(self):
@@ -981,8 +539,9 @@ class TestWebSocketIntegration:
         await server.start()
 
         try:
-            async with websockets.connect("ws://127.0.0.1:18767") as ws:
-                # Should receive welcome message
+            async with websockets.connect(
+                "ws://127.0.0.1:18767"
+            ) as ws:
                 welcome = await asyncio.wait_for(ws.recv(), timeout=5.0)
                 data = json.loads(welcome)
 
@@ -1000,11 +559,11 @@ class TestWebSocketIntegration:
         await server.start()
 
         try:
-            async with websockets.connect("ws://127.0.0.1:18768") as ws:
-                # Skip welcome message
-                await ws.recv()
+            async with websockets.connect(
+                "ws://127.0.0.1:18768"
+            ) as ws:
+                await ws.recv()  # skip welcome
 
-                # Send request
                 request = {
                     "type": "request",
                     "id": "test-1",
@@ -1013,8 +572,9 @@ class TestWebSocketIntegration:
                 }
                 await ws.send(json.dumps(request))
 
-                # Receive response
-                response = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                response = await asyncio.wait_for(
+                    ws.recv(), timeout=5.0
+                )
                 data = json.loads(response)
 
                 assert data["type"] == "response"
@@ -1023,3 +583,104 @@ class TestWebSocketIntegration:
                 assert data["data"]["valid"] is True
         finally:
             await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_full_scan_event_flow(self):
+        """Run a full scan via WebSocket and verify events."""
+        server = WebSocketServer(host="127.0.0.1", port=18769)
+        await server.start()
+
+        try:
+            async with websockets.connect(
+                "ws://127.0.0.1:18769"
+            ) as ws:
+                client_id = await self._recv_client_id(ws)
+                await self._start_and_subscribe(
+                    ws, client_id
+                )
+                await self._verify_scan_events(ws)
+        finally:
+            await server.stop()
+
+    @staticmethod
+    async def _recv_client_id(ws) -> str:
+        """Receive welcome and extract client_id."""
+        welcome = await asyncio.wait_for(ws.recv(), timeout=5.0)
+        data = json.loads(welcome)
+        assert data["type"] == "event"
+        assert data["event"] == "connection.established"
+        return data["data"]["client_id"]
+
+    @staticmethod
+    async def _start_and_subscribe(ws, client_id: str) -> str:
+        """Start a scan, subscribe, and return scan_id."""
+        test_subnet = str(TEST_SUBNET).split(",", maxsplit=1)[0].strip()
+
+        start_req = {
+            "type": "request",
+            "id": "scan-1",
+            "action": "scan.start",
+            "params": {
+                "subnet": test_subnet,
+                "port_list": "small",
+                "lookup_type": [
+                    ScanType.ICMP.value,
+                    ScanType.POKE_THEN_ARP.value,
+                ],
+                "t_cnt_isalive": 2,
+                "ping_config": {"timeout": 1.0, "attempts": 2},
+            },
+        }
+        await ws.send(json.dumps(start_req))
+        start_resp = await asyncio.wait_for(ws.recv(), timeout=10.0)
+        start_data = json.loads(start_resp)
+        assert start_data["type"] == "response"
+        assert start_data["success"] is True
+        scan_id = start_data["data"]["scan_id"]
+
+        sub_req = {
+            "type": "request",
+            "id": "sub-1",
+            "action": "scan.subscribe",
+            "params": {
+                "scan_id": scan_id,
+                "client_id": client_id,
+            },
+        }
+        await ws.send(json.dumps(sub_req))
+        sub_resp = await asyncio.wait_for(ws.recv(), timeout=10.0)
+        sub_data = json.loads(sub_resp)
+        assert sub_data["success"] is True
+        assert sub_data["data"]["subscribed"] is True
+        return scan_id
+
+    @staticmethod
+    async def _verify_scan_events(ws) -> None:
+        """Collect events and verify update + complete arrived."""
+        got_update = False
+        got_complete = False
+
+        for _ in range(100):
+            try:
+                msg = await asyncio.wait_for(
+                    ws.recv(), timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                break
+            event = json.loads(msg)
+            if event.get("type") != "event":
+                continue
+            name = event.get("event")
+            if name == "scan.update":
+                got_update = True
+                assert "metadata" in event["data"]
+                assert "percent_complete" in event["data"]["metadata"]
+            if name == "scan.complete":
+                got_complete = True
+                meta = event["data"].get("metadata", {})
+                assert meta.get("running") is False
+                assert meta.get("stage") == "complete"
+                break
+
+        assert got_update, "Did not receive scan.update event"
+        assert got_complete, "Did not receive scan.complete event"

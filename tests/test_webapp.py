@@ -79,7 +79,8 @@ class TestStartWebappServer:
             http_port=5001,
             ws_port=8766,
             host='127.0.0.1',
-            persistent=False
+            persistent=False,
+            mdns_enabled=True,
         )
         mock_controller_cls.return_value.start.assert_called_once_with(
             temp_webapp_dir, open_browser=True
@@ -94,14 +95,16 @@ class TestStartWebappServer:
                 ws_port=9090,
                 host='0.0.0.0',
                 open_browser=False,
-                persistent=True
+                persistent=True,
+                mdns_enabled=False,
             )
 
         mock_controller_cls.assert_called_once_with(
             http_port=8080,
             ws_port=9090,
             host='0.0.0.0',
-            persistent=True
+            persistent=True,
+            mdns_enabled=False,
         )
         mock_controller_cls.return_value.start.assert_called_once_with(
             temp_webapp_dir, open_browser=False
@@ -138,6 +141,7 @@ class TestWebappServerController:
         assert controller.ws_port == 8766
         assert controller.host == '127.0.0.1'
         assert controller.persistent is False
+        assert controller.mdns_enabled is True
 
     def test_controller_init_custom(self):
         """Test controller with custom parameters."""
@@ -145,12 +149,14 @@ class TestWebappServerController:
             http_port=8080,
             ws_port=9090,
             host='0.0.0.0',
-            persistent=True
+            persistent=True,
+            mdns_enabled=False,
         )
         assert controller.http_port == 8080
         assert controller.ws_port == 9090
         assert controller.host == '0.0.0.0'
         assert controller.persistent is True
+        assert controller.mdns_enabled is False
 
 
 class TestStartStaticServer:
@@ -226,3 +232,87 @@ class TestCacheHeaders:
         finally:
             server.shutdown()
             server.server_close()
+
+
+class TestDiscoverEndpoint:
+    """Tests for the /api/discover endpoint."""
+
+    @staticmethod
+    def _make_server(temp_webapp_dir):
+        """Start a test server and return (base_url, server)."""
+        import threading  # pylint: disable=import-outside-toplevel
+        server = start_static_server(temp_webapp_dir, 0)
+        base_url = f'http://127.0.0.1:{server.server_address[1]}'
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return base_url, server
+
+    def test_discover_returns_json(self, temp_webapp_dir):
+        """Test that /api/discover returns valid JSON with expected keys."""
+        import json as _json  # pylint: disable=import-outside-toplevel
+        SPAHandler.discovery = None
+        SPAHandler.mdns_enabled = True
+        SPAHandler.default_route = 'http://localhost:5001'
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/discover') as resp:
+                data = _json.loads(resp.read())
+            assert 'mdns_enabled' in data
+            assert 'default_route' in data
+            assert 'instances' in data
+            assert data['mdns_enabled'] is True
+            assert data['default_route'] == 'http://localhost:5001'
+            assert data['instances'] == []
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_discover_mdns_disabled(self, temp_webapp_dir):
+        """Test that /api/discover reflects mdns_enabled=False."""
+        import json as _json  # pylint: disable=import-outside-toplevel
+        SPAHandler.discovery = None
+        SPAHandler.mdns_enabled = False
+        SPAHandler.default_route = 'http://10.0.0.5:8080'
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/discover') as resp:
+                data = _json.loads(resp.read())
+            assert data['mdns_enabled'] is False
+            assert data['default_route'] == 'http://10.0.0.5:8080'
+            assert data['instances'] == []
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_discover_with_instances(self, temp_webapp_dir):
+        """Test that /api/discover includes discovered instances."""
+        import json as _json  # pylint: disable=import-outside-toplevel
+        from unittest.mock import MagicMock  # pylint: disable=import-outside-toplevel
+        from lanscape.ui.react_proxy.discovery import (  # pylint: disable=import-outside-toplevel
+            DiscoveredInstance,
+        )
+
+        mock_discovery = MagicMock()
+        mock_discovery.get_instances.return_value = [
+            DiscoveredInstance(
+                host='10.0.0.2',
+                ws_port=8766,
+                http_port=5001,
+                version='1.0.0',
+                hostname='test-host',
+            ).model_dump()
+        ]
+        SPAHandler.discovery = mock_discovery
+        SPAHandler.mdns_enabled = True
+        SPAHandler.default_route = 'http://localhost:5001'
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/discover') as resp:
+                data = _json.loads(resp.read())
+            assert len(data['instances']) == 1
+            assert data['instances'][0]['host'] == '10.0.0.2'
+            assert data['instances'][0]['hostname'] == 'test-host'
+        finally:
+            server.shutdown()
+            server.server_close()
+            SPAHandler.discovery = None

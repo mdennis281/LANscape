@@ -165,7 +165,7 @@ class ToolsHandler(BaseHandler):
 
         # Build runtime args dict (excluding None values)
         runtime_args = {
-            'port': args.port,
+            'ui_port': args.ui_port,
             'ws_port': args.ws_port,
             'loglevel': args.loglevel,
             'persistent': args.persistent,

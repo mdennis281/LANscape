@@ -11,7 +11,7 @@ from lanscape.core.version_manager import get_installed_version
 @dataclass
 class RuntimeArgs:
     """Class representing runtime arguments for the application."""
-    port: int = 5001
+    ui_port: int = 5001
     logfile: Optional[str] = None
     loglevel: str = 'INFO'
     persistent: bool = False
@@ -21,8 +21,8 @@ class RuntimeArgs:
 
 
 def was_port_explicit() -> bool:
-    """Check if --port was explicitly provided on command line."""
-    return any(arg.startswith('--port') for arg in sys.argv)
+    """Check if --ui-port was explicitly provided on command line."""
+    return any(arg.startswith('--ui-port') for arg in sys.argv)
 
 
 def was_ws_port_explicit() -> bool:
@@ -38,8 +38,8 @@ def parse_args() -> RuntimeArgs:
 
     parser.add_argument('--version', action='version',
                         version=f'LANscape v{get_installed_version()}')
-    parser.add_argument('--port', type=int, default=5001,
-                        help='Port to run the server on')
+    parser.add_argument('--ui-port', type=int, default=5001,
+                        help='Port for the web UI (default: auto)')
     parser.add_argument('--logfile', type=str, default=None,
                         help='Log output to the specified file path')
     parser.add_argument('--loglevel', default='INFO', help='Set the log level')

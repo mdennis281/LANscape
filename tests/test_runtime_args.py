@@ -14,7 +14,7 @@ class TestParseArgsDefaults:
         """Default values are returned when no args provided."""
         with patch.object(sys, 'argv', ['lanscape']):
             args = parse_args()
-        assert args.port == 5001
+        assert args.ui_port == 5001
         assert args.logfile is None
         assert args.loglevel == 'INFO'
         assert args.persistent is False
@@ -26,11 +26,11 @@ class TestParseArgsDefaults:
 class TestParseArgsCustom:
     """Tests for explicitly provided arguments."""
 
-    def test_custom_port(self) -> None:
-        """--port sets the port value."""
-        with patch.object(sys, 'argv', ['lanscape', '--port', '9090']):
+    def test_custom_ui_port(self) -> None:
+        """--ui-port sets the ui_port value."""
+        with patch.object(sys, 'argv', ['lanscape', '--ui-port', '9090']):
             args = parse_args()
-        assert args.port == 9090
+        assert args.ui_port == 9090
 
     def test_logfile(self) -> None:
         """--logfile sets the logfile path."""
@@ -104,13 +104,13 @@ class TestExplicitPortChecks:
     """Tests for was_port_explicit and was_ws_port_explicit."""
 
     def test_port_not_explicit(self) -> None:
-        """was_port_explicit returns False when --port not in argv."""
+        """was_port_explicit returns False when --ui-port not in argv."""
         with patch.object(sys, 'argv', ['lanscape']):
             assert was_port_explicit() is False
 
     def test_port_explicit(self) -> None:
-        """was_port_explicit returns True when --port is in argv."""
-        with patch.object(sys, 'argv', ['lanscape', '--port', '8080']):
+        """was_port_explicit returns True when --ui-port is in argv."""
+        with patch.object(sys, 'argv', ['lanscape', '--ui-port', '8080']):
             assert was_port_explicit() is True
 
     def test_ws_port_not_explicit(self) -> None:

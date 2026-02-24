@@ -6,7 +6,7 @@ Pydantic models used throughout LANscape for structured data exchange. All model
 
 ```python
 from lanscape import (
-    DeviceResult, ServiceInfo,
+    DeviceResult, ServiceInfo, ProbeResponseInfo,
     ScanMetadata, ScanResults, ScanSummary,
     DeviceStage, ScanStage
 )
@@ -55,6 +55,33 @@ Detailed information about a service discovered on an open port.
 | `probes_sent` | `int` | `0` | Number of probes sent to this port |
 | `probes_received` | `int` | `0` | Number of responses received |
 | `is_tls` | `bool` | `False` | Whether TLS/SSL was detected |
+| `all_responses` | `List[ProbeResponseInfo]` | `[]` | All probe/response pairs collected during the service scan |
+
+The `all_responses` list contains every individual probe attempt and its result, giving you granular visibility into how a service was identified. The top-level `request` / `response` fields hold the *best match*; `all_responses` holds *everything*.
+
+---
+
+### ProbeResponseInfo
+
+A single probe request/response pair from service detection.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `request` | `str \| None` | `None` | Probe payload that was sent |
+| `response` | `str \| None` | `None` | Response received from the service |
+| `service` | `str` | `"Unknown"` | Service identified for this response |
+| `weight` | `int` | `0` | Match confidence weight (higher = more confident) |
+| `is_tls` | `bool` | `False` | Whether TLS/SSL was used for this probe |
+
+```python
+for device in results.devices:
+    for si in device.service_info:
+        print(f"Port {si.port}: {si.service}")
+        for pr in si.all_responses:
+            print(f"  [{pr.weight}] {pr.service} (tls={pr.is_tls})")
+            print(f"    Request:  {pr.request}")
+            print(f"    Response: {pr.response[:80] if pr.response else 'None'}")
+```
 
 ---
 

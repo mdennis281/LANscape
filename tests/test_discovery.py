@@ -48,7 +48,7 @@ class TestGetLocalAddresses:
         mock_psutil.net_if_addrs.return_value = {'lo': [mock_addr]}
 
         result = _get_local_addresses()
-        assert result == []
+        assert not result
 
     @patch('lanscape.ui.react_proxy.discovery.psutil')
     def test_skips_virtual_interfaces(self, mock_psutil):
@@ -65,7 +65,7 @@ class TestGetLocalAddresses:
         }
 
         result = _get_local_addresses()
-        assert result == []
+        assert not result
 
     @patch('lanscape.ui.react_proxy.discovery.psutil')
     def test_skips_down_interfaces(self, mock_psutil):
@@ -77,7 +77,7 @@ class TestGetLocalAddresses:
         mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
 
         result = _get_local_addresses()
-        assert result == []
+        assert not result
 
     @patch('lanscape.ui.react_proxy.discovery.psutil')
     def test_skips_link_local(self, mock_psutil):
@@ -89,7 +89,7 @@ class TestGetLocalAddresses:
         mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
 
         result = _get_local_addresses()
-        assert result == []
+        assert not result
 
     @patch('lanscape.ui.react_proxy.discovery.psutil')
     def test_skips_zerotier_interface(self, mock_psutil):
@@ -103,7 +103,7 @@ class TestGetLocalAddresses:
         }
 
         result = _get_local_addresses()
-        assert result == []
+        assert not result
 
     @patch('lanscape.ui.react_proxy.discovery.psutil')
     def test_skips_ics_subnet(self, mock_psutil):
@@ -115,7 +115,7 @@ class TestGetLocalAddresses:
         mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
 
         result = _get_local_addresses()
-        assert result == []
+        assert not result
 
 
 class TestGetLocalSubnets:
@@ -154,7 +154,7 @@ class TestGetLocalSubnets:
         }
 
         result = _get_local_subnets()
-        assert result == []
+        assert not result
 
 
 class TestBestLanAddress:

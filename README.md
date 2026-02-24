@@ -43,17 +43,20 @@ Health:
 
 | Flag | Description |
 |------|-------------|
-| `--port <number>` | Port for the web UI (default: auto) |
+| `--version` | Show the installed version and exit |
+| `--ui-port <number>` | Port for the web UI (default: auto) |
 | `--ws-port <number>` | Port for the WebSocket server (default: 8766) |
 | `--ws-server` | Start WebSocket server only (no UI) |
 | `--persistent` | Don't auto-shutdown when the browser tab closes |
+| `--mdns-off` | Disable mDNS service discovery |
 | `--logfile <path>` | Write log output to a file |
 | `--loglevel <level>` | Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO) |
 | `--debug` | Shorthand for `--loglevel DEBUG` |
 
 ```sh
 python -m lanscape
-python -m lanscape --port 8080
+python -m lanscape --version
+python -m lanscape --ui-port 8080
 python -m lanscape --debug --persistent
 python -m lanscape --logfile /tmp/lanscape.log --loglevel WARNING
 python -m lanscape --ws-server --ws-port 9000

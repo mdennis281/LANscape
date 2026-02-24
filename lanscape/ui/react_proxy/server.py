@@ -259,12 +259,13 @@ class WebappServerController:
                     self._discovery = discovery
                     SPAHandler.discovery = discovery
                 except Exception as exc:  # pylint: disable=broad-exception-caught
-                    log.warning('mDNS discovery unavailable: %s', exc)
+                    log.warning('mDNS broadcasting failed to start')
+                    log.debug('mDNS startup error details:', exc_info=exc)
                     self._discovery = None
 
             threading.Thread(target=_start_discovery, daemon=True, name='mDNS-init').start()
         else:
-            log.info('mDNS discovery disabled via --mdns-off')
+            log.info('mDNS service disabled')
 
         # Build the localhost URL for the local browser (no ws-server param;
         # the frontend will discover the backend via mDNS or same-origin default).

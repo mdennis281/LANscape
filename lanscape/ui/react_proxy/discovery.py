@@ -258,7 +258,7 @@ class DiscoveryService:
             SERVICE_TYPE,
             handlers=[self._on_service_state_change],
         )
-        log.info('mDNS discovery started (service=%s)', self._service_name)
+        log.debug('mDNS discovery started (service=%s)', self._service_name)
 
     def _create_zeroconf(self) -> Zeroconf:
         """Create a Zeroconf instance, falling back to unicast mode.
@@ -273,7 +273,7 @@ class DiscoveryService:
         except OSError as exc:
             if exc.errno != errno.EADDRINUSE:
                 raise
-            log.warning(
+            log.debug(
                 'Port 5353 in use (likely system mDNS daemon); '
                 'falling back to unicast mode'
             )
@@ -296,7 +296,7 @@ class DiscoveryService:
         self._zeroconf = None
         self._browser = None
         self._service_info = None
-        log.info('mDNS discovery stopped')
+        log.debug('mDNS discovery stopped')
 
     def get_instances(self) -> list[dict]:
         """Return a snapshot of discovered instances as plain dicts."""

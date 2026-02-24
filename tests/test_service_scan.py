@@ -212,6 +212,47 @@ def test_try_probe_timeout():
     asyncio.run(run_test())
 
 
+def test_aggressive_no_global_timeout_starvation():
+    """AGGRESSIVE mode must collect all probe responses even when the
+    semaphore forces later probes to wait longer than cfg.timeout.
+
+    Regression: previously asyncio.as_completed used cfg.timeout as a
+    global timeout, which starved queued probes behind the semaphore.
+    """
+    async def run_test():
+        # Simulate a slow but valid probe: each takes 0.15s
+        probe_delay = 0.15
+
+        async def _slow_probe(_ip, _port, _payload=None, **_kwargs):
+            await asyncio.sleep(probe_delay)
+            return (b"HTTP/1.1 200 OK\r\n", "HTTP/1.1 200 OK\r\n")
+
+        # concurrency=1 serialises all probes.  With many probes the
+        # total wall-time far exceeds timeout=0.5.
+        # Before the fix the global timeout on as_completed would fire at
+        # 0.5s and drop the remaining probes.
+        cfg = ServiceScanConfig(
+            timeout=0.5,
+            lookup_type=ServiceScanStrategy.AGGRESSIVE,
+            max_concurrent_probes=1,
+        )
+
+        with patch(
+            'lanscape.core.service_scan._try_probe',
+            side_effect=_slow_probe,
+        ):
+            result = await _multi_probe_generic("127.0.0.1", 99999, cfg)
+
+        probes = get_port_probes(99999, ServiceScanStrategy.AGGRESSIVE)
+        # Every probe must have been sent — none should be starved
+        assert result.probes_sent == len(probes)
+        # Every probe returned a response, so probes_received must match
+        assert result.probes_received == len(probes)
+        assert len(result.all_responses) == len(probes)
+
+    asyncio.run(run_test())
+
+
 def test_multi_probe_generic_no_response():
     """Test _multi_probe_generic with no responses."""
     async def run_test():

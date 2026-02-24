@@ -495,8 +495,15 @@ async def _multi_probe_generic(  # pylint: disable=too-many-locals,too-many-bran
     # Track whether we already have a usable response (for early-exit modes)
     found_first = False
 
+    # In AGGRESSIVE mode every probe must run to completion, so do NOT
+    # impose a global timeout on as_completed — each probe already has
+    # its own per-connection timeout via cfg.timeout.  For non-aggressive
+    # modes we keep a global cap because we break on the first result and
+    # just need a safety net.
+    global_timeout: float | None = None if aggressive else cfg.timeout
+
     try:
-        for fut in asyncio.as_completed(tasks, timeout=cfg.timeout):
+        for fut in asyncio.as_completed(tasks, timeout=global_timeout):
             try:
                 result = await fut
             except Exception:

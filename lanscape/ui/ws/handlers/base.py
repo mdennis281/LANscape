@@ -68,6 +68,36 @@ class BaseHandler:
         """
         return list(self._actions.keys())
 
+    def invoke(
+        self,
+        action: str,
+        params: dict | None = None,
+        send_event: Optional[Callable] = None,
+    ) -> Any:
+        """
+        Invoke a registered handler directly by its short action name.
+
+        This is a synchronous, unwrapped alternative to :meth:`handle`
+        intended for unit tests and internal callers that want the raw
+        return value without WSResponse wrapping.
+
+        Args:
+            action: The short action name (e.g. ``'start'``, not ``'scan.start'``)
+            params: Parameters dict passed to the handler
+            send_event: Optional event callback
+
+        Returns:
+            The raw value returned by the handler callable
+
+        Raises:
+            KeyError: If the action is not registered
+        """
+        full_action = f"{self.prefix}.{action}"
+        handler = self._actions.get(full_action)
+        if handler is None:
+            raise KeyError(f"No handler registered for {full_action}")
+        return handler(params or {}, send_event)
+
     async def handle(
         self,
         request: WSRequest,

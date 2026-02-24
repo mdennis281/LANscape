@@ -5,6 +5,8 @@ import sys
 from dataclasses import dataclass, fields
 from typing import Any, Dict, Optional
 
+from lanscape.core.version_manager import get_installed_version
+
 
 @dataclass
 class RuntimeArgs:
@@ -34,6 +36,8 @@ def parse_args() -> RuntimeArgs:
     """
     parser = argparse.ArgumentParser(description='LANscape')
 
+    parser.add_argument('--version', action='version',
+                        version=f'LANscape v{get_installed_version()}')
     parser.add_argument('--port', type=int, default=5001,
                         help='Port to run the server on')
     parser.add_argument('--logfile', type=str, default=None,

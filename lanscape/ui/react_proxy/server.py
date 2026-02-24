@@ -255,13 +255,17 @@ class WebappServerController:
                         ws_port=self.ws_port,
                         http_port=self.http_port,
                     )
-                    discovery.start()
+                    # Assign the discovery instance before starting it so that
+                    # shutdown logic that checks `self._discovery` can always
+                    # see and stop it, even if shutdown races with startup.
                     self._discovery = discovery
                     SPAHandler.discovery = discovery
+                    discovery.start()
                 except Exception as exc:  # pylint: disable=broad-exception-caught
                     log.warning('mDNS broadcasting failed to start')
                     log.debug('mDNS startup error details:', exc_info=exc)
                     self._discovery = None
+                    SPAHandler.discovery = None
 
             threading.Thread(target=_start_discovery, daemon=True, name='mDNS-init').start()
         else:

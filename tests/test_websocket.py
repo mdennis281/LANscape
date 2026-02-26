@@ -380,7 +380,7 @@ class TestToolsHandler:
         ), patch(
             'lanscape.ui.ws.handlers.tools.parse_args',
         ) as mock_args:
-            mock_args.return_value.port = 5001
+            mock_args.return_value.ui_port = 5001
             mock_args.return_value.ws_port = 8766
             mock_args.return_value.loglevel = 'INFO'
             mock_args.return_value.persistent = False
@@ -394,7 +394,7 @@ class TestToolsHandler:
             assert result["arp_supported"] is True
             assert result["update_available"] is False
             assert "runtime_args" in result
-            assert result["runtime_args"]["port"] == 5001
+            assert result["runtime_args"]["ui_port"] == 5001
 
     def test_handle_app_info_with_update(self, tools_handler):
         """Test getting app info when update is available."""
@@ -413,7 +413,7 @@ class TestToolsHandler:
         ), patch(
             'lanscape.ui.ws.handlers.tools.parse_args',
         ) as mock_args:
-            mock_args.return_value.port = 5001
+            mock_args.return_value.ui_port = 5001
             mock_args.return_value.ws_port = 8766
             mock_args.return_value.loglevel = 'INFO'
             mock_args.return_value.persistent = False

@@ -77,9 +77,9 @@ def start_websocket_server():
 def start_webapp_mode():
     """Start the React webapp with WebSocket backend (default mode)."""
     if was_port_explicit():
-        validate_port_available(args.port, '--port')
+        validate_port_available(args.ui_port, '--ui-port')
     else:
-        args.port = get_valid_port(args.port)
+        args.ui_port = get_valid_port(args.ui_port)
 
     if was_ws_port_explicit():
         validate_port_available(args.ws_port, '--ws-port')
@@ -87,11 +87,11 @@ def start_webapp_mode():
         args.ws_port = get_valid_port(args.ws_port)
 
     log.info('Starting React webapp mode')
-    log.info(f'Reserving ports: {args.port} - UI | {args.ws_port} - WS')
+    log.info(f'Reserving ports: {args.ui_port} - UI | {args.ws_port} - WS')
 
     try:
         start_webapp_server(
-            http_port=args.port,
+            http_port=args.ui_port,
             ws_port=args.ws_port,
             open_browser=True,
             persistent=args.persistent,

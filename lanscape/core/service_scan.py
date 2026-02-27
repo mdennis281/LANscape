@@ -5,14 +5,18 @@ Features:
 - TLS/SSL detection and secure probing
 - Weighted service matching (higher weight = higher priority)
 - Binary protocol signature detection
+
+Probe data, binary signatures, and text matchers are loaded from JSONC
+resource files under ``lanscape/resources/services/``.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Union, List, Tuple
+from typing import Optional, Union, List, Tuple, Dict
 import asyncio
 import logging
 import ssl
 import traceback
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from lanscape.core.app_scope import ResourceManager
 from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
@@ -21,135 +25,75 @@ from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 log = logging.getLogger('ServiceScan')
-SERVICES = ResourceManager('services').get_jsonc('definitions.jsonc')
+
+# ── resource manager shared by all loaders ──────────────────────────
+_svc_resources = ResourceManager('services')
+
+# Legacy service definitions (hints, ports, probes from definitions.jsonc)
+SERVICES = _svc_resources.get_jsonc('definitions.jsonc')
 
 # skip printer ports because they cause blank pages to be printed
 PRINTER_PORTS = [9100, 631]
 
 
 # =============================================================================
-# Binary Protocol Signatures - detect protocols by byte patterns
+# Resource loaders – convert JSONC data into runtime structures
 # =============================================================================
-BINARY_SIGNATURES = [
-    # (name, pattern_bytes, weight)
-    # TLS/SSL Alert or Handshake
-    ("TLS", b"\x15\x03", 50),  # TLS Alert
-    ("TLS", b"\x16\x03", 50),  # TLS Handshake
 
-    # SMB/NetBIOS - Windows file sharing
-    ("SMB", b"\xffSMB", 60),  # SMB1 response
-    ("SMB", b"\xfeSMB", 60),  # SMB2/3 response
-    ("NetBIOS", b"\x83\x00\x00\x01", 55),  # NetBIOS negative session response
-    ("NetBIOS", b"\x82\x00\x00\x00", 55),  # NetBIOS positive session response
+class BinarySignature(BaseModel):
+    """A binary protocol signature for detecting services by byte patterns."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # RDP (Remote Desktop) - X.224 connection confirm
-    ("RDP", b"\x03\x00\x00", 55),  # TPKT header
-    ("RDP", b"\x03\x00", 50),  # Short TPKT
-
-    # RPC/DCE
-    ("RPC", b"\x05\x00", 45),  # DCE/RPC version 5
-
-    # MySQL greeting
-    ("MySQL", b"\x00\x00\x00\x0a", 40),  # MySQL protocol v10
-
-    # PostgreSQL
-    ("PostgreSQL", b"SFATAL", 40),
-    ("PostgreSQL", b"SERROR", 40),
-    ("PostgreSQL", b"E", 35),  # PostgreSQL error response single byte
-
-    # Redis
-    ("Redis", b"+PONG", 40),
-    ("Redis", b"-ERR", 30),
-    ("Redis", b"-NOAUTH", 45),  # Redis auth required
-
-    # MongoDB
-    ("MongoDB", b"ismaster", 40),
-
-    # SSH (already text but good to have)
-    ("SSH", b"SSH-", 50),
-
-    # VNC
-    ("VNC", b"RFB ", 55),  # RFB protocol version
-
-    # DNS responses (binary)
-    ("DNS", b"\x00\x00\x81\x80", 40),  # Standard query response
-    ("DNS", b"\x00\x00\x81\x83", 40),  # Name error response
-
-    # SOCKS5 proxy
-    ("SOCKS5", b"\x05\x00", 55),  # SOCKS5 no auth required
-    ("SOCKS5", b"\x05\xff", 55),  # SOCKS5 no acceptable methods
-    ("SOCKS5", b"\x05\x02", 55),  # SOCKS5 auth methods
-
-    # RTMP (Flash Media Server)
-    ("RTMP", b"\x03\x00\x00\x00", 50),  # RTMP handshake S0
-
-    # Sun RPC / Portmapper
-    ("SunRPC", b"\x00\x00\x00\x1c", 45),  # RPC reply header
-    ("SunRPC", b"\x80\x00", 40),  # RPC fragment header
-
-    # MQTT
-    ("MQTT", b"\x20\x02", 55),  # CONNACK
-    ("MQTT", b"\x10", 35),  # CONNECT packet type
-
-    # Printer protocols
-    ("LPD", b"\x00", 25),  # LPD ACK
-    ("IPP", b"\x01\x01", 40),  # IPP version 1.1
-]
-
-# =============================================================================
-# Protocol-specific probes for better service detection
-# =============================================================================
-PROTOCOL_PROBES = {
-    # SMB negotiate - minimal SMB1 negotiate request
-    "SMB": b"\x00\x00\x00\x2f\xffSMBr\x00\x00\x00\x00\x08\x01\x00\x00\x00\x00\x00\x00\x00"
-           b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-           b"\x00\x0c\x00\x02NT LM 0.12\x00",
-
-    # RDP X.224 connection request
-    "RDP": b"\x03\x00\x00\x13\x0e\xe0\x00\x00\x00\x00\x00\x01\x00\x08\x00\x03\x00\x00\x00",
-
-    # NetBIOS session request
-    "NetBIOS": b"\x81\x00\x00D *SMBSERVER\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-               b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00 WORKSTATION\x00\x00\x00\x00"
-               b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-
-    # Redis PING
-    "Redis": b"*1\r\n$4\r\nPING\r\n",
-
-    # MySQL initial handshake (just wait for banner)
-    "MySQL": None,  # MySQL sends banner automatically
-
-    # VNC version request (just connect and wait)
-    "VNC": None,
-
-    # PostgreSQL SSL request
-    "PostgreSQL": b"\x00\x00\x00\x08\x04\xd2\x16/",
-
-    # SOCKS5 version identification/method selection
-    "SOCKS5": b"\x05\x01\x00",  # SOCKS5, 1 method, no auth
-
-    # RTMP handshake C0+C1
-    "RTMP": b"\x03" + (b"\x00" * 1536),  # C0 version + C1 zeros (simplified)
-
-    # Sun RPC portmapper getport (NFS)
-    "SunRPC": b"\x00\x00\x00\x00\x00\x00\x00\x02\x00\x01\x86\xa0\x00\x00\x00\x02"
-              b"\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-              b"\x00\x00\x00\x00",
-
-    # MQTT CONNECT packet (minimal)
-    "MQTT": b"\x10\x0d\x00\x04MQTT\x04\x02\x00\x3c\x00\x01x",
-}
+    name: str
+    pattern: bytes
+    weight: int
 
 
-# =============================================================================
-# Weighted Service Matchers - text patterns with priority weights
-# =============================================================================
-@dataclass
-class ServiceMatcher:
+def _load_binary_signatures() -> List[BinarySignature]:
+    """Load binary protocol signatures from ``binary_signatures.jsonc``.
+
+    Each entry has ``name``, ``pattern`` (hex string), and ``weight``.
+    Returns a list of :class:`BinarySignature` instances.
+    """
+    raw = _svc_resources.get_jsonc('binary_signatures.jsonc')
+    return [
+        BinarySignature(
+            name=entry['name'],
+            pattern=bytes.fromhex(entry['pattern']),
+            weight=entry['weight'],
+        )
+        for entry in raw
+    ]
+
+
+def _load_protocol_probes() -> Dict[str, Optional[bytes]]:
+    """Load protocol-specific probe payloads from ``protocol_probes.jsonc``.
+
+    Values are either:
+    - A hex string decoded to bytes.
+    - ``null`` (banner-grab only, decoded to ``None``).
+    - An object ``{"hex": "<prefix>", "pad_to": <int>}`` for zero-padded
+      payloads (e.g. RTMP).
+    """
+    raw = _svc_resources.get_jsonc('protocol_probes.jsonc')
+    probes: Dict[str, Optional[bytes]] = {}
+    for name, value in raw.items():
+        if value is None:
+            probes[name] = None
+        elif isinstance(value, dict):
+            prefix = bytes.fromhex(value['hex'])
+            total = value['pad_to']
+            probes[name] = prefix.ljust(total, b'\x00')
+        else:
+            probes[name] = bytes.fromhex(value)
+    return probes
+
+
+class ServiceMatcher(BaseModel):
     """A pattern matcher for identifying services with weighted priority."""
     name: str
     weight: int
-    patterns: List[str] = field(default_factory=list)
+    patterns: List[str] = Field(default_factory=list)
     case_sensitive: bool = False
 
     def match(self, response: str) -> bool:
@@ -162,121 +106,53 @@ class ServiceMatcher:
         return False
 
 
-# Service matchers ordered by specificity (more specific = higher weight)
-SERVICE_MATCHERS = [
-    # WebSocket gets high priority (often contains HTTP headers too)
-    ServiceMatcher("WebSocket", weight=100, patterns=[
-        "websocket", "upgrade: websocket", "sec-websocket", "ws://"
-    ]),
+def _load_service_matchers() -> List[ServiceMatcher]:
+    """Load text-based service matchers from ``service_matchers.jsonc``.
 
-    # gRPC / HTTP/2
-    ServiceMatcher("gRPC", weight=90, patterns=[
-        "grpc", "application/grpc", "PRI * HTTP/2"
-    ]),
-
-    # TLS/HTTPS (high priority, detected by binary or text)
-    ServiceMatcher("HTTPS", weight=80, patterns=[
-        "https", "ssl", "tls", "certificate"
-    ]),
-
-    # API-specific (higher than generic HTTP)
-    ServiceMatcher("REST API", weight=70, patterns=[
-        "application/json", '"api"', '"version"', '"status"'
-    ]),
-
-    # Common web servers
-    ServiceMatcher("HTTP", weight=50, patterns=[
-        "http/1.", "http/2", "apache", "nginx", "iis", "lighttpd",
-        "gunicorn", "caddy", "cloudflare", "server:", "content-type:"
-    ]),
-
-    # Databases
-    ServiceMatcher("Redis", weight=60, patterns=["+pong", "redis"]),
-    ServiceMatcher("MongoDB", weight=60, patterns=["mongodb", "ismaster"]),
-    ServiceMatcher("MySQL", weight=60, patterns=["mysql", "mariadb"]),
-    ServiceMatcher("PostgreSQL", weight=55, patterns=["postgresql", "postgres", "fatal:", "psql"]),
-
-    # Remote access
-    ServiceMatcher("SSH", weight=70, patterns=["ssh-", "openssh", "dropbear"]),
-    ServiceMatcher("Telnet", weight=40, patterns=["telnet", "login:"]),
-
-    # Mail
-    ServiceMatcher("SMTP", weight=60, patterns=["smtp", "220 ", "postfix", "exim"]),
-    ServiceMatcher("IMAP", weight=60, patterns=["imap", "* ok"]),
-    ServiceMatcher("POP3", weight=60, patterns=["+ok", "pop3"]),
-
-    # File transfer
-    ServiceMatcher("FTP", weight=60, patterns=["ftp", "220-", "vsftpd", "filezilla"]),
-
-    # Messaging
-    ServiceMatcher("MQTT", weight=60, patterns=["mqtt"]),
-    ServiceMatcher("AMQP", weight=60, patterns=["amqp", "rabbitmq"]),
-
-    # Minecraft (specific)
-    ServiceMatcher("Minecraft", weight=70, patterns=["minecraft"]),
-
-    # DNS (rare to get text response but possible)
-    ServiceMatcher("DNS", weight=40, patterns=["dns", "bind", "named"]),
-
-    # Windows Services - important for enterprise networks
-    ServiceMatcher("SMB", weight=65, patterns=["smb", "samba", "netbios", "cifs"]),
-    ServiceMatcher("RDP", weight=65, patterns=[
-        "rdp", "remote desktop", "terminal service", "ms-wbt-server"
-    ]),
-    ServiceMatcher("RPC", weight=55, patterns=["rpc", "dcerpc", "endpoint mapper"]),
-    ServiceMatcher("WinRM", weight=60, patterns=["wsman", "winrm", "windows remote"]),
-    ServiceMatcher("WSDAPI", weight=55, patterns=[
-        "wsdapi", "microsoft-httpapi", "web services"
-    ]),
-    ServiceMatcher("LDAP", weight=60, patterns=["ldap", "active directory"]),
-
-    # Apple/AirPlay
-    ServiceMatcher("AirTunes", weight=65, patterns=["airtunes", "airplay"]),
-    ServiceMatcher("mDNS", weight=50, patterns=["mdns", "bonjour", "_tcp.local"]),
-
-    # IoT & Home Automation
-    ServiceMatcher("UPnP", weight=50, patterns=["upnp", "ssdp", "igd:"]),
-    ServiceMatcher("Plex", weight=65, patterns=["plex", "x-plex"]),
-    ServiceMatcher("HomeAssistant", weight=65, patterns=["home assistant", "hass"]),
-
-    # VNC
-    ServiceMatcher("VNC", weight=60, patterns=["rfb ", "vnc", "tightvnc", "realvnc"]),
-
-    # Streaming
-    ServiceMatcher("RTSP", weight=55, patterns=["rtsp/", "real time streaming"]),
-    ServiceMatcher("RTMP", weight=55, patterns=["rtmp", "flash media", "fms/"]),
-
-    # Databases (additional)
-    ServiceMatcher("Elasticsearch", weight=60, patterns=["elasticsearch", "lucene"]),
-    ServiceMatcher("Memcached", weight=55, patterns=["memcached", "stat "]),
-
-    # Proxy protocols
-    ServiceMatcher("SOCKS5", weight=60, patterns=["socks", "socks5"]),
-    ServiceMatcher("Squid", weight=55, patterns=["squid", "proxy"]),
-
-    # RPC/Portmapper
-    ServiceMatcher("SunRPC", weight=50, patterns=["portmapper", "rpcbind", "nfs"]),
-    ServiceMatcher("NFS", weight=55, patterns=["nfs", "mount"]),
-
-    # Printers
-    ServiceMatcher("Printer", weight=55, patterns=["printer", "jetdirect", "cups", "lpd"]),
-    ServiceMatcher("IPP", weight=55, patterns=["ipp", "internet printing"]),
-
-    # Google Cast / Chromecast
-    ServiceMatcher("GoogleCast", weight=60, patterns=["chromecast", "google cast", "eureka"]),
-
-    # Spotify Connect
-    ServiceMatcher("SpotifyConnect", weight=60, patterns=["spotify", "spotifyconnect"]),
-
-    # Common IoT
-    ServiceMatcher("Roku", weight=60, patterns=["roku"]),
-    ServiceMatcher("Sonos", weight=60, patterns=["sonos"]),
-]
+    Each entry is converted into a :class:`ServiceMatcher` instance.
+    """
+    raw = _svc_resources.get_jsonc('service_matchers.jsonc')
+    return [
+        ServiceMatcher(
+            name=entry['name'],
+            weight=entry['weight'],
+            patterns=entry.get('patterns', []),
+            case_sensitive=entry.get('case_sensitive', False),
+        )
+        for entry in raw
+    ]
 
 
-@dataclass
-class ProbeResponse:
+def _load_port_specific_probes(
+    protocol_probes: Dict[str, Optional[bytes]],
+) -> Dict[int, List[Optional[bytes]]]:
+    """Load port-to-probe mappings from ``port_probes.jsonc``.
+
+    Keys are port numbers (as strings in JSON), values are lists of
+    protocol probe names resolved via *protocol_probes*.
+    """
+    raw = _svc_resources.get_jsonc('port_probes.jsonc')
+    result: Dict[int, List[Optional[bytes]]] = {}
+    for port_str, probe_names in raw.items():
+        result[int(port_str)] = [
+            protocol_probes.get(name) for name in probe_names
+        ]
+    return result
+
+
+# ── Load once at import time ────────────────────────────────────────
+BINARY_SIGNATURES: List[BinarySignature] = _load_binary_signatures()
+PROTOCOL_PROBES: Dict[str, Optional[bytes]] = _load_protocol_probes()
+SERVICE_MATCHERS: List[ServiceMatcher] = _load_service_matchers()
+PORT_SPECIFIC_PROBES: Dict[int, List[Optional[bytes]]] = _load_port_specific_probes(
+    PROTOCOL_PROBES
+)
+
+
+class ProbeResponse(BaseModel):
     """A single probe's request/response pair."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     request: Optional[str] = None
     response: Optional[str] = None
     response_bytes: Optional[bytes] = None
@@ -285,8 +161,7 @@ class ProbeResponse:
     weight: int = 0
 
 
-@dataclass
-class ServiceScanResult:
+class ServiceScanResult(BaseModel):
     """Result of a service scan probe."""
     service: str
     response: Optional[str] = None
@@ -294,19 +169,20 @@ class ServiceScanResult:
     probes_sent: int = 0
     probes_received: int = 0
     is_tls: bool = False
-    all_responses: List['ProbeResponse'] = field(default_factory=list)
+    all_responses: List['ProbeResponse'] = Field(default_factory=list)
 
 
-@dataclass
-class ProbeResult:
+class ProbeResult(BaseModel):
     """Result from multi-probe operation with statistics."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     response: Optional[str] = None
     response_bytes: Optional[bytes] = None
     request: Optional[str] = None
     probes_sent: int = 0
     probes_received: int = 0
     is_tls: bool = False
-    all_responses: List[ProbeResponse] = field(default_factory=list)
+    all_responses: List[ProbeResponse] = Field(default_factory=list)
 
 
 async def _try_probe(  # pylint: disable=too-many-locals,too-many-arguments
@@ -412,9 +288,17 @@ def _match_binary_signature(data: bytes) -> Optional[Tuple[str, int]]:
     """Check for binary protocol signatures. Returns (service_name, weight) or None."""
     if not data:
         return None
-    for name, pattern, weight in BINARY_SIGNATURES:
-        if pattern in data:
-            return (name, weight)
+
+    # Special DNS detection: look for our probe's transaction ID (0xAABB)
+    # echoed back with the QR (response) bit set.
+    for offset in range(min(len(data) - 2, 12)):
+        if (data[offset] == 0xAA and data[offset + 1] == 0xBB
+                and len(data) > offset + 2 and data[offset + 2] & 0x80):
+            return ("DNS", 60)
+
+    for sig in BINARY_SIGNATURES:
+        if sig.pattern in data:
+            return (sig.name, sig.weight)
     return None
 
 
@@ -436,6 +320,16 @@ async def _try_ssl_probe(
     )
 
 
+# Plaintext error messages that indicate the server expects HTTPS/TLS.
+# When detected on a non-TLS response, we attempt an SSL probe.
+HTTPS_PLAINTEXT_INDICATORS = [
+    "the plain http request was sent to https",
+    "this combination of host and port requires tls",
+    "you're speaking plain http to an ssl-enabled server",
+    "client sent an http request to an https server",
+]
+
+
 async def _handle_tls_escalation(  # pylint: disable=too-many-positional-arguments,too-many-arguments
     ip: str,
     port: int,
@@ -444,18 +338,38 @@ async def _handle_tls_escalation(  # pylint: disable=too-many-positional-argumen
     request: Optional[bytes],
     timeout: float
 ) -> Tuple[str, Optional[bytes], Optional[bytes], bool]:
-    """If TLS detected, try SSL probe and return updated values."""
-    if not raw_bytes or not _detect_tls_from_bytes(raw_bytes):
+    """If TLS detected (via bytes, plaintext indicators, or HTTPS redirect), try SSL probe."""
+    tls_from_bytes = bool(raw_bytes) and _detect_tls_from_bytes(raw_bytes)
+
+    # Check for plaintext indicators of an HTTPS-only port
+    tls_from_text = False
+    https_redirect = False
+    if decoded_str and not tls_from_bytes:
+        lower = decoded_str.lower()
+        # Explicit error messages telling us "this port is HTTPS"
+        tls_from_text = any(ind in lower for ind in HTTPS_PLAINTEXT_INDICATORS)
+        # HTTP redirect to HTTPS (e.g. Proxmox 8006, pve-api-daemon)
+        if not tls_from_text:
+            has_redirect = any(f'{code} ' in lower for code in ['301', '302', '307', '308'])
+            has_https_location = 'location: https://' in lower
+            https_redirect = has_redirect and has_https_location
+
+    if not tls_from_bytes and not tls_from_text and not https_redirect:
         return (decoded_str, raw_bytes, request, False)
-    # TLS detected - try SSL probe for actual service
+
+    # TLS detected — try SSL probe for actual service content
     ssl_raw, ssl_decoded = await _try_ssl_probe(ip, port, timeout)
+    ssl_request = b"HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
     if ssl_decoded and ssl_decoded.strip():
-        return (
-            ssl_decoded, ssl_raw,
-            b"HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-            True
-        )
-    return (decoded_str, raw_bytes, request, True)
+        return (ssl_decoded, ssl_raw, ssl_request, True)
+
+    # SSL probe didn't return readable content
+    if tls_from_bytes or tls_from_text:
+        # Binary TLS or explicit HTTPS error — it IS TLS even without content
+        return (decoded_str, raw_bytes, request, True)
+
+    # HTTPS redirect but SSL probe failed — HTTP server with redirect, not HTTPS
+    return (decoded_str, raw_bytes, request, False)
 
 
 async def _multi_probe_generic(  # pylint: disable=too-many-locals,too-many-branches
@@ -586,31 +500,6 @@ def _format_request(
     return str(value)
 
 
-# Port-specific binary probes for protocols that need special handling
-PORT_SPECIFIC_PROBES = {
-    # SMB/NetBIOS - ports 139, 445
-    139: [PROTOCOL_PROBES.get("NetBIOS")],
-    445: [PROTOCOL_PROBES.get("SMB")],
-    # RDP - port 3389
-    3389: [PROTOCOL_PROBES.get("RDP")],
-    # Redis - port 6379
-    6379: [PROTOCOL_PROBES.get("Redis")],
-    # PostgreSQL - port 5432
-    5432: [PROTOCOL_PROBES.get("PostgreSQL")],
-    # SOCKS5 - port 1080
-    1080: [PROTOCOL_PROBES.get("SOCKS5")],
-    # RTMP - port 1935
-    1935: [PROTOCOL_PROBES.get("RTMP")],
-    # Sun RPC/Portmapper - port 111
-    111: [PROTOCOL_PROBES.get("SunRPC")],
-    # MQTT - ports 1883, 8883
-    1883: [PROTOCOL_PROBES.get("MQTT")],
-    8883: [PROTOCOL_PROBES.get("MQTT")],
-    # NFS - port 2049
-    2049: [PROTOCOL_PROBES.get("SunRPC")],
-}
-
-
 def get_port_probes(port: int, strategy: ServiceScanStrategy):
     """
     Return a list of probe payloads based on the port and strategy.
@@ -688,6 +577,23 @@ def _clean_response(response: str) -> str:
     return cleaned
 
 
+def _strip_redirect_noise(response: str) -> str:
+    """Remove ``Location:`` header values before text-based matching.
+
+    Redirect URLs often echo the probe's request path (e.g. ``/wsman``),
+    which causes false-positive matches on service keywords like WinRM.
+    Stripping Location lines ensures we only match on actual response
+    content such as ``Server:``, ``Content-Type:``, and body text.
+    """
+    if not response:
+        return ""
+    lines = response.split('\n')
+    return '\n'.join(
+        line for line in lines
+        if not line.strip().lower().startswith('location:')
+    )
+
+
 def _identify_service(
     response: str,
     response_bytes: Optional[bytes] = None,
@@ -724,18 +630,26 @@ def _identify_service(
                 best_service = sig_name
                 best_weight = sig_weight
 
-    # Check text-based matchers
+    # Check text-based matchers against redirect-stripped response
+    # Redirect Location headers echo probe paths (e.g. /wsman) and
+    # cause false-positive keyword matches.
+    match_text = _strip_redirect_noise(response)
     for matcher in SERVICE_MATCHERS:
-        if matcher.match(response):
+        # HTTPS text matcher should only fire when TLS is confirmed;
+        # otherwise body text mentioning "https" (e.g. redirect URLs,
+        # error messages) causes false positives.
+        if matcher.name == "HTTPS" and not is_tls:
+            continue
+        if matcher.match(match_text):
             if matcher.weight > best_weight:
                 best_service = matcher.name
                 best_weight = matcher.weight
 
     # If no match yet, fall back to legacy SERVICES definitions
-    if best_weight == 0 and response:
+    if best_weight == 0 and match_text:
         for service, config in SERVICES.items():
             hints = config.get("hints", [])
-            if any(hint.lower() in response.lower() for hint in hints):
+            if any(hint.lower() in match_text.lower() for hint in hints):
                 best_service = service
                 best_weight = 30  # Legacy matches get low weight
                 break

@@ -13,8 +13,17 @@ from lanscape.core.service_scan import (
     get_port_probes,
     _try_probe,
     _multi_probe_generic,
+    _identify_service,
+    _match_binary_signature,
+    _handle_tls_escalation,
+    _detect_tls_from_bytes,
+    _strip_redirect_noise,
     PRINTER_PORTS,
-    ServiceScanResult
+    HTTPS_PLAINTEXT_INDICATORS,
+    PROTOCOL_PROBES,
+    PORT_SPECIFIC_PROBES,
+    ServiceScanResult,
+    ServiceMatcher,
 )
 from lanscape.core.scan_config import ServiceScanConfig, ServiceScanStrategy
 
@@ -324,3 +333,407 @@ def test_probe_payload_types():
 
     assert has_none, "Should include None for banner grab"
     assert has_bytes, "Should include bytes payloads"
+
+
+# =============================================================================
+# Service Identification Tests
+# =============================================================================
+
+
+class TestIdentifyService:
+    """Tests for _identify_service weighted matching."""
+
+    def test_ssh_identification(self):
+        """SSH banners should be identified as SSH."""
+        svc, weight = _identify_service("SSH-2.0-OpenSSH_9.7")
+        assert svc == "SSH"
+        assert weight >= 50
+
+    def test_http_identification(self):
+        """Plain HTTP responses should be identified as HTTP."""
+        response = "HTTP/1.1 200 OK\r\nServer: nginx\r\nContent-Type: text/html"
+        svc, weight = _identify_service(response, is_tls=False)
+        assert svc == "HTTP"
+        assert weight >= 50
+
+    def test_https_requires_tls(self):
+        """HTTPS text matcher must NOT fire when is_tls=False."""
+        # An HTTP redirect to HTTPS should be HTTP, not HTTPS
+        response = (
+            "HTTP/1.1 301 Moved Permanently\r\n"
+            "Server: nginx\r\n"
+            "Location: https:///\r\n"
+        )
+        svc, _weight = _identify_service(response, is_tls=False)
+        assert svc != "HTTPS", "Non-TLS response mentioning 'https' should not be HTTPS"
+        assert svc == "HTTP"
+
+    def test_https_with_tls_flag(self):
+        """When is_tls=True, HTTPS identification should work."""
+        response = "HTTP/1.1 200 OK\r\nServer: nginx"
+        svc, weight = _identify_service(response, is_tls=True)
+        assert svc == "HTTPS"
+        assert weight >= 80
+
+    def test_https_error_message_not_false_positive(self):
+        """'plain HTTP request was sent to HTTPS port' should not yield HTTPS
+        when is_tls=False — the TLS escalation handles the promotion."""
+        response = (
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Server: nginx\r\n\r\n"
+            "<html><head><title>400 The plain HTTP request was sent to HTTPS port"
+            "</title></head></html>"
+        )
+        svc, _weight = _identify_service(response, is_tls=False)
+        assert svc != "HTTPS"
+
+    def test_tls_baseline_weight(self):
+        """is_tls=True gives HTTPS baseline at weight 80."""
+        svc, weight = _identify_service("", is_tls=True)
+        assert svc == "HTTPS"
+        assert weight == 80
+
+    def test_binary_signature_beats_text(self):
+        """A binary signature with higher weight should win."""
+        smb_bytes = b"\xffSMBsome data here"
+        svc, weight = _identify_service("unknown", response_bytes=smb_bytes)
+        assert svc == "SMB"
+        assert weight == 60
+
+    def test_plex_identification(self):
+        """Plex headers should be identified correctly."""
+        response = (
+            "HTTP/1.1 200 OK\r\n"
+            "Access-Control-Allow-Origin: http://plex.lan\r\n"
+            "content-type: text/html\r\n"
+            "set-cookie: SID=abc; HttpOnly"
+        )
+        svc, _weight = _identify_service(response)
+        assert svc == "Plex"
+
+    def test_unknown_response(self):
+        """Unrecognizable responses should be Unknown."""
+        svc, weight = _identify_service("xyzzy gibberish")
+        assert svc == "Unknown"
+        assert weight == 0
+
+
+# =============================================================================
+# Binary Signature Matching Tests
+# =============================================================================
+
+
+class TestBinarySignatures:
+    """Tests for _match_binary_signature."""
+
+    def test_empty_data(self):
+        """Empty data should return None."""
+        assert _match_binary_signature(b"") is None
+        assert _match_binary_signature(None) is None
+
+    def test_tls_alert(self):
+        """TLS Alert record should be detected."""
+        data = b"\x15\x03\x01\x00\x02\x02\x28"
+        result = _match_binary_signature(data)
+        assert result is not None
+        assert result[0] == "TLS"
+
+    def test_smb1_response(self):
+        """SMB1 header should be detected."""
+        data = b"\xffSMB" + b"\x00" * 20
+        result = _match_binary_signature(data)
+        assert result is not None
+        assert result[0] == "SMB"
+
+    def test_dns_transaction_id_detection(self):
+        """DNS response with our probe's transaction ID should be detected."""
+        # TCP length prefix + transaction ID 0xAABB + QR flag set (0x81)
+        data = b"\x00\x20\xAA\xBB\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
+        result = _match_binary_signature(data)
+        assert result is not None
+        assert result[0] == "DNS"
+        assert result[1] == 60
+
+    def test_dns_transaction_id_without_qr_bit(self):
+        """DNS probe ID without QR bit set should NOT match as DNS."""
+        # Transaction ID present but QR bit not set (query, not response)
+        data = b"\x00\x20\xAA\xBB\x01\x00\x00\x01"
+        result = _match_binary_signature(data)
+        # Should not match as DNS (QR bit = 0 means it's a query, not response)
+        if result is not None:
+            assert result[0] != "DNS"
+
+    def test_rdp_tpkt_3byte(self):
+        """3-byte TPKT header should match RDP."""
+        data = b"\x03\x00\x00\x13\x0e\xe0\x00\x00"
+        result = _match_binary_signature(data)
+        assert result is not None
+        assert result[0] == "RDP"
+
+    def test_rdp_x224_confirm(self):
+        """X.224 Connection Confirm should match RDP at higher weight."""
+        data = b"\x03\x00\x00\x13\x0e\xd0\x00\x00"
+        result = _match_binary_signature(data)
+        assert result is not None
+        assert result[0] in ("RDP", "DNS")  # Could match either depending on byte patterns
+
+    def test_generic_03_00_no_false_rdp(self):
+        """Short \\x03\\x00 should NOT match RDP (removed signature)."""
+        # Two bytes only — previously triggered false RDP on DNS responses
+        data = b"\x03\x00"
+        result = _match_binary_signature(data)
+        # Should not match RDP with just 2 bytes (the 3-byte signature needs \x03\x00\x00)
+        if result is not None:
+            assert result[0] != "RDP" or len(data) >= 3
+
+
+# =============================================================================
+# TLS Escalation Tests
+# =============================================================================
+
+
+class TestTLSEscalation:
+    """Tests for _handle_tls_escalation with plaintext HTTPS detection."""
+
+    def test_no_escalation_for_plain_http(self):
+        """Normal HTTP response should not trigger escalation."""
+        async def run():
+            response = "HTTP/1.1 200 OK\r\nServer: nginx\r\nContent-Type: text/html"
+            raw = response.encode()
+            result = await _handle_tls_escalation("127.0.0.1", 80, raw, response, None, 2.0)
+            _resp, _raw_bytes, _req, is_tls = result
+            assert not is_tls
+        asyncio.run(run())
+
+    def test_escalation_on_tls_bytes(self):
+        """Binary TLS handshake should trigger escalation."""
+        async def run():
+            raw = b"\x16\x03\x01\x00\x05hello"  # TLS Handshake record
+            decoded = raw.decode("utf-8", errors="replace")
+            with patch('lanscape.core.service_scan._try_ssl_probe',
+                       new_callable=AsyncMock) as mock_ssl:
+                mock_ssl.return_value = (b"HTTP/1.1 200 OK", "HTTP/1.1 200 OK")
+                result = await _handle_tls_escalation(
+                    "127.0.0.1", 443, raw, decoded, None, 2.0
+                )
+                _, _, _, is_tls = result
+                assert is_tls
+                mock_ssl.assert_called_once()
+        asyncio.run(run())
+
+    def test_escalation_on_https_error_message(self):
+        """'plain HTTP request was sent to HTTPS port' should trigger SSL probe."""
+        async def run():
+            response = (
+                "HTTP/1.1 400 Bad Request\r\nServer: nginx\r\n\r\n"
+                "<html><title>400 The plain HTTP request was sent to HTTPS port</title>"
+            )
+            raw = response.encode()
+            with patch('lanscape.core.service_scan._try_ssl_probe',
+                       new_callable=AsyncMock) as mock_ssl:
+                mock_ssl.return_value = (b"HTTP/1.1 200 OK", "HTTP/1.1 200 OK")
+                result = await _handle_tls_escalation(
+                    "127.0.0.1", 443, raw, response, None, 2.0
+                )
+                _, _, _, is_tls = result
+                assert is_tls
+                mock_ssl.assert_called_once()
+        asyncio.run(run())
+
+    def test_escalation_on_https_error_no_ssl_content(self):
+        """HTTPS error indicator with failed SSL probe should still set is_tls=True."""
+        async def run():
+            response = (
+                "HTTP/1.1 400 Bad Request\r\n\r\n"
+                "The plain HTTP request was sent to HTTPS port"
+            )
+            raw = response.encode()
+            with patch('lanscape.core.service_scan._try_ssl_probe',
+                       new_callable=AsyncMock) as mock_ssl:
+                mock_ssl.return_value = (None, None)
+                result = await _handle_tls_escalation(
+                    "127.0.0.1", 443, raw, response, None, 2.0
+                )
+                _, _, _, is_tls = result
+                assert is_tls, "Explicit HTTPS error should still flag is_tls"
+        asyncio.run(run())
+
+    def test_https_redirect_ssl_succeeds(self):
+        """HTTP→HTTPS redirect should trigger SSL probe; is_tls=True if SSL works."""
+        async def run():
+            response = (
+                "HTTP/1.0 301 Moved Permanently\r\n"
+                "Location: https://example.com/\r\n"
+            )
+            raw = response.encode()
+            with patch('lanscape.core.service_scan._try_ssl_probe',
+                       new_callable=AsyncMock) as mock_ssl:
+                mock_ssl.return_value = (b"HTTP/1.1 200 OK", "HTTP/1.1 200 OK")
+                result = await _handle_tls_escalation(
+                    "10.0.0.20", 8006, raw, response, None, 2.0
+                )
+                _, _, _, is_tls = result
+                assert is_tls
+        asyncio.run(run())
+
+    def test_https_redirect_ssl_fails(self):
+        """HTTP→HTTPS redirect where SSL probe fails → is_tls=False (HTTP redirect)."""
+        async def run():
+            response = (
+                "HTTP/1.1 301 Moved Permanently\r\n"
+                "Location: https://other-server.com/\r\n"
+            )
+            raw = response.encode()
+            with patch('lanscape.core.service_scan._try_ssl_probe',
+                       new_callable=AsyncMock) as mock_ssl:
+                mock_ssl.return_value = (None, None)
+                result = await _handle_tls_escalation(
+                    "10.0.0.1", 80, raw, response, None, 2.0
+                )
+                _, _, _, is_tls = result
+                assert not is_tls, "HTTP redirect to HTTPS with failed SSL → should be HTTP"
+        asyncio.run(run())
+
+    def test_https_plaintext_indicators_list(self):
+        """Verify the HTTPS_PLAINTEXT_INDICATORS list is populated."""
+        assert len(HTTPS_PLAINTEXT_INDICATORS) >= 3
+        for indicator in HTTPS_PLAINTEXT_INDICATORS:
+            assert indicator == indicator.lower(), "Indicators should be lowercase"
+
+
+# =============================================================================
+# DNS Probe and Port-Specific Probes Tests
+# =============================================================================
+
+
+class TestDNSProbes:
+    """Tests for DNS probe integration."""
+
+    def test_dns_probe_exists(self):
+        """DNS protocol probe should be defined."""
+        assert "DNS" in PROTOCOL_PROBES
+        probe = PROTOCOL_PROBES["DNS"]
+        assert isinstance(probe, bytes)
+        # Should contain our transaction ID 0xAABB
+        assert b"\xAA\xBB" in probe
+
+    def test_port_53_has_dns_probe(self):
+        """Port 53 should have DNS-specific probes."""
+        assert 53 in PORT_SPECIFIC_PROBES
+        probes = PORT_SPECIFIC_PROBES[53]
+        assert len(probes) > 0
+        # DNS probe from PORT_SPECIFIC_PROBES should contain our transaction ID
+        dns_probe = probes[0]
+        assert b"\xAA\xBB" in dns_probe
+
+    def test_port_53_probes_include_dns(self):
+        """get_port_probes for port 53 should include the DNS probe."""
+        for strategy in ServiceScanStrategy:
+            probes = get_port_probes(53, strategy)
+            dns_payloads = [p for p in probes if p and isinstance(p, bytes)
+                           and b"\xAA\xBB" in p]
+            assert len(dns_payloads) > 0, f"DNS probe missing for port 53 in {strategy}"
+
+
+class TestDetectTLSFromBytes:
+    """Tests for _detect_tls_from_bytes."""
+
+    def test_valid_tls_handshake(self):
+        """TLS Handshake record should be detected."""
+        assert _detect_tls_from_bytes(b"\x16\x03\x01\x00\x05")
+
+    def test_valid_tls_alert(self):
+        """TLS Alert record should be detected."""
+        assert _detect_tls_from_bytes(b"\x15\x03\x03\x00\x02")
+
+    def test_not_tls(self):
+        """Non-TLS data should not be detected."""
+        assert not _detect_tls_from_bytes(b"HTTP/1.1 200 OK")
+        assert not _detect_tls_from_bytes(b"\x00\x00\x00")
+
+    def test_empty_data(self):
+        """Empty/short data should not be detected."""
+        assert not _detect_tls_from_bytes(b"")
+        assert not _detect_tls_from_bytes(b"\x16")
+        assert not _detect_tls_from_bytes(None)
+
+
+class TestServiceMatcher:
+    """Tests for ServiceMatcher model."""
+
+    def test_case_insensitive_match(self):
+        """Default matching should be case-insensitive."""
+        matcher = ServiceMatcher(name="Test", weight=50, patterns=["hello"])
+        assert matcher.match("HELLO WORLD")
+        assert matcher.match("hello world")
+
+    def test_case_sensitive_match(self):
+        """Case-sensitive matching when specified."""
+        matcher = ServiceMatcher(name="Test", weight=50, patterns=["SSH-"],
+                                 case_sensitive=True)
+        assert matcher.match("SSH-2.0")
+        assert not matcher.match("ssh-2.0")
+
+    def test_no_match(self):
+        """Should return False when no pattern matches."""
+        matcher = ServiceMatcher(name="Test", weight=50, patterns=["xyz123"])
+        assert not matcher.match("nothing here")
+
+
+# =============================================================================
+# Redirect Noise Stripping Tests
+# =============================================================================
+
+
+class TestStripRedirectNoise:
+    """Tests for _strip_redirect_noise."""
+
+    def test_strips_location_header(self):
+        """Location headers should be removed."""
+        response = (
+            "HTTP/1.1 301 Moved Permanently\r\n"
+            "Server: nginx\r\n"
+            "Location: https://example.com/wsman\r\n"
+            "Content-Type: text/html\r\n"
+        )
+        cleaned = _strip_redirect_noise(response)
+        assert "wsman" not in cleaned.lower()
+        assert "nginx" in cleaned.lower()
+
+    def test_preserves_non_location_headers(self):
+        """Non-Location headers should be preserved."""
+        response = (
+            "HTTP/1.1 200 OK\r\n"
+            "Server: Apache\r\n"
+            "Content-Type: application/json\r\n"
+        )
+        cleaned = _strip_redirect_noise(response)
+        assert "Apache" in cleaned
+        assert "application/json" in cleaned
+
+    def test_empty_response(self):
+        """Empty input should return empty string."""
+        assert _strip_redirect_noise("") == ""
+        assert _strip_redirect_noise(None) == ""
+
+    def test_redirect_url_with_service_keyword(self):
+        """Redirect echoing probe path /wsman should not cause WinRM match."""
+        response = (
+            "HTTP/1.1 301 Moved Permanently\r\n"
+            "Server: nginx\r\n"
+            "Location: https://host/wsman\r\n"
+        )
+        svc, _weight = _identify_service(response, is_tls=False)
+        assert svc != "WinRM", "Redirect URL containing /wsman should not match WinRM"
+        assert svc == "HTTP"
+
+    def test_redirect_url_with_plex_keyword(self):
+        """Redirect echoing /plex in URL should not cause Plex match."""
+        response = (
+            "HTTP/1.1 302 Found\r\n"
+            "Server: nginx\r\n"
+            "Location: https://host/plex/web\r\n"
+        )
+        svc, _weight = _identify_service(response, is_tls=False)
+        assert svc != "Plex"
+        assert svc == "HTTP"

@@ -1,0 +1,41 @@
+{
+    // Each value is either a hex string (decoded to bytes at load time) or null
+    // (meaning "just connect and wait for the server's banner").
+
+    // SMB negotiate - minimal SMB1 negotiate request
+    "SMB": "0000002fff534d42720000000008010000000000000000000000000000000000000000000000000000000c00024e54204c4d20302e313200",
+
+    // RDP X.224 connection request
+    "RDP": "030000130ee000000000000100080003000000",
+
+    // NetBIOS session request
+    "NetBIOS": "81000044202a534d4253455256455200000000000000000000000000000000000000000020574f524b53544154494f4e0000000000000000000000000000000000",
+
+    // Redis PING
+    "Redis": "2a310d0a24340d0a50494e470d0a",
+
+    // MySQL initial handshake (just wait for banner)
+    "MySQL": null,
+
+    // VNC version request (just connect and wait)
+    "VNC": null,
+
+    // PostgreSQL SSL request
+    "PostgreSQL": "0000000804d2162f",
+
+    // SOCKS5 version identification/method selection
+    "SOCKS5": "050100",
+
+    // RTMP handshake C0+C1 (1 version byte + 1536 zero-padded bytes)
+    // Uses special "hex:length" format: "03" is the prefix, pad to 1537 total.
+    "RTMP": { "hex": "03", "pad_to": 1537 },
+
+    // Sun RPC portmapper getport (NFS)
+    "SunRPC": "0000000000000002000186a0000000020000000300000000000000000000000000000000",
+
+    // MQTT CONNECT packet (minimal)
+    "MQTT": "100d00044d5154540402003c000178",
+
+    // DNS TCP query for version.bind TXT CH (transaction ID 0xAABB)
+    "DNS": "001eaabb010000010000000000000776657273696f6e0462696e640000100003"
+}

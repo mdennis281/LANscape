@@ -126,6 +126,8 @@ Scan progress and status metadata — the "header" for a scan.
 | `devices_scanned` | `int` | `0` | IPs checked so far |
 | `devices_alive` | `int` | `0` | Devices found alive |
 | `port_list_length` | `int` | `0` | Number of ports being tested per device |
+| `ports_scanned` | `int` | `0` | Total port tests completed across all devices |
+| `ports_total` | `int` | `0` | Total port tests expected (alive devices × ports) |
 | `start_time` | `float` | `0.0` | Unix timestamp when scan started |
 | `end_time` | `float \| None` | `None` | Unix timestamp when scan ended |
 | `run_time` | `int` | `0` | Runtime in seconds |

@@ -52,7 +52,9 @@ class ScanMetadata(BaseModel):
     devices_alive: int = Field(default=0, ge=0, description="Devices found alive")
 
     # Port scanning progress
-    port_list_length: int = Field(default=0, ge=0, description="Number of ports to test")
+    port_list_length: int = Field(default=0, ge=0, description="Number of ports to test per device")
+    ports_scanned: int = Field(default=0, ge=0, description="Total port tests completed")
+    ports_total: int = Field(default=0, ge=0, description="Total port tests expected")
 
     # Timing
     start_time: float = Field(default=0.0, description="Unix timestamp when scan started")

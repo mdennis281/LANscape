@@ -124,6 +124,13 @@ class SubnetScanner():
         self.running = False
         self._set_stage('complete')
 
+        devices_found = len(self.results.devices)
+        open_ports = sum(len(d.ports) for d in self.results.devices)
+        self.log.info(
+            f'Scan complete for {self.subnet_str}: '
+            f'{devices_found} device(s) found, {open_ports} open port(s)'
+        )
+
         return self.results
 
     def terminate(self):

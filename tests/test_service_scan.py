@@ -737,3 +737,63 @@ class TestStripRedirectNoise:
         svc, _weight = _identify_service(response, is_tls=False)
         assert svc != "Plex"
         assert svc == "HTTP"
+
+
+# Error Propagation Tests
+###########################
+
+
+class TestServiceScanErrorPropagation:
+    """Tests that service scan errors are surfaced via the error field."""
+
+    def test_timeout_populates_error_field(self):
+        """Async timeout should populate ServiceScanResult.error."""
+        mock_loop = MagicMock()
+        mock_loop.run_until_complete.side_effect = asyncio.TimeoutError()
+        mock_loop.close = MagicMock()
+
+        with (
+            patch("lanscape.core.service_scan.asyncio.get_running_loop",
+                  side_effect=RuntimeError),
+            patch("lanscape.core.service_scan.asyncio.new_event_loop",
+                  return_value=mock_loop),
+            patch("lanscape.core.service_scan.asyncio.set_event_loop"),
+            patch("lanscape.core.service_scan.asyncio.all_tasks",
+                  return_value=set()),
+        ):
+            cfg = ServiceScanConfig(timeout=0.5)
+            result = scan_service("127.0.0.1", 99999, cfg)
+            assert result.service == "Unknown"
+            assert result.error is not None
+            assert "Event loop error" in result.error
+
+    def test_generic_exception_populates_error_field(self):
+        """An unexpected exception should populate ServiceScanResult.error."""
+        mock_loop = MagicMock()
+        mock_loop.run_until_complete.side_effect = RuntimeError("test boom")
+        mock_loop.close = MagicMock()
+
+        with (
+            patch("lanscape.core.service_scan.asyncio.get_running_loop",
+                  side_effect=RuntimeError),
+            patch("lanscape.core.service_scan.asyncio.new_event_loop",
+                  return_value=mock_loop),
+            patch("lanscape.core.service_scan.asyncio.set_event_loop"),
+            patch("lanscape.core.service_scan.asyncio.all_tasks",
+                  return_value=set()),
+        ):
+            cfg = ServiceScanConfig(timeout=0.5)
+            result = scan_service("127.0.0.1", 99999, cfg)
+            assert result.service == "Unknown"
+            assert result.error is not None
+            assert "test boom" in result.error
+
+    def test_successful_scan_has_no_error(self):
+        """A normal successful scan should have error=None."""
+        result = ServiceScanResult(service="HTTP", probes_sent=1, probes_received=1)
+        assert result.error is None
+
+    def test_error_field_default_none(self):
+        """ServiceScanResult.error defaults to None."""
+        result = ServiceScanResult(service="Unknown")
+        assert result.error is None

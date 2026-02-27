@@ -370,6 +370,7 @@ class SubnetScanner():
         """
         self.results.warnings.append({
             'type': warning_type,
+            'stage': self.results.stage,
             **warning_data
         })
         self.log.warning(f'Scan warning [{warning_type}]: {warning_data.get("message", "")}')
@@ -465,7 +466,12 @@ class ScannerResults:
                 old_multiplier=warn.get('old_multiplier'),
                 new_multiplier=warn.get('new_multiplier'),
                 decrease_percent=warn.get('decrease_percent'),
-                timestamp=warn.get('timestamp')
+                timestamp=warn.get('timestamp'),
+                failed_job=warn.get('failed_job'),
+                error_message=warn.get('error_message'),
+                stage=warn.get('stage'),
+                retry_attempt=warn.get('retry_attempt'),
+                max_retries=warn.get('max_retries'),
             )
             if isinstance(warn, dict) else ScanWarningInfo(type='unknown', message=str(warn))
             for warn in self.warnings

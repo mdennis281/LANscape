@@ -77,9 +77,13 @@ class MultiplierController:
         with self._lock:
             return self._multiplier
 
-    def on_failure(self) -> bool:
+    def on_failure(self, context: Optional[Dict[str, Any]] = None) -> bool:
         """
         Handle a failure event, potentially reducing the multiplier.
+
+        Args:
+            context: Optional dict with job failure context
+                     (failed_job, error_message, retry_attempt, max_retries)
 
         Returns:
             bool: True if multiplier was reduced, False if debounced
@@ -111,13 +115,16 @@ class MultiplierController:
 
             # Emit warning callback if provided
             if self._on_warning:
-                self._on_warning('multiplier_reduced', {
+                warning_data: Dict[str, Any] = {
                     'message': warning_msg,
                     'old_multiplier': old_multiplier,
                     'new_multiplier': self._multiplier,
                     'decrease_percent': self._decrease_percent * 100,
                     'timestamp': current_time,
-                })
+                }
+                if context:
+                    warning_data.update(context)
+                self._on_warning('multiplier_reduced', warning_data)
 
             return True
 
@@ -244,8 +251,13 @@ class ThreadPoolRetryManager:
                 f'Job {job.job_id} failed (attempt {job.retry_count}/{job.max_retries + 1}), '
                 f'requeueing. Error: {error}'
             )
-            # Trigger multiplier reduction (debounced)
-            self._multiplier.on_failure()
+            # Trigger multiplier reduction (debounced) with job context
+            self._multiplier.on_failure(context={
+                'failed_job': str(job.job_id),
+                'error_message': str(error),
+                'retry_attempt': job.retry_count,
+                'max_retries': job.max_retries,
+            })
         else:
             # Job has exhausted retries
             self._log.error(

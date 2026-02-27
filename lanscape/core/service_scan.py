@@ -170,6 +170,7 @@ class ServiceScanResult(BaseModel):
     probes_received: int = 0
     is_tls: bool = False
     all_responses: List['ProbeResponse'] = Field(default_factory=list)
+    error: Optional[str] = None
 
 
 class ProbeResult(BaseModel):
@@ -726,13 +727,19 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
             )
         except asyncio.TimeoutError:
             log.warning(f"Timeout scanning {ip}:{port}")
+            return ServiceScanResult(
+                service="Unknown", response=None, request=None,
+                probes_sent=0, probes_received=0,
+                error=f"Timeout scanning {ip}:{port}",
+            )
         except Exception as e:
             log.error(f"Error scanning {ip}:{port}: {str(e)}")
             log.debug(traceback.format_exc())
-        return ServiceScanResult(
-            service="Unknown", response=None, request=None,
-            probes_sent=0, probes_received=0
-        )
+            return ServiceScanResult(
+                service="Unknown", response=None, request=None,
+                probes_sent=0, probes_received=0,
+                error=f"Error scanning {ip}:{port}: {str(e)}",
+            )
 
     # Create and properly manage event loop to avoid file descriptor leaks
     # Using new_event_loop + explicit close is safer in threaded environments
@@ -770,5 +777,6 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
         log.error(f"Event loop error scanning {ip}:{port}: {e}")
         return ServiceScanResult(
             service="Unknown", response=None, request=None,
-            probes_sent=0, probes_received=0
+            probes_sent=0, probes_received=0,
+            error=f"Event loop error scanning {ip}:{port}: {e}",
         )

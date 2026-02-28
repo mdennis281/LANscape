@@ -291,6 +291,34 @@ def extract_patterns(response: str) -> List[str]:  # pylint: disable=too-many-br
     return patterns
 
 
+def _print_unknown_patterns(analysis: Dict[str, Any]):
+    """Print patterns found in unknown responses."""
+    unknown_patterns = defaultdict(int)
+    for item in analysis['unknown_responses']:
+        patterns = extract_patterns(item['response'].lower())
+        for p in patterns:
+            unknown_patterns[p] += 1
+
+    if unknown_patterns:
+        print("\n--- PATTERNS IN UNKNOWN RESPONSES ---")
+        for pattern, count in sorted(unknown_patterns.items(),
+                                     key=lambda x: x[1], reverse=True):
+            print(f"  {pattern}: {count}")
+
+
+def _print_mismatches(analysis: Dict[str, Any]):
+    """Print likely misidentifications."""
+    if not analysis.get('mismatches'):
+        return
+    print(f"\n--- LIKELY MISIDENTIFICATIONS ({len(analysis['mismatches'])} total) ---")
+    for item in analysis['mismatches']:
+        print(f"\n  {item['ip']}:{item['port']}")
+        print(f"    Detected: {item['detected']}  |  Likely: {item['likely']}")
+        print(f"    Reason: {item['reason']}")
+        resp_preview = item.get('response_snippet', '')[:100].replace('\n', '\\n')
+        print(f"    Response: {resp_preview}")
+
+
 def print_analysis(analysis: Dict[str, Any]):
     """Print analysis results to console."""
     print(f"\n{'=' * 60}")
@@ -320,18 +348,7 @@ def print_analysis(analysis: Dict[str, Any]):
             print(f"    Request: {item['request']}")
             print(f"    Response: {resp_preview}...")
 
-    # Analyze patterns in unknown responses
-    unknown_patterns = defaultdict(int)
-    for item in analysis['unknown_responses']:
-        patterns = extract_patterns(item['response'].lower())
-        for p in patterns:
-            unknown_patterns[p] += 1
-
-    if unknown_patterns:
-        print("\n--- PATTERNS IN UNKNOWN RESPONSES ---")
-        for pattern, count in sorted(unknown_patterns.items(),
-                                     key=lambda x: x[1], reverse=True):
-            print(f"  {pattern}: {count}")
+    _print_unknown_patterns(analysis)
 
     # Port-to-service mapping insights
     print("\n--- PORT TO SERVICE MAPPING ---")
@@ -340,15 +357,7 @@ def print_analysis(analysis: Dict[str, Any]):
             service_str = ', '.join(f"{s}({c})" for s, c in services.items())
             print(f"  Port {port}: {service_str}")
 
-    # Misidentification insights
-    if analysis.get('mismatches'):
-        print(f"\n--- LIKELY MISIDENTIFICATIONS ({len(analysis['mismatches'])} total) ---")
-        for item in analysis['mismatches']:
-            print(f"\n  {item['ip']}:{item['port']}")
-            print(f"    Detected: {item['detected']}  |  Likely: {item['likely']}")
-            print(f"    Reason: {item['reason']}")
-            resp_preview = item.get('response_snippet', '')[:100].replace('\n', '\\n')
-            print(f"    Response: {resp_preview}")
+    _print_mismatches(analysis)
 
 
 def save_analysis(analysis: Dict[str, Any], filename: str = None):

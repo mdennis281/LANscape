@@ -2,7 +2,7 @@
 
 A local network scanner with a built-in web UI. Discover devices, open ports, and running services on your network.
 
-> The UI was recently converted into react, in a separate repo: [mdennis281/lanscape-ui](https://github.com/mdennis281/lanscape-ui)
+> The UI was recently converted into react, stored in a separate repo: [mdennis281/lanscape-ui](https://github.com/mdennis281/lanscape-ui)
 
 ```sh
 pip install lanscape

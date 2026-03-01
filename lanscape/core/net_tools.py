@@ -299,9 +299,11 @@ class Device(BaseModel):
 
         # Record service-scan-level errors on the device
         if result.error:
-            self.caught_errors.append(
-                DeviceError(RuntimeError(result.error))
-            )
+            try:
+                # Raise and catch to ensure the exception has a traceback
+                raise RuntimeError(result.error)
+            except RuntimeError as err:
+                self.caught_errors.append(DeviceError(err))
 
         # Update the services mapping (service name -> ports)
         service_ports = self.services.get(result.service, [])

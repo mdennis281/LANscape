@@ -134,19 +134,36 @@ def _load_port_specific_probes(
     raw = _svc_resources.get_jsonc('port_probes.jsonc')
     result: Dict[int, List[Optional[bytes]]] = {}
     for port_str, probe_names in raw.items():
-        result[int(port_str)] = [
-            protocol_probes.get(name) for name in probe_names
-        ]
+        resolved_probes: List[Optional[bytes]] = []
+        for name in probe_names:
+            probe = protocol_probes.get(name)
+            if probe is None and name not in protocol_probes:
+                log.warning(
+                    "Unknown protocol probe name '%s' referenced for port %s "
+                    "in port_probes.jsonc; this entry will be ignored at runtime.",
+                    name,
+                    port_str,
+                )
+            resolved_probes.append(probe)
+        result[int(port_str)] = resolved_probes
     return result
 
 
 # ── Load once at import time ────────────────────────────────────────
-BINARY_SIGNATURES: List[BinarySignature] = _load_binary_signatures()
-PROTOCOL_PROBES: Dict[str, Optional[bytes]] = _load_protocol_probes()
-SERVICE_MATCHERS: List[ServiceMatcher] = _load_service_matchers()
-PORT_SPECIFIC_PROBES: Dict[int, List[Optional[bytes]]] = _load_port_specific_probes(
-    PROTOCOL_PROBES
-)
+try:
+    BINARY_SIGNATURES: List[BinarySignature] = _load_binary_signatures()
+    PROTOCOL_PROBES: Dict[str, Optional[bytes]] = _load_protocol_probes()
+    SERVICE_MATCHERS: List[ServiceMatcher] = _load_service_matchers()
+    PORT_SPECIFIC_PROBES: Dict[int, List[Optional[bytes]]] = _load_port_specific_probes(
+        PROTOCOL_PROBES
+    )
+except Exception as exc:  # pragma: no cover - defensive import-time guard
+    raise RuntimeError(
+        "Failed to load service scan resources from 'lanscape/resources/services'. "
+        "Ensure all required JSONC files (e.g., 'binary_signatures.jsonc', "
+        "'protocol_probes.jsonc', 'service_matchers.jsonc', 'port_probes.jsonc') "
+        "are present and valid."
+    ) from exc
 
 
 class ProbeResponse(BaseModel):
@@ -286,21 +303,37 @@ def _detect_tls_from_bytes(data: bytes) -> bool:
 
 
 def _match_binary_signature(data: bytes) -> Optional[Tuple[str, int]]:
-    """Check for binary protocol signatures. Returns (service_name, weight) or None."""
+    """Check for binary protocol signatures. Returns (service_name, weight) or None.
+    
+    Scans all matching signatures and returns the one with highest weight,
+    since signatures can overlap (e.g., RPC and SOCKS5 both use 0x05 0x00).
+    """
     if not data:
         return None
 
+    best_name: Optional[str] = None
+    best_weight: int = -1
+
     # Special DNS detection: look for our probe's transaction ID (0xAABB)
     # echoed back with the QR (response) bit set.
+    dns_weight = 60
     for offset in range(min(len(data) - 2, 12)):
         if (data[offset] == 0xAA and data[offset + 1] == 0xBB
                 and len(data) > offset + 2 and data[offset + 2] & 0x80):
-            return ("DNS", 60)
+            if dns_weight > best_weight:
+                best_name = "DNS"
+                best_weight = dns_weight
+            break  # DNS transaction ID is definitive
 
     for sig in BINARY_SIGNATURES:
         if sig.pattern in data:
-            return (sig.name, sig.weight)
-    return None
+            if sig.weight > best_weight:
+                best_name = sig.name
+                best_weight = sig.weight
+
+    if best_name is None:
+        return None
+    return (best_name, best_weight)
 
 
 async def _try_ssl_probe(
@@ -334,11 +367,11 @@ HTTPS_PLAINTEXT_INDICATORS = [
 async def _handle_tls_escalation(  # pylint: disable=too-many-positional-arguments,too-many-arguments
     ip: str,
     port: int,
-    raw_bytes: bytes,
-    decoded_str: str,
+    raw_bytes: Optional[bytes],
+    decoded_str: Optional[str],
     request: Optional[bytes],
     timeout: float
-) -> Tuple[str, Optional[bytes], Optional[bytes], bool]:
+) -> Tuple[Optional[str], Optional[bytes], Optional[bytes], bool]:
     """If TLS detected (via bytes, plaintext indicators, or HTTPS redirect), try SSL probe."""
     tls_from_bytes = bool(raw_bytes) and _detect_tls_from_bytes(raw_bytes)
 

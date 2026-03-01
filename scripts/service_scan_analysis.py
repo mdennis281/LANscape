@@ -11,7 +11,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # Add parent dir to path for lanscape imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -35,7 +35,7 @@ def get_available_port_lists() -> List[str]:
 def run_scan(
     subnet: str,
     port_list: str = 'large',
-    config_override: Dict[str, Any] = None
+    config_override: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Run a network scan with aggressive service scanning.
@@ -57,8 +57,8 @@ def run_scan(
     print(f"{'=' * 60}\n")
 
     if config_override:
-        config_override['subnet'] = subnet
-        cfg = ScanConfig.from_dict(config_override)
+        override = {**config_override, 'subnet': subnet}
+        cfg = ScanConfig.from_dict(override)
     else:
         service_cfg = ServiceScanConfig(
             timeout=8.0,

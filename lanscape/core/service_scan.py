@@ -611,7 +611,7 @@ def _clean_response(response: str) -> str:
     return cleaned
 
 
-def _strip_redirect_noise(response: str) -> str:
+def _strip_redirect_noise(response: Optional[str]) -> str:
     """Remove ``Location:`` header values before text-based matching.
 
     Redirect URLs often echo the probe's request path (e.g. ``/wsman``),

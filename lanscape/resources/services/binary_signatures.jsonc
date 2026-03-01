@@ -45,10 +45,12 @@
     { "name": "DNS", "pattern": "00008180", "weight": 40 },
     { "name": "DNS", "pattern": "00008183", "weight": 40 },
 
-    // SOCKS5 proxy
-    { "name": "SOCKS5", "pattern": "0500", "weight": 55 },
-    { "name": "SOCKS5", "pattern": "05ff", "weight": 55 },
-    { "name": "SOCKS5", "pattern": "0502", "weight": 55 },
+    // SOCKS5 proxy - Use more specific response patterns to avoid RPC conflict
+    // SOCKS5 method selection response: version(05) + method (00=no auth, 02=user/pass, ff=no acceptable)
+    // Adding third byte makes these unambiguous vs DCE/RPC which has different byte 3
+    { "name": "SOCKS5", "pattern": "050000", "weight": 55 },
+    { "name": "SOCKS5", "pattern": "050002", "weight": 55 },
+    { "name": "SOCKS5", "pattern": "0500ff", "weight": 55 },
 
     // RTMP (Flash Media Server)
     { "name": "RTMP", "pattern": "03000000", "weight": 50 },

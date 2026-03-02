@@ -1,0 +1,18 @@
+{
+    // Maps port numbers (as strings, JSON requirement) to lists of protocol
+    // probe keys.  Each key must exist in protocol_probes.jsonc.  At load
+    // time the keys are resolved to their byte payloads.
+
+    "53":   ["DNS"],
+    "111":  ["SunRPC"],
+    "139":  ["NetBIOS"],
+    "445":  ["SMB"],
+    "1080": ["SOCKS5"],
+    "1883": ["MQTT"],
+    "1935": ["RTMP"],
+    "2049": ["SunRPC"],
+    "3389": ["RDP"],
+    "5432": ["PostgreSQL"],
+    "6379": ["Redis"],
+    "8883": ["MQTT"]
+}

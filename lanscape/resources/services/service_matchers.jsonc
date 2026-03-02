@@ -1,0 +1,115 @@
+[
+    // Service matchers ordered by specificity (more specific = higher weight).
+    // Each entry: { "name": "<service>", "weight": <int>, "patterns": [...] }
+    // Optional: "case_sensitive": true (defaults to false)
+
+    // WebSocket gets high priority (often contains HTTP headers too)
+    { "name": "WebSocket", "weight": 100, "patterns": [
+        "websocket", "upgrade: websocket", "sec-websocket", "ws://"
+    ]},
+
+    // gRPC / HTTP/2
+    { "name": "gRPC", "weight": 90, "patterns": [
+        "grpc", "application/grpc", "PRI * HTTP/2"
+    ]},
+
+    // TLS/HTTPS – only matched when is_tls=True (gate enforced in _identify_service)
+    { "name": "HTTPS", "weight": 80, "patterns": [
+        "https", "ssl", "tls", "certificate"
+    ]},
+
+    // API-specific (higher than generic HTTP)
+    { "name": "REST API", "weight": 70, "patterns": [
+        "application/json", "\"api\"", "\"version\"", "\"status\""
+    ]},
+
+    // Common web servers
+    { "name": "HTTP", "weight": 50, "patterns": [
+        "http/1.", "http/2", "apache", "nginx", "iis", "lighttpd",
+        "gunicorn", "caddy", "cloudflare", "server:", "content-type:"
+    ]},
+
+    // Databases
+    { "name": "Redis", "weight": 60, "patterns": ["+pong", "redis"] },
+    { "name": "MongoDB", "weight": 60, "patterns": ["mongodb", "ismaster"] },
+    { "name": "MySQL", "weight": 60, "patterns": ["mysql", "mariadb"] },
+    { "name": "PostgreSQL", "weight": 55, "patterns": [
+        "postgresql", "postgres", "fatal:", "psql"
+    ]},
+
+    // Remote access
+    { "name": "SSH", "weight": 70, "patterns": ["ssh-", "openssh", "dropbear"] },
+    { "name": "Telnet", "weight": 40, "patterns": ["telnet", "login:"] },
+
+    // Mail
+    { "name": "SMTP", "weight": 60, "patterns": ["smtp", "220 ", "postfix", "exim"] },
+    { "name": "IMAP", "weight": 60, "patterns": ["imap", "* ok"] },
+    { "name": "POP3", "weight": 60, "patterns": ["+ok", "pop3"] },
+
+    // File transfer
+    { "name": "FTP", "weight": 60, "patterns": ["ftp", "220-", "vsftpd", "filezilla"] },
+
+    // Messaging
+    { "name": "MQTT", "weight": 60, "patterns": ["mqtt"] },
+    { "name": "AMQP", "weight": 60, "patterns": ["amqp", "rabbitmq"] },
+
+    // Minecraft (specific)
+    { "name": "Minecraft", "weight": 70, "patterns": ["minecraft"] },
+
+    // DNS (rare to get text response but possible)
+    { "name": "DNS", "weight": 40, "patterns": ["dns", "bind", "named"] },
+
+    // Windows Services - important for enterprise networks
+    { "name": "SMB", "weight": 65, "patterns": ["smb", "samba", "netbios", "cifs"] },
+    { "name": "RDP", "weight": 65, "patterns": [
+        "rdp", "remote desktop", "terminal service", "ms-wbt-server"
+    ]},
+    { "name": "RPC", "weight": 55, "patterns": ["rpc", "dcerpc", "endpoint mapper"] },
+    { "name": "WinRM", "weight": 60, "patterns": ["wsman", "winrm", "windows remote"] },
+    { "name": "WSDAPI", "weight": 55, "patterns": [
+        "wsdapi", "microsoft-httpapi", "web services"
+    ]},
+    { "name": "LDAP", "weight": 60, "patterns": ["ldap", "active directory"] },
+
+    // Apple/AirPlay
+    { "name": "AirTunes", "weight": 65, "patterns": ["airtunes", "airplay"] },
+    { "name": "mDNS", "weight": 50, "patterns": ["mdns", "bonjour", "_tcp.local"] },
+
+    // IoT & Home Automation
+    { "name": "UPnP", "weight": 50, "patterns": ["upnp", "ssdp", "igd:"] },
+    { "name": "Plex", "weight": 65, "patterns": ["plex", "x-plex"] },
+    { "name": "HomeAssistant", "weight": 65, "patterns": ["home assistant", "hass"] },
+
+    // VNC
+    { "name": "VNC", "weight": 60, "patterns": ["rfb ", "vnc", "tightvnc", "realvnc"] },
+
+    // Streaming
+    { "name": "RTSP", "weight": 55, "patterns": ["rtsp/", "real time streaming"] },
+    { "name": "RTMP", "weight": 55, "patterns": ["rtmp", "flash media", "fms/"] },
+
+    // Databases (additional)
+    { "name": "Elasticsearch", "weight": 60, "patterns": ["elasticsearch", "lucene"] },
+    { "name": "Memcached", "weight": 55, "patterns": ["memcached", "stat "] },
+
+    // Proxy protocols
+    { "name": "SOCKS5", "weight": 60, "patterns": ["socks", "socks5"] },
+    { "name": "Squid", "weight": 55, "patterns": ["squid", "proxy"] },
+
+    // RPC/Portmapper
+    { "name": "SunRPC", "weight": 50, "patterns": ["portmapper", "rpcbind", "nfs"] },
+    { "name": "NFS", "weight": 55, "patterns": ["nfs", "mount"] },
+
+    // Printers
+    { "name": "Printer", "weight": 55, "patterns": ["printer", "jetdirect", "cups", "lpd"] },
+    { "name": "IPP", "weight": 55, "patterns": ["ipp", "internet printing"] },
+
+    // Google Cast / Chromecast
+    { "name": "GoogleCast", "weight": 60, "patterns": ["chromecast", "google cast", "eureka"] },
+
+    // Spotify Connect
+    { "name": "SpotifyConnect", "weight": 60, "patterns": ["spotify", "spotifyconnect"] },
+
+    // Common IoT
+    { "name": "Roku", "weight": 60, "patterns": ["roku"] },
+    { "name": "Sonos", "weight": 60, "patterns": ["sonos"] }
+]

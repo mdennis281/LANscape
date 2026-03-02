@@ -11,7 +11,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # Add parent dir to path for lanscape imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,13 +32,18 @@ def get_available_port_lists() -> List[str]:
     return pm.get_port_lists()
 
 
-def run_scan(subnet: str, port_list: str = 'large') -> Dict[str, Any]:
+def run_scan(
+    subnet: str,
+    port_list: str = 'large',
+    config_override: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Run a network scan with aggressive service scanning.
 
     Args:
-        subnet: The subnet to scan (e.g., '10.0.4.0/22')
+        subnet: The subnet to scan (e.g., '10.0.0.0/24')
         port_list: Name of port list to use
+        config_override: Full ScanConfig dict override (from CLI JSON)
 
     Returns:
         Dict containing scan results and analysis
@@ -48,25 +53,27 @@ def run_scan(subnet: str, port_list: str = 'large') -> Dict[str, Any]:
     print(f"{'=' * 60}")
     print(f"Subnet: {subnet}")
     print(f"Port List: {port_list}")
-    print("Strategy: AGGRESSIVE")
     print(f"Started: {datetime.now().isoformat()}")
     print(f"{'=' * 60}\n")
 
-    # Configure aggressive service scanning
-    service_cfg = ServiceScanConfig(
-        timeout=8.0,  # Longer timeout for better results
-        lookup_type=ServiceScanStrategy.AGGRESSIVE,
-        max_concurrent_probes=15
-    )
-
-    cfg = ScanConfig(
-        subnet=subnet,
-        port_list=port_list,
-        lookup_type=[ScanType.ICMP_THEN_ARP],
-        service_scan_config=service_cfg
-    )
+    if config_override:
+        override = {**config_override, 'subnet': subnet}
+        cfg = ScanConfig.from_dict(override)
+    else:
+        service_cfg = ServiceScanConfig(
+            timeout=8.0,
+            lookup_type=ServiceScanStrategy.AGGRESSIVE,
+            max_concurrent_probes=15
+        )
+        cfg = ScanConfig(
+            subnet=subnet,
+            port_list=port_list,
+            lookup_type=[ScanType.ICMP_THEN_ARP],
+            service_scan_config=service_cfg
+        )
 
     print(f"Port list has {len(cfg.get_ports())} ports")
+    print(f"Strategy: {cfg.service_scan_config.lookup_type}")
     print("Scanning...")
 
     sm = ScanManager()
@@ -101,6 +108,7 @@ def analyze_results(results) -> Dict[str, Any]:  # pylint: disable=too-many-bran
         'tls_detected': [],
         'response_patterns': defaultdict(list),
         'request_response_pairs': [],
+        'mismatches': [],
     }
 
     for device in results.devices:
@@ -151,8 +159,36 @@ def analyze_results(results) -> Dict[str, Any]:  # pylint: disable=too-many-bran
                     'is_tls': is_tls
                 })
 
+                # Detect likely misidentifications
+                resp_lower = response.lower()
+                # Port 80 getting HTTPS because response mentions "https" in content
+                if port == 80 and service == 'HTTPS' and not is_tls:
+                    analysis['mismatches'].append({
+                        'ip': device.ip, 'port': port,
+                        'detected': service, 'likely': 'HTTP',
+                        'reason': 'Port 80 non-TLS labeled HTTPS (content mentions https)',
+                        'response_snippet': response[:200]
+                    })
+                # Non-standard HTTP ports with HTTPS label but no TLS
+                if service == 'HTTPS' and not is_tls and 'http/' in resp_lower:
+                    analysis['mismatches'].append({
+                        'ip': device.ip, 'port': port,
+                        'detected': service, 'likely': 'HTTP',
+                        'reason': 'HTTPS detected without TLS handshake',
+                        'response_snippet': response[:200]
+                    })
+                # REST API on standard HTTP ports should probably be HTTP
+                if service == 'REST API' and ('http/' in resp_lower
+                                              or 'server:' in resp_lower):
+                    analysis['mismatches'].append({
+                        'ip': device.ip, 'port': port,
+                        'detected': service, 'likely': 'HTTP (REST API)',
+                        'reason': 'REST API detected on HTTP server',
+                        'response_snippet': response[:200]
+                    })
+
                 # Look for patterns in responses
-                response_lower = response.lower()
+                response_lower = resp_lower
                 patterns = extract_patterns(response_lower)
                 if patterns:
                     analysis['response_patterns'][service].append({
@@ -255,6 +291,34 @@ def extract_patterns(response: str) -> List[str]:  # pylint: disable=too-many-br
     return patterns
 
 
+def _print_unknown_patterns(analysis: Dict[str, Any]):
+    """Print patterns found in unknown responses."""
+    unknown_patterns = defaultdict(int)
+    for item in analysis['unknown_responses']:
+        patterns = extract_patterns(item['response'].lower())
+        for p in patterns:
+            unknown_patterns[p] += 1
+
+    if unknown_patterns:
+        print("\n--- PATTERNS IN UNKNOWN RESPONSES ---")
+        for pattern, count in sorted(unknown_patterns.items(),
+                                     key=lambda x: x[1], reverse=True):
+            print(f"  {pattern}: {count}")
+
+
+def _print_mismatches(analysis: Dict[str, Any]):
+    """Print likely misidentifications."""
+    if not analysis.get('mismatches'):
+        return
+    print(f"\n--- LIKELY MISIDENTIFICATIONS ({len(analysis['mismatches'])} total) ---")
+    for item in analysis['mismatches']:
+        print(f"\n  {item['ip']}:{item['port']}")
+        print(f"    Detected: {item['detected']}  |  Likely: {item['likely']}")
+        print(f"    Reason: {item['reason']}")
+        resp_preview = item.get('response_snippet', '')[:100].replace('\n', '\\n')
+        print(f"    Response: {resp_preview}")
+
+
 def print_analysis(analysis: Dict[str, Any]):
     """Print analysis results to console."""
     print(f"\n{'=' * 60}")
@@ -284,18 +348,7 @@ def print_analysis(analysis: Dict[str, Any]):
             print(f"    Request: {item['request']}")
             print(f"    Response: {resp_preview}...")
 
-    # Analyze patterns in unknown responses
-    unknown_patterns = defaultdict(int)
-    for item in analysis['unknown_responses']:
-        patterns = extract_patterns(item['response'].lower())
-        for p in patterns:
-            unknown_patterns[p] += 1
-
-    if unknown_patterns:
-        print("\n--- PATTERNS IN UNKNOWN RESPONSES ---")
-        for pattern, count in sorted(unknown_patterns.items(),
-                                     key=lambda x: x[1], reverse=True):
-            print(f"  {pattern}: {count}")
+    _print_unknown_patterns(analysis)
 
     # Port-to-service mapping insights
     print("\n--- PORT TO SERVICE MAPPING ---")
@@ -303,6 +356,8 @@ def print_analysis(analysis: Dict[str, Any]):
         if len(services) > 1 or 'Unknown' in services:
             service_str = ', '.join(f"{s}({c})" for s, c in services.items())
             print(f"  Port {port}: {service_str}")
+
+    _print_mismatches(analysis)
 
 
 def save_analysis(analysis: Dict[str, Any], filename: str = None):
@@ -322,19 +377,33 @@ def save_analysis(analysis: Dict[str, Any], filename: str = None):
 
 def main():
     """Main entry point."""
-    # Default values
-    subnet = '10.0.4.0/22'
-    port_list = 'large'
-
-    # Parse command line args
-    if len(sys.argv) > 1:
-        subnet = sys.argv[1]
-    if len(sys.argv) > 2:
-        port_list = sys.argv[2]
+    import argparse  # pylint: disable=import-outside-toplevel
+    parser = argparse.ArgumentParser(description='Service Scan Analysis')
+    parser.add_argument('subnet', nargs='?', default='10.0.0.0/24',
+                        help='Subnet to scan (default: 10.0.0.0/24)')
+    parser.add_argument('port_list', nargs='?', default='large',
+                        help='Port list to use (default: large)')
+    parser.add_argument('--config', type=str, default=None,
+                        help='Path to JSON file with full ScanConfig override')
+    cli_args = parser.parse_args()
 
     # Show available port lists
     available = get_available_port_lists()
     print(f"Available port lists: {', '.join(available)}")
+
+    config_override = None
+    if cli_args.config:
+        config_path = Path(cli_args.config)
+        if not config_path.exists():
+            print(f"Error: Config file '{cli_args.config}' not found")
+            sys.exit(1)
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config_override = json.load(f)
+        print(f"Using config override from: {config_path}")
+
+    port_list = cli_args.port_list
+    if config_override and 'port_list' in config_override:
+        port_list = config_override['port_list']
 
     if port_list not in available:
         print(f"Error: Port list '{port_list}' not found")
@@ -342,7 +411,7 @@ def main():
         sys.exit(1)
 
     # Run the scan
-    analysis = run_scan(subnet, port_list)
+    analysis = run_scan(cli_args.subnet, port_list, config_override)
 
     # Print and save results
     print_analysis(analysis)

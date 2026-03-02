@@ -7,6 +7,7 @@ Pydantic models used throughout LANscape for structured data exchange. All model
 ```python
 from lanscape import (
     DeviceResult, ServiceInfo, ProbeResponseInfo,
+    DeviceErrorInfo, ScanErrorInfo, ScanWarningInfo,
     ScanMetadata, ScanResults, ScanSummary,
     DeviceStage, ScanStage
 )
@@ -32,7 +33,7 @@ The primary model for a discovered network device.
 | `ports_scanned` | `int` | `0` | Number of ports that have been tested |
 | `services` | `Dict[str, List[int]]` | `{}` | Service name → list of ports mapping (e.g., `{"ssh": [22]}`) |
 | `service_info` | `List[ServiceInfo]` | `[]` | Detailed service probe results |
-| `errors` | `List[DeviceErrorInfo]` | `[]` | Errors encountered during scanning |
+| `errors` | `List[DeviceErrorInfo]` | `[]` | Errors encountered during scanning (port scans, service scans, etc.) |
 
 **Computed field:**
 
@@ -85,6 +86,26 @@ for device in results.devices:
 
 ---
 
+### DeviceErrorInfo
+
+A serializable representation of an error encountered while scanning a specific device. Errors from all scan phases — alive checks, port scans, and service scans — are collected here.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `source` | `str` | *required* | Method or scan phase where the error occurred (e.g., `"scan_service"`, `"_get_hostname"`) |
+| `message` | `str` | *required* | Human-readable error message |
+| `traceback` | `str \| None` | `None` | Full Python traceback, if available |
+
+Service scan errors (timeouts, connection failures, event-loop errors) are automatically captured and appended to the device's `errors` list. Previously these were silently swallowed — they now surface as `DeviceErrorInfo` entries.
+
+```python
+for device in results.devices:
+    if device.errors:
+        print(f"{device.ip} had {len(device.errors)} error(s):")
+        for err in device.errors:
+            print(f"  [{err.source}] {err.message}")
+```
+
 ---
 
 ## Scan Models
@@ -105,6 +126,8 @@ Scan progress and status metadata — the "header" for a scan.
 | `devices_scanned` | `int` | `0` | IPs checked so far |
 | `devices_alive` | `int` | `0` | Devices found alive |
 | `port_list_length` | `int` | `0` | Number of ports being tested per device |
+| `ports_scanned` | `int` | `0` | Total port tests completed across all devices |
+| `ports_total` | `int` | `0` | Total port tests expected (alive devices × ports) |
 | `start_time` | `float` | `0.0` | Unix timestamp when scan started |
 | `end_time` | `float \| None` | `None` | Unix timestamp when scan ended |
 | `run_time` | `int` | `0` | Runtime in seconds |
@@ -142,5 +165,52 @@ Lightweight scan summary for progress display.
 | `ports_found` | `List[int]` | `[]` | All unique open ports found across all devices |
 | `services_found` | `List[str]` | `[]` | All unique service names identified |
 | `warnings` | `List[dict]` | `[]` | Raw warning dicts from the scan |
+
+---
+
+### ScanErrorInfo
+
+A serializable representation of a scan-level error (as opposed to per-device errors).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `basic` | `str` | *required* | Brief error summary |
+| `traceback` | `str \| None` | `None` | Full traceback if available |
+
+---
+
+### ScanWarningInfo
+
+A scan-level warning, typically related to automatic thread-pool tuning. When jobs fail and trigger a multiplier reduction, the warning includes contextual information about the failure — which job failed, the error message, the scan stage, and retry details.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `str` | *required* | Warning type identifier (e.g., `"multiplier_reduced"`) |
+| `message` | `str` | *required* | Human-readable warning message |
+| `old_multiplier` | `float \| None` | `None` | Previous thread multiplier value |
+| `new_multiplier` | `float \| None` | `None` | New thread multiplier value after reduction |
+| `decrease_percent` | `float \| None` | `None` | Percent decrease applied |
+| `timestamp` | `float \| None` | `None` | Unix timestamp of the warning |
+| `failed_job` | `str \| None` | `None` | The job ID (e.g., IP address) that triggered the warning |
+| `error_message` | `str \| None` | `None` | The error message from the failed job |
+| `stage` | `str \| None` | `None` | The scan stage when the warning occurred (e.g., `"scanning devices"`, `"testing ports"`) |
+| `retry_attempt` | `int \| None` | `None` | Which retry attempt failed (1-based) |
+| `max_retries` | `int \| None` | `None` | Maximum retries configured for this job type |
+
+The contextual fields (`failed_job`, `error_message`, `stage`, `retry_attempt`, `max_retries`) are populated when a job failure triggers a thread multiplier reduction. They give visibility into *why* the scan is throttling itself.
+
+```python
+for warning in results.metadata.warnings:
+    print(f"[{warning.type}] {warning.message}")
+    if warning.failed_job:
+        print(f"  Failed job: {warning.failed_job}")
+        print(f"  Error:      {warning.error_message}")
+    if warning.stage:
+        print(f"  Stage:      {warning.stage}")
+    if warning.retry_attempt is not None:
+        print(f"  Retry:      {warning.retry_attempt}/{warning.max_retries}")
+    if warning.old_multiplier is not None:
+        print(f"  Multiplier: {warning.old_multiplier:.2f} -> {warning.new_multiplier:.2f}")
+```
 
 

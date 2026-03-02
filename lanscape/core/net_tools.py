@@ -291,7 +291,19 @@ class Device(BaseModel):
     @job_tracker
     def scan_service(self, port: int, cfg: ServiceScanConfig):
         """Scan a specific port for services."""
-        result: ServiceScanResult = scan_service(self.ip, port, cfg)
+        try:
+            result: ServiceScanResult = scan_service(self.ip, port, cfg)
+        except Exception as e:
+            self.caught_errors.append(DeviceError(e))
+            return
+
+        # Record service-scan-level errors on the device
+        if result.error:
+            try:
+                # Raise and catch to ensure the exception has a traceback
+                raise RuntimeError(result.error)
+            except RuntimeError as err:
+                self.caught_errors.append(DeviceError(err))
 
         # Update the services mapping (service name -> ports)
         service_ports = self.services.get(result.service, [])

@@ -2,6 +2,8 @@
 
 A local network scanner with a built-in web UI. Discover devices, open ports, and running services on your network.
 
+> The UI was recently converted into react, stored in a separate repo: [mdennis281/lanscape-ui](https://github.com/mdennis281/lanscape-ui)
+
 ```sh
 pip install lanscape
 python -m lanscape
@@ -26,14 +28,14 @@ Health:
 
 ---
 
-![LANscape UI](docs/img/lanscape-ui-main.jpg)
+![LANscape UI](https://github.com/mdennis281/LANscape/raw/main/docs/img/lanscape-ui-main.jpg)
 
 <details>
 <summary>More screenshots</summary>
 
-![Scan Configuration](docs/img/lanscape-config.png)
+![Scan Configuration](https://github.com/mdennis281/LANscape/raw/main/docs/img/lanscape-config.png)
 
-![Port Detail](docs/img/lanscape-port-detail.jpg)
+![Port Detail](https://github.com/mdennis281/LANscape/raw/main/docs/img/lanscape-port-detail.jpg)
 
 </details>
 
@@ -73,7 +75,7 @@ The scanner uses a combination of ARP, ICMP, and port probing to find devices.
 If results aren't great out of the box:
 
 - Tweak the scan configuration preset (accessible from the gear icon)
-- Set up ARP lookup properly — see [ARP issues](./docs/arp-issues.md)
+- Set up ARP lookup properly — see [ARP issues](https://github.com/mdennis281/LANscape/blob/main/docs/arp-issues.md)
 - Open an issue if something still seems off
 
 ### Something else

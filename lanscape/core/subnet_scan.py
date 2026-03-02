@@ -124,6 +124,13 @@ class SubnetScanner():
         self.running = False
         self._set_stage('complete')
 
+        devices_found = len(self.results.devices)
+        open_ports = sum(len(d.ports) for d in self.results.devices)
+        self.log.info(
+            f'Scan complete for {self.subnet_str}: '
+            f'{devices_found} device(s) found, {open_ports} open port(s)'
+        )
+
         return self.results
 
     def terminate(self):
@@ -189,6 +196,35 @@ class SubnetScanner():
         multiplier = self.cfg.t_cnt('isalive')
         return total_sec / multiplier, remaining_sec / multiplier
 
+    def _estimate_port_test_time(self) -> float:
+        """
+        Estimate the average time per port test based on config and measured data.
+
+        Uses a weighted blend between config-derived estimate and measured average,
+        transitioning smoothly as more samples accumulate.
+
+        Returns:
+            float: Estimated seconds per port test
+        """
+        pcfg = self.cfg.port_scan_config
+        # Worst-case per-port: each attempt can take up to `timeout`,
+        # plus `retry_delay` between retries (not after the last attempt).
+        config_estimate = (
+            pcfg.timeout * (pcfg.retries + 1)
+            + pcfg.retry_delay * pcfg.retries
+        )
+
+        ports_scanned = self.job_stats.finished.get('SubnetScanner._test_port', 0)
+        measured_avg = self.job_stats.timing.get('SubnetScanner._test_port', 0.0)
+
+        if ports_scanned == 0 or measured_avg <= 0:
+            return config_estimate
+
+        # Blend: measured data gets more weight as samples grow (full trust at 20)
+        blend_threshold = 20
+        measured_weight = min(1.0, ports_scanned / blend_threshold)
+        return measured_avg * measured_weight + config_estimate * (1 - measured_weight)
+
     def _calc_port_scan_time(self, est_alive_devices: float) -> tuple[float, float]:
         """
         Calculate total and remaining time for port scanning phase.
@@ -200,9 +236,7 @@ class SubnetScanner():
             tuple: (total_time_sec, remaining_time_sec) adjusted by thread multiplier
         """
         ports_scanned = self.job_stats.finished.get('SubnetScanner._test_port', 0)
-        # Use default timing until we have enough samples for accuracy
-        avg_port_test_sec = self.job_stats.timing.get(
-            'SubnetScanner._test_port', 1) if ports_scanned > 20 else 1
+        avg_port_test_sec = self._estimate_port_test_time()
 
         total_ports = est_alive_devices * len(self.ports)
         remaining_ports = max(0, total_ports - ports_scanned)
@@ -363,6 +397,7 @@ class SubnetScanner():
         """
         self.results.warnings.append({
             'type': warning_type,
+            'stage': self.results.stage,
             **warning_data
         })
         self.log.warning(f'Scan warning [{warning_type}]: {warning_data.get("message", "")}')
@@ -458,11 +493,20 @@ class ScannerResults:
                 old_multiplier=warn.get('old_multiplier'),
                 new_multiplier=warn.get('new_multiplier'),
                 decrease_percent=warn.get('decrease_percent'),
-                timestamp=warn.get('timestamp')
+                timestamp=warn.get('timestamp'),
+                failed_job=warn.get('failed_job'),
+                error_message=warn.get('error_message'),
+                stage=warn.get('stage'),
+                retry_attempt=warn.get('retry_attempt'),
+                max_retries=warn.get('max_retries'),
             )
             if isinstance(warn, dict) else ScanWarningInfo(type='unknown', message=str(warn))
             for warn in self.warnings
         ]
+
+        ports_scanned = self.scan.job_stats.finished.get(
+            'SubnetScanner._test_port', 0)
+        ports_total = self.devices_alive * self.port_list_length
 
         return ScanMetadata(
             scan_id=self.uid,
@@ -475,6 +519,8 @@ class ScannerResults:
             devices_scanned=self.devices_scanned,
             devices_alive=self.devices_alive,
             port_list_length=self.port_list_length,
+            ports_scanned=ports_scanned,
+            ports_total=ports_total,
             start_time=self.start_time,
             end_time=self.end_time,
             run_time=int(round(self.get_runtime(), 0)),

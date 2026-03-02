@@ -11,4 +11,4 @@ committed diff off of main (assuming checkout to a non main branch)
 staged diff
 unstaged diff
 
-once you have context for each of these, summarize the new functionality in each and report back to the user.
+once you have context for each of these, summarize the new functionality in each and report back to the user. The goal is to be as concise as possible while still highlighting the key changes.

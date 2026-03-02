@@ -118,6 +118,58 @@ class TestMultiplierController:
         assert 'message' in warning_data
         assert 'timestamp' in warning_data
 
+    def test_on_warning_callback_with_context(self):
+        """Test that context dict is included in warning callback data."""
+        warnings_received = []
+
+        def warning_handler(warning_type: str, warning_data: dict):
+            warnings_received.append((warning_type, warning_data))
+
+        controller = MultiplierController(
+            initial_multiplier=1.0,
+            decrease_percent=0.25,
+            debounce_sec=0.0,
+            on_warning=warning_handler
+        )
+
+        controller.on_failure(context={
+            'failed_job': '192.168.1.50',
+            'error_message': 'Connection refused',
+            'retry_attempt': 1,
+            'max_retries': 2,
+        })
+
+        assert len(warnings_received) == 1
+        _, warning_data = warnings_received[0]
+        assert warning_data['failed_job'] == '192.168.1.50'
+        assert warning_data['error_message'] == 'Connection refused'
+        assert warning_data['retry_attempt'] == 1
+        assert warning_data['max_retries'] == 2
+        # Standard fields are still present
+        assert warning_data['old_multiplier'] == 1.0
+        assert warning_data['new_multiplier'] == 0.75
+
+    def test_on_failure_without_context(self):
+        """Test that on_failure works without context (backward compatible)."""
+        warnings_received = []
+
+        def warning_handler(warning_type: str, warning_data: dict):
+            warnings_received.append((warning_type, warning_data))
+
+        controller = MultiplierController(
+            initial_multiplier=1.0,
+            decrease_percent=0.25,
+            debounce_sec=0.0,
+            on_warning=warning_handler
+        )
+
+        controller.on_failure()
+
+        assert len(warnings_received) == 1
+        _, warning_data = warnings_received[0]
+        assert 'failed_job' not in warning_data
+        assert 'error_message' not in warning_data
+
 
 class TestRetryJob:
     """Tests for RetryJob."""
@@ -253,6 +305,46 @@ class TestThreadPoolRetryManager:
 
         # Multiplier should have been reduced
         assert controller.multiplier < 1.0
+
+    def test_warning_includes_job_context(self):
+        """Test that warnings from failed jobs include the job ID and error."""
+        warnings_received = []
+
+        def warning_handler(warning_type: str, warning_data: dict):
+            warnings_received.append((warning_type, warning_data))
+
+        controller = MultiplierController(
+            initial_multiplier=1.0,
+            decrease_percent=0.25,
+            debounce_sec=0.0,
+            on_warning=warning_handler,
+        )
+        retry_config = RetryConfig(max_retries=1)
+
+        def fail_with_message():
+            raise RuntimeError("connection timed out")
+
+        manager = ThreadPoolRetryManager(
+            max_workers=1,
+            retry_config=retry_config,
+            multiplier_controller=controller,
+        )
+
+        jobs = [RetryJob(
+            job_id="192.168.1.99",
+            func=fail_with_message,
+            max_retries=1,
+        )]
+
+        manager.execute_all(jobs)
+
+        # Should have at least one warning with context
+        assert len(warnings_received) >= 1
+        _, warning_data = warnings_received[0]
+        assert warning_data['failed_job'] == '192.168.1.99'
+        assert 'connection timed out' in warning_data['error_message']
+        assert warning_data['retry_attempt'] == 1
+        assert warning_data['max_retries'] == 1
 
     def test_worker_count_reduces_with_multiplier(self):
         """Test that worker count is recalculated when multiplier decreases."""

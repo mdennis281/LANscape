@@ -437,8 +437,9 @@ def _open_browser(
         Popen instance if PWA was opened, None otherwise
     """
     time.sleep(wait)
-    # Suppress noisy pwa_launcher logs
-    logging.getLogger('pwa_launcher').setLevel(logging.WARNING)
+    # Suppress pwa_launcher logs — browser-not-found errors are expected
+    # on headless systems and handled gracefully with our own warning.
+    logging.getLogger('pwa_launcher').setLevel(logging.CRITICAL)
     try:
         log.debug(f'Opening browser: {url}')
         return open_pwa(url, auto_profile=False)

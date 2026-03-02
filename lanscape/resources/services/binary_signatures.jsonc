@@ -1,0 +1,69 @@
+[
+    // Each entry: { "name": "<service>", "pattern": "<hex>", "weight": <int> }
+    // pattern is a hex string (no 0x prefix) decoded at load time into bytes.
+
+    // TLS/SSL Alert or Handshake
+    { "name": "TLS", "pattern": "1503", "weight": 50 },
+    { "name": "TLS", "pattern": "1603", "weight": 50 },
+
+    // SMB/NetBIOS - Windows file sharing
+    { "name": "SMB", "pattern": "ff534d42", "weight": 60 },
+    { "name": "SMB", "pattern": "fe534d42", "weight": 60 },
+    { "name": "NetBIOS", "pattern": "83000001", "weight": 55 },
+    { "name": "NetBIOS", "pattern": "82000000", "weight": 55 },
+
+    // RDP (Remote Desktop) - X.224 connection confirm
+    { "name": "RDP", "pattern": "030000", "weight": 55 },
+    { "name": "RDP", "pattern": "0ed0", "weight": 58 },
+
+    // RPC/DCE
+    { "name": "RPC", "pattern": "0500", "weight": 45 },
+
+    // MySQL greeting
+    { "name": "MySQL", "pattern": "0000000a", "weight": 40 },
+
+    // PostgreSQL
+    { "name": "PostgreSQL", "pattern": "53464154414c", "weight": 40 },
+    { "name": "PostgreSQL", "pattern": "534552524f52", "weight": 40 },
+    { "name": "PostgreSQL", "pattern": "45", "weight": 35 },
+
+    // Redis
+    { "name": "Redis", "pattern": "2b504f4e47", "weight": 40 },
+    { "name": "Redis", "pattern": "2d455252", "weight": 30 },
+    { "name": "Redis", "pattern": "2d4e4f41555448", "weight": 45 },
+
+    // MongoDB
+    { "name": "MongoDB", "pattern": "69736d6173746572", "weight": 40 },
+
+    // SSH (already text but good to have)
+    { "name": "SSH", "pattern": "5353482d", "weight": 50 },
+
+    // VNC
+    { "name": "VNC", "pattern": "52464220", "weight": 55 },
+
+    // DNS responses (binary)
+    { "name": "DNS", "pattern": "00008180", "weight": 40 },
+    { "name": "DNS", "pattern": "00008183", "weight": 40 },
+
+    // SOCKS5 proxy - Use more specific response patterns to avoid RPC conflict
+    // SOCKS5 method selection response: version(05) + method (00=no auth, 02=user/pass, ff=no acceptable)
+    // Adding third byte makes these unambiguous vs DCE/RPC which has different byte 3
+    { "name": "SOCKS5", "pattern": "050000", "weight": 55 },
+    { "name": "SOCKS5", "pattern": "050002", "weight": 55 },
+    { "name": "SOCKS5", "pattern": "0500ff", "weight": 55 },
+
+    // RTMP (Flash Media Server)
+    { "name": "RTMP", "pattern": "03000000", "weight": 50 },
+
+    // Sun RPC / Portmapper
+    { "name": "SunRPC", "pattern": "0000001c", "weight": 45 },
+    { "name": "SunRPC", "pattern": "8000", "weight": 40 },
+
+    // MQTT
+    { "name": "MQTT", "pattern": "2002", "weight": 55 },
+    { "name": "MQTT", "pattern": "10", "weight": 35 },
+
+    // Printer protocols
+    { "name": "LPD", "pattern": "00", "weight": 25 },
+    { "name": "IPP", "pattern": "0101", "weight": 40 }
+]

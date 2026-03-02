@@ -30,6 +30,11 @@ from lanscape.core.version_manager import get_installed_version
 
 log = logging.getLogger('Discovery')
 
+# Suppress zeroconf library logs — binding failures and async socket errors
+# are expected on macOS/BSD (mDNSResponder owns port 5353) and handled gracefully.
+# We emit our own warning when falling back to unicast mode.
+logging.getLogger('zeroconf').setLevel(logging.CRITICAL)
+
 SERVICE_TYPE = '_lanscape._tcp.local.'
 
 
@@ -273,9 +278,9 @@ class DiscoveryService:
         except OSError as exc:
             if exc.errno != errno.EADDRINUSE:
                 raise
-            log.debug(
-                'Port 5353 in use (likely system mDNS daemon); '
-                'falling back to unicast mode'
+            log.warning(
+                'mDNS port 5353 in use (system mDNS daemon); '
+                'falling back to unicast mode — discovery may be limited'
             )
             return Zeroconf(ip_version=IPVersion.V4Only, unicast=True)
 

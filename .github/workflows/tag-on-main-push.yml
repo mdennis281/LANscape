@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   actions: read
+  packages: write
 
 jobs:
   tag:
@@ -67,4 +68,13 @@ jobs:
     with:
       branch: ${{ github.ref_name }}
       version: ${{ needs.tag.outputs.version }}
+    secrets: inherit
+
+  docker-publish:
+    needs: [tag, publish]
+    if: ${{ always() && needs.tag.outputs.version != '' && needs.publish.result == 'success' }}
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      version: ${{ needs.tag.outputs.version }}
+      is_prerelease: "false"
     secrets: inherit

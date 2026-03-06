@@ -77,6 +77,18 @@ class TestArpCacheLookupPlatformCommand:
         result = ArpCacheLookup._get_platform_arp_command()
         assert result == ['ip', 'neigh', 'show']
 
+    @patch('lanscape.core.system_compat.shutil.which')
+    @patch('lanscape.core.system_compat.psutil')
+    def test_linux_raises_when_no_arp_command(self, mock_psutil, mock_which):
+        """Linux should raise RuntimeError when neither ip nor arp is available."""
+        mock_psutil.WINDOWS = False
+        mock_psutil.LINUX = True
+        mock_psutil.MACOS = False
+        mock_which.return_value = None
+
+        with pytest.raises(RuntimeError, match="No suitable ARP command found"):
+            ArpCacheLookup._get_platform_arp_command()
+
     @patch('lanscape.core.system_compat.psutil')
     def test_macos_uses_arp_n(self, mock_psutil):
         """macOS should use 'arp -n' command."""

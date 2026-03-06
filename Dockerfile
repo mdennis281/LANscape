@@ -1,5 +1,5 @@
 # LANscape Docker Image
-# Installs from PyPI for simplicity and consistency
+# Single-stage build - installs from PyPI for simplicity and consistency
 
 ARG VERSION=latest
 

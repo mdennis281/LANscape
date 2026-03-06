@@ -37,9 +37,15 @@ def get_linux_arp_command() -> Tuple[List[str], str]:
     if shutil.which('arp'):
         return (['arp', '-n'], 'arp -n')
 
-    # Neither available - return ip and let it fail with clear error
-    log.warning("Neither 'ip' nor 'arp' command found - ARP lookup may fail")
-    return (['ip', 'neigh', 'show'], 'ip neigh show')
+    # Neither available - raise a clear error instead of returning a bad command
+    log.warning(
+        "Neither 'ip' nor 'arp' command found - ARP lookup is unavailable. "
+        "Please install the 'iproute2' or 'net-tools' package to enable ARP cache lookups."
+    )
+    raise RuntimeError(
+        "No suitable ARP command found on this Linux system. "
+        "Install 'iproute2' (providing 'ip') or 'net-tools' (providing 'arp')."
+    )
 
 
 def get_arp_cache_command() -> List[str]:

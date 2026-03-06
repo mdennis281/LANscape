@@ -783,7 +783,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
         return ServiceScanResult(
             service="Unknown", response=None, request=None,
             probes_sent=0, probes_received=0,
-            error=f"Event loop error: {e}",
+            error=f"Event loop error scanning {ip}:{port}: {e}",
         )
     finally:
         loop.close()

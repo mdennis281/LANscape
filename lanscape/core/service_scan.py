@@ -780,10 +780,11 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
     # Note: We always create a new loop because this is a synchronous function.
     # Using get_running_loop() + run_coroutine_threadsafe() would deadlock
     # since .result() blocks the thread that owns the loop.
+    # IMPORTANT: Do NOT call set_event_loop() - it leaves global state that
+    # causes pytest-xdist worker teardown to hang.
     loop = None
     try:
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
             return loop.run_until_complete(_async_scan_service(ip, port, cfg=cfg))
         finally:

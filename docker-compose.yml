@@ -1,5 +1,9 @@
 # LANscape Docker Compose Configuration
 # 
+# NOTE: Docker is recommended for Linux only. Network scanning requires
+#       --network host mode, which doesn't work on Docker Desktop (Windows/Mac).
+#       For Windows/Mac, use: pip install lanscape
+#
 # Usage:
 #   docker compose up -d              # Start LANscape
 #   docker compose logs -f            # View logs

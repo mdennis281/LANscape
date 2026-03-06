@@ -3,9 +3,9 @@ MAC address lookup and resolution service.
 This module provides functionality to look up MAC addresses and resolve them
 """
 
-import re
 import logging
 import platform
+import re
 import subprocess
 from typing import List, Optional
 from scapy.sendrecv import srp
@@ -13,6 +13,7 @@ from scapy.layers.l2 import ARP, Ether
 from .app_scope import ResourceManager
 from .decorators import job_tracker, JobStatsMixin
 from .errors import DeviceError
+from .system_compat import get_linux_arp_command
 
 
 log = logging.getLogger('MacLookup')
@@ -62,8 +63,7 @@ class MacResolver(JobStatsMixin):
     def _get_mac_by_arp(self, ip: str) -> List[str]:
         """Retrieve the last MAC address instance using the ARP command."""
         try:
-            # Use the appropriate ARP command based on the platform
-            cmd = f"arp -a {ip}" if platform.system() == "Windows" else f"arp {ip}"
+            cmd = self._get_arp_command(ip)
 
             # Execute the ARP command and decode the output
             output = subprocess.check_output(
@@ -76,6 +76,26 @@ class MacResolver(JobStatsMixin):
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []
+
+    def _get_arp_command(self, ip: str) -> str:
+        """
+        Get the appropriate ARP command for the current platform.
+
+        On Linux, prefers 'ip neigh show' (iproute2) but falls back to
+        'arp' (net-tools) if ip command is not available.
+
+        Args:
+            ip: The IP address to look up.
+
+        Returns:
+            str: The shell command to execute.
+        """
+        if platform.system() == "Windows":
+            return f"arp -a {ip}"
+        if platform.system() == "Linux":
+            _, cmd_str = get_linux_arp_command()
+            return f"{cmd_str} {ip}"
+        return f"arp {ip}"
 
     @job_tracker
     def _get_mac_by_scapy(self, ip: str) -> List[str]:

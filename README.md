@@ -66,9 +66,9 @@ python -m lanscape --ws-server --ws-port 9000
 ```
 
 
-## Docker
+## Docker (Linux Only)
 
-Run LANscape in a Docker container with full network scanning capabilities:
+Docker is recommended for **Linux hosts only**. Network scanning requires `--network host` mode, which only works properly on Linux. For Windows/Mac, use `pip install lanscape` instead.
 
 ```sh
 docker run -d --name lanscape \
@@ -86,6 +86,20 @@ docker compose up -d
 ```
 
 Access the UI at `http://localhost:5001`
+
+### Custom Ports
+
+To use different ports, set both the environment variable AND expose the matching port:
+
+```sh
+docker run -d --name lanscape \
+  --network host \
+  -e LANSCAPE_UI_PORT=8080 \
+  -e LANSCAPE_WS_PORT=8081 \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/mdennis281/lanscape:latest
+```
 
 ### Environment Variables
 

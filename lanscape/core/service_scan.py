@@ -774,37 +774,16 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
                 error=f"Error scanning {ip}:{port}: {str(e)}",
             )
 
-    # Create and properly manage event loop to avoid file descriptor leaks
-    # Using new_event_loop + explicit close is safer in threaded environments
-    # than asyncio.run() which can leave resources open under heavy load
-    # Note: We always create a new loop because this is a synchronous function.
-    # Using get_running_loop() + run_coroutine_threadsafe() would deadlock
-    # since .result() blocks the thread that owns the loop.
-    # IMPORTANT: Do NOT call set_event_loop() - it leaves global state that
-    # causes pytest-xdist worker teardown to hang.
-    loop = None
+    # Run async scan in a dedicated event loop (avoids global state issues)
+    loop = asyncio.new_event_loop()
     try:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(_async_scan_service(ip, port, cfg=cfg))
-        finally:
-            # Clean up the loop properly
-            try:
-                # Cancel all remaining tasks
-                pending = asyncio.all_tasks(loop)
-                for task in pending:
-                    task.cancel()
-                # Run loop once more to process cancellations
-                if pending:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            except Exception:
-                pass
-            finally:
-                loop.close()
+        return loop.run_until_complete(_async_scan_service(ip, port, cfg=cfg))
     except Exception as e:
         log.error(f"Event loop error scanning {ip}:{port}: {e}")
         return ServiceScanResult(
             service="Unknown", response=None, request=None,
             probes_sent=0, probes_received=0,
-            error=f"Event loop error scanning {ip}:{port}: {e}",
+            error=f"Event loop error: {e}",
         )
+    finally:
+        loop.close()

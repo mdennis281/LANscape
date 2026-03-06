@@ -30,18 +30,15 @@ def get_linux_arp_command() -> Tuple[List[str], str]:
         - list[str]: Command as list for subprocess (e.g., ['ip', 'neigh', 'show'])
         - str: Command as string for shell execution (e.g., 'ip neigh show')
     """
-    # Try ip command first (iproute2 - usually available on modern Linux)
+    # Prefer iproute2 (modern Linux), fall back to net-tools (legacy)
     if shutil.which('ip'):
-        log.debug("Using 'ip neigh show' for ARP cache lookup")
         return (['ip', 'neigh', 'show'], 'ip neigh show')
 
-    # Fall back to arp command (net-tools - legacy package)
     if shutil.which('arp'):
-        log.debug("Using 'arp -n' for ARP cache lookup (ip command not found)")
         return (['arp', '-n'], 'arp -n')
 
     # Neither available - return ip and let it fail with clear error
-    log.warning("Neither 'ip' nor 'arp' command found - ARP cache lookup may fail")
+    log.warning("Neither 'ip' nor 'arp' command found - ARP lookup may fail")
     return (['ip', 'neigh', 'show'], 'ip neigh show')
 
 

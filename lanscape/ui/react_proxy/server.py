@@ -401,36 +401,19 @@ def start_webapp_server(
     """
     webapp_dir = REACT_BUILD_DIR
 
+    # Create directory if missing (graceful degradation for Docker/edge cases)
     if not webapp_dir.exists():
         try:
             webapp_dir.mkdir(parents=True, exist_ok=True)
             log.warning('React UI build directory not found - created empty directory')
-        except OSError as exc:
-            # Do not crash startup if we cannot create the UI directory
-            # (e.g. read-only site-packages). The HTTP server will still start.
-            log.warning(
-                'React UI build directory %s could not be created (%s). '
-                'Continuing without bundled UI assets.',
-                webapp_dir,
-                exc,
-            )
+        except OSError:
+            pass  # Will be handled below as empty
 
-    is_empty = False
-    if not webapp_dir.exists():
-        # Directory still doesn't exist (e.g. mkdir failed), treat as empty
+    # Check if build assets exist
+    try:
+        is_empty = not webapp_dir.exists() or not any(webapp_dir.iterdir())
+    except OSError:
         is_empty = True
-    else:
-        try:
-            is_empty = not any(webapp_dir.iterdir())
-        except OSError as exc:
-            # Directory exists but is not accessible; treat as missing assets
-            log.warning(
-                'React UI build directory %s is not accessible (%s). '
-                'The webapp will display an error page.',
-                webapp_dir,
-                exc,
-            )
-            is_empty = True
 
     if is_empty:
         log.warning(

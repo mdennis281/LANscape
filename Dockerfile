@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install lanscape from PyPI
+# Use explicit version since pypi occasionally has propagation delays
 ARG VERSION
 RUN pip install --no-cache-dir "lanscape==${VERSION}"
 

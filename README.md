@@ -9,10 +9,11 @@ pip install lanscape
 python -m lanscape
 ```
 
-PyPi Stats: 
+Stats: 
 
 ![Version](https://img.shields.io/pypi/v/lanscape)
 ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
+![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fmdennis281%2Flanscape-blue?logo=docker)
 
 Latest release: 
 
@@ -63,6 +64,41 @@ python -m lanscape --debug --persistent
 python -m lanscape --logfile /tmp/lanscape.log --loglevel WARNING
 python -m lanscape --ws-server --ws-port 9000
 ```
+
+
+## Docker
+
+Run LANscape in a Docker container with full network scanning capabilities:
+
+```sh
+docker run -d --name lanscape \
+  --network host \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/mdennis281/lanscape:latest
+```
+
+Or use Docker Compose:
+
+```sh
+curl -O https://raw.githubusercontent.com/mdennis281/LANscape/main/docker-compose.yml
+docker compose up -d
+```
+
+Access the UI at `http://localhost:5001`
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LANSCAPE_UI_PORT` | `5001` | Web UI port |
+| `LANSCAPE_WS_PORT` | `8766` | WebSocket server port |
+| `LANSCAPE_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `LANSCAPE_MDNS` | `true` | Enable mDNS discovery (`true`/`false`) |
+| `LANSCAPE_WS_ONLY` | `false` | WebSocket-only mode (`true`/`false`) |
+| `LANSCAPE_LOG_FILE` | | Path to log file (optional) |
+
+> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, only TCP port scanning will work.
 
 ## Troubleshooting
 

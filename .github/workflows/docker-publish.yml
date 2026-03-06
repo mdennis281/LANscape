@@ -1,0 +1,85 @@
+name: Release - Docker Publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version tag for the Docker image"
+        required: true
+        type: string
+      is_prerelease:
+        description: "Whether this is a pre-release version"
+        required: false
+        type: string
+        default: "false"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ inputs.version }}
+            type=raw,value=latest,enable=${{ inputs.is_prerelease != 'true' }}
+
+      - name: Download webapp artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webapp-dist
+          path: ./webapp-artifact
+
+      - name: Bundle React build into package
+        run: |
+          rm -rf lanscape/ui/react_build/*
+          unzip ./webapp-artifact/webapp-dist.zip -d lanscape/ui/react_build/
+          echo "Bundled React build contents:"
+          ls -la lanscape/ui/react_build/
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ inputs.version }}
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

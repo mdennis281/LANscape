@@ -1,0 +1,51 @@
+# LANscape Docker Compose Configuration
+# 
+# Usage:
+#   docker compose up -d              # Start LANscape
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop LANscape
+#
+# Access the UI at http://localhost:5001
+
+services:
+  lanscape:
+    image: ghcr.io/mdennis281/lanscape:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lanscape
+    restart: unless-stopped
+    
+    # Network scanning requires host network mode for ARP discovery
+    # Comment this out and uncomment 'ports' if you only need TCP port scanning
+    network_mode: host
+    
+    # Alternative: Bridge mode with port mapping (limited to TCP scanning)
+    # ports:
+    #   - "5001:5001"   # Web UI
+    #   - "8766:8766"   # WebSocket
+    
+    # Required for raw socket access (network scanning)
+    cap_add:
+      - NET_RAW       # For raw sockets (ping, TCP SYN)
+      - NET_ADMIN     # For ARP scanning and interface access
+    
+    # Environment configuration
+    environment:
+      - LANSCAPE_UI_PORT=5001
+      - LANSCAPE_WS_PORT=8766
+      - LANSCAPE_LOG_LEVEL=INFO
+      - LANSCAPE_MDNS=true
+      # - LANSCAPE_WS_ONLY=false     # Set to 'true' for WebSocket-only mode
+      # - LANSCAPE_LOG_FILE=/app/logs/lanscape.log
+    
+    # Optional: Persist logs
+    # volumes:
+    #   - ./logs:/app/logs
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

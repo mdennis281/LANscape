@@ -4,9 +4,11 @@ Unit tests for ARP command generation and MAC address extraction.
 Tests the platform-specific ARP command selection and MAC address parsing
 from both traditional 'arp' and modern 'ip neigh' command outputs.
 """
+# pylint: disable=protected-access
+
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from lanscape.core.device_alive import ArpCacheLookup
 from lanscape.core.mac_lookup import MacResolver
@@ -206,4 +208,3 @@ class TestMacResolverARP:
 
         assert result == []
         assert len(resolver.caught_errors) == 1
-

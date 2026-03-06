@@ -66,7 +66,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
 
         # Check if index.html exists and has content
         index_path = os.path.join(self.spa_directory, 'index.html')
-        if self.path == '/index.html' or self.path == '/':
+        if self.path in ('/index.html', '/'):
             if not os.path.exists(index_path) or os.path.getsize(index_path) == 0:
                 return self._serve_missing_build_page()
 

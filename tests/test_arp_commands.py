@@ -5,14 +5,13 @@ Tests the platform-specific ARP command selection and MAC address parsing
 from both traditional 'arp' and modern 'ip neigh' command outputs.
 """
 # pylint: disable=protected-access
-
 from unittest.mock import patch
 
 import pytest
 
+from lanscape.core import system_compat
 from lanscape.core.device_alive import ArpCacheLookup
 from lanscape.core.mac_lookup import MacResolver
-from lanscape.core import system_compat
 
 
 @pytest.fixture(autouse=True)

@@ -145,8 +145,8 @@ jobs:
       UI_BUILD_PAT: ${{ secrets.UI_BUILD_PAT }}
 
   docker-publish:
-    needs: [create-tag, determine-release, create-release, trigger-ui-build]
-    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' && needs.trigger-ui-build.result == 'success' }}
+    needs: [create-tag, determine-release, publish]
+    if: ${{ always() && needs.determine-release.outputs.should_publish == 'true' && needs.publish.result == 'success' }}
     uses: ./.github/workflows/docker-publish.yml
     with:
       version: ${{ needs.determine-release.outputs.clean_version }}

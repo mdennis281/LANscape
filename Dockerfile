@@ -1,19 +1,8 @@
 # LANscape Docker Image
-# Multi-stage build for minimal image size
+# Installs from PyPI for simplicity and consistency
 
-# Build stage - extract React UI from PyPI package
-FROM python:3.12-slim AS builder
+ARG VERSION=latest
 
-WORKDIR /build
-
-# Install build dependencies
-RUN pip install --no-cache-dir build
-
-# Copy source and build wheel
-COPY . .
-RUN python -m build --wheel
-
-# Runtime stage
 FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="LANscape"
@@ -30,12 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install from built wheel
-COPY --from=builder /build/dist/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl && rm /tmp/*.whl
-
-# Create non-root user (network scanning needs root, but we can drop privs later if needed)
-# For now, running as root is required for raw socket access
+# Install lanscape from PyPI
+ARG VERSION
+RUN pip install --no-cache-dir "lanscape==${VERSION}"
 
 # Environment variables for configuration
 ENV LANSCAPE_UI_PORT=5001

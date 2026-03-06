@@ -50,18 +50,18 @@ jobs:
             type=raw,value=${{ inputs.version }}
             type=raw,value=latest,enable=${{ inputs.is_prerelease != 'true' }}
 
-      - name: Download webapp artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: webapp-dist
-          path: ./webapp-artifact
-
-      - name: Bundle React build into package
+      - name: Wait for PyPI availability
         run: |
-          rm -rf lanscape/ui/react_build/*
-          unzip ./webapp-artifact/webapp-dist.zip -d lanscape/ui/react_build/
-          echo "Bundled React build contents:"
-          ls -la lanscape/ui/react_build/
+          echo "Waiting for lanscape==${{ inputs.version }} to be available on PyPI..."
+          for i in {1..30}; do
+            if pip index versions lanscape 2>/dev/null | grep -q "${{ inputs.version }}"; then
+              echo "Version ${{ inputs.version }} is available on PyPI"
+              exit 0
+            fi
+            echo "Attempt $i/30: Not yet available, waiting 10s..."
+            sleep 10
+          done
+          echo "Warning: Version may not be available yet, proceeding anyway"
 
       - name: Build and push Docker image
         id: build

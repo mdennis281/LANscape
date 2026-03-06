@@ -112,7 +112,7 @@ docker run -d --name lanscape \
 | `LANSCAPE_WS_ONLY` | `false` | WebSocket-only mode (`true`/`false`) |
 | `LANSCAPE_LOG_FILE` | | Path to log file (optional) |
 
-> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, only TCP port scanning will work.
+> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, you wont see MAC addresses/hostnames
 
 ## Troubleshooting
 

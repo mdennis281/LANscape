@@ -110,7 +110,7 @@ docker run -d --name lanscape \
 | `LANSCAPE_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
 | `LANSCAPE_MDNS` | `true` | Enable mDNS discovery (`true`/`false`) |
 | `LANSCAPE_WS_ONLY` | `false` | WebSocket-only mode (`true`/`false`) |
-| `LANSCAPE_LOG_FILE` | | Path to log file (optional) |
+| `LANSCAPE_LOG_FILE` | `None` | Path to log file (optional) |
 
 > **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, you won't see MAC addresses/hostnames
 

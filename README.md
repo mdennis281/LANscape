@@ -89,7 +89,7 @@ Access the UI at `http://localhost:5001`
 
 ### Custom Ports
 
-To use different ports, set both the environment variable AND expose the matching port:
+To use different ports, set the environment variables. When using `--network host` (as below), Docker ignores `-p`, so only the environment variables are needed. In bridge mode, you must also publish the matching ports with `-p`/`ports:`.
 
 ```sh
 docker run -d --name lanscape \
@@ -112,7 +112,7 @@ docker run -d --name lanscape \
 | `LANSCAPE_WS_ONLY` | `false` | WebSocket-only mode (`true`/`false`) |
 | `LANSCAPE_LOG_FILE` | | Path to log file (optional) |
 
-> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, you wont see MAC addresses/hostnames
+> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, you won't see MAC addresses/hostnames
 
 ## Troubleshooting
 

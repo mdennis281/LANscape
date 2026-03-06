@@ -35,11 +35,16 @@ EXPOSE 5001 8766
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${LANSCAPE_UI_PORT}/')" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/' % os.environ.get('LANSCAPE_UI_PORT', '5001'))" || exit 1
+
+# Create non-root user for running LANscape
+RUN useradd -m -r -s /bin/bash lanscape && chown -R lanscape:lanscape /app
 
 # Entry point script to handle env vars
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+USER lanscape
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["lanscape"]

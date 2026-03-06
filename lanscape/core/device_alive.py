@@ -173,11 +173,19 @@ class ArpCacheLookup():
             bool: True if the device is found in the ARP cache, False otherwise.
         """
 
-        command = cls._get_platform_arp_command() + [device.ip]
+        try:
+            command = cls._get_platform_arp_command() + [device.ip]
+        except RuntimeError as e:
+            device.caught_errors.append(DeviceError(e))
+            return False
 
         for _ in range(cfg.attempts):
             time.sleep(cfg.wait_before)
-            output = subprocess.check_output(command).decode()
+            try:
+                output = subprocess.check_output(command).decode()
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                device.caught_errors.append(DeviceError(e))
+                return False
             macs = cls._extract_mac_address(output)
             if macs:
                 device.macs = macs

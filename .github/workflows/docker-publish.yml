@@ -54,7 +54,7 @@ jobs:
         run: |
           echo "Waiting for lanscape==${{ inputs.version }} to be available on PyPI..."
           for i in {1..30}; do
-            if pip index versions lanscape 2>/dev/null | grep -q "${{ inputs.version }}"; then
+            if curl -sf "https://pypi.org/pypi/lanscape/${{ inputs.version }}/json" > /dev/null 2>&1; then
               echo "Version ${{ inputs.version }} is available on PyPI"
               exit 0
             fi

@@ -56,18 +56,24 @@ class TestReactBuildDir:
 class TestStartWebappServer:
     """Tests for start_webapp_server function."""
 
-    def test_raises_when_build_dir_missing(self, tmp_path):
-        """Test that missing build directory raises RuntimeError."""
+    @patch('lanscape.ui.react_proxy.server.WebappServerController')
+    def test_creates_missing_build_dir(self, mock_controller_cls, tmp_path):
+        """Test that missing build directory is created (graceful degradation)."""
         fake_dir = tmp_path / 'nonexistent'
         with patch('lanscape.ui.react_proxy.server.REACT_BUILD_DIR', fake_dir):
-            with pytest.raises(RuntimeError, match='Webapp build not found'):
-                start_webapp_server()
+            start_webapp_server()
+            # Directory should be created
+            assert fake_dir.exists()
+            # Server should still start
+            mock_controller_cls.assert_called_once()
 
-    def test_raises_when_build_dir_empty(self, empty_dir):
-        """Test that empty build directory raises RuntimeError."""
+    @patch('lanscape.ui.react_proxy.server.WebappServerController')
+    def test_starts_with_empty_build_dir(self, mock_controller_cls, empty_dir):
+        """Test that empty build directory logs warning but starts server."""
         with patch('lanscape.ui.react_proxy.server.REACT_BUILD_DIR', empty_dir):
-            with pytest.raises(RuntimeError, match='Webapp build not found'):
-                start_webapp_server()
+            start_webapp_server()
+            # Server should still start (will show error page)
+            mock_controller_cls.assert_called_once()
 
     @patch('lanscape.ui.react_proxy.server.WebappServerController')
     def test_starts_controller_with_defaults(self, mock_controller_cls, temp_webapp_dir):

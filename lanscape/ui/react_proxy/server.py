@@ -64,7 +64,25 @@ class SPAHandler(SimpleHTTPRequestHandler):
         if not os.path.exists(path) and not self.path.startswith('/assets'):
             self.path = '/index.html'  # pylint: disable=attribute-defined-outside-init
 
+        # Check if index.html exists and has content
+        index_path = os.path.join(self.spa_directory, 'index.html')
+        if self.path in ('/index.html', '/'):
+            try:
+                if (not os.path.exists(index_path)) or os.path.getsize(index_path) == 0:
+                    return self._serve_missing_build_page()
+            except OSError:
+                return self._serve_missing_build_page()
+
         return super().do_GET()
+
+    def _serve_missing_build_page(self) -> None:
+        """Serve a fallback page when the React build is missing."""
+        html = b'''LANscape UI is missing. Something went wrong with the install.'''
+        self.send_response(503)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(html)))
+        self.end_headers()
+        self.wfile.write(html)
 
     # -----------------------------------------------------------------
     # API endpoint handlers
@@ -386,11 +404,24 @@ def start_webapp_server(
     """
     webapp_dir = REACT_BUILD_DIR
 
-    if not webapp_dir.exists() or not any(webapp_dir.iterdir()):
-        raise RuntimeError(
-            f'Webapp build not found at: {webapp_dir}\n'
-            'The React UI build is missing from this installation. '
-            'Please reinstall the package or check your installation.'
+    # Create directory if missing (graceful degradation for Docker/edge cases)
+    if not webapp_dir.exists():
+        try:
+            webapp_dir.mkdir(parents=True, exist_ok=True)
+            log.warning('React UI build directory not found - created empty directory')
+        except OSError:
+            pass  # Will be handled below as empty
+
+    # Check if build assets exist
+    try:
+        is_empty = not webapp_dir.exists() or not any(webapp_dir.iterdir())
+    except OSError:
+        is_empty = True
+
+    if is_empty:
+        log.warning(
+            'React UI build is missing. The webapp will display an error page. '
+            'Reinstall with: pip install --force-reinstall lanscape'
         )
 
     log.debug(f'UI: Bundled build at {webapp_dir}')

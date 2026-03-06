@@ -1,0 +1,53 @@
+# LANscape Docker Image
+# Single-stage build - installs from PyPI for simplicity and consistency
+
+ARG VERSION
+
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="LANscape"
+LABEL org.opencontainers.image.description="A Python-based local network scanner with web UI"
+LABEL org.opencontainers.image.source="https://github.com/mdennis281/LANscape"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Install runtime dependencies for network scanning
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpcap0.8 \
+    iproute2 \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install lanscape from PyPI
+# Use explicit version when provided; fall back to latest for local builds
+ARG VERSION
+RUN if [ -n "$VERSION" ]; then \
+        pip install --no-cache-dir "lanscape==${VERSION}"; \
+    else \
+        pip install --no-cache-dir lanscape; \
+    fi
+
+# Environment variables for configuration
+ENV LANSCAPE_UI_PORT=5001
+ENV LANSCAPE_WS_PORT=8766
+ENV LANSCAPE_LOG_LEVEL=INFO
+ENV LANSCAPE_MDNS=true
+
+# Expose default ports
+EXPOSE 5001 8766
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/' % os.environ.get('LANSCAPE_UI_PORT', '5001'))" || exit 1
+
+# Scapy ARP scanning requires root (see docs/arp-issues.md)
+# Container is sandboxed via Docker; cap_add in docker-compose.yml
+# grants NET_RAW and NET_ADMIN capabilities.
+
+# Entry point script to handle env vars
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["lanscape"]

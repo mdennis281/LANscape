@@ -9,10 +9,11 @@ pip install lanscape
 python -m lanscape
 ```
 
-PyPi Stats: 
+Stats: 
 
 ![Version](https://img.shields.io/pypi/v/lanscape)
 ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
+![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fmdennis281%2Flanscape-blue?logo=docker)
 
 Latest release: 
 
@@ -63,6 +64,55 @@ python -m lanscape --debug --persistent
 python -m lanscape --logfile /tmp/lanscape.log --loglevel WARNING
 python -m lanscape --ws-server --ws-port 9000
 ```
+
+
+## Docker (Linux Only)
+
+Docker is recommended for **Linux hosts only**. Network scanning requires `--network host` mode, which only works properly on Linux. For Windows/Mac, use `pip install lanscape` instead.
+
+```sh
+docker run -d --name lanscape \
+  --network host \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/mdennis281/lanscape:latest
+```
+
+Or use Docker Compose:
+
+```sh
+curl -O https://raw.githubusercontent.com/mdennis281/LANscape/main/docker-compose.yml
+docker compose up -d
+```
+
+Access the UI at `http://localhost:5001`
+
+### Custom Ports
+
+To use different ports, set the environment variables. When using `--network host` (as below), Docker ignores `-p`, so only the environment variables are needed. In bridge mode, you must also publish the matching ports with `-p`/`ports:`.
+
+```sh
+docker run -d --name lanscape \
+  --network host \
+  -e LANSCAPE_UI_PORT=8080 \
+  -e LANSCAPE_WS_PORT=8081 \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/mdennis281/lanscape:latest
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LANSCAPE_UI_PORT` | `5001` | Web UI port |
+| `LANSCAPE_WS_PORT` | `8766` | WebSocket server port |
+| `LANSCAPE_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `LANSCAPE_MDNS` | `true` | Enable mDNS discovery (`true`/`false`) |
+| `LANSCAPE_WS_ONLY` | `false` | WebSocket-only mode (`true`/`false`) |
+| `LANSCAPE_LOG_FILE` | `None` | Path to log file (optional) |
+
+> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, you won't see MAC addresses/hostnames
 
 ## Troubleshooting
 

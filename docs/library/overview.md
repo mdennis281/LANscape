@@ -2,6 +2,8 @@
 
 LANscape is a Python library for scanning your local network — discovering devices, testing ports, and identifying services.
 
+These docs give more context on how to use LANscape as a Python library instead of using the high-level module.
+
 ## Installation
 
 ```bash

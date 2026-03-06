@@ -20,6 +20,7 @@ from lanscape.core.scan_config import (
     ArpConfig, PokeConfig, ArpCacheConfig
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
+from lanscape.core.system_compat import get_arp_cache_command
 
 
 def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
@@ -172,11 +173,19 @@ class ArpCacheLookup():
             bool: True if the device is found in the ARP cache, False otherwise.
         """
 
-        command = cls._get_platform_arp_command() + [device.ip]
+        try:
+            command = cls._get_platform_arp_command() + [device.ip]
+        except RuntimeError as e:
+            device.caught_errors.append(DeviceError(e))
+            return False
 
         for _ in range(cfg.attempts):
             time.sleep(cfg.wait_before)
-            output = subprocess.check_output(command).decode()
+            try:
+                output = subprocess.check_output(command).decode()
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                device.caught_errors.append(DeviceError(e))
+                return False
             macs = cls._extract_mac_address(output)
             if macs:
                 device.macs = macs
@@ -190,17 +199,13 @@ class ArpCacheLookup():
         """
         Get the ARP command to execute based on the platform.
 
+        On Linux, prefers 'ip neigh show' (iproute2) but falls back to
+        'arp -n' (net-tools) if ip command is not available.
+
         Returns:
             list[str]: The ARP command to execute.
         """
-        if psutil.WINDOWS:
-            return ['arp', '-a']
-        if psutil.LINUX:
-            return ['arp', '-n']
-        if psutil.MACOS:
-            return ['arp', '-n']
-
-        raise NotImplementedError("Unsupported platform")
+        return get_arp_cache_command()
 
     @classmethod
     def _extract_mac_address(cls, arp_resp: str) -> List[str]:

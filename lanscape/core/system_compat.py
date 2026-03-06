@@ -38,7 +38,7 @@ def get_linux_arp_command() -> Tuple[List[str], str]:
     # Fall back to arp command (net-tools - legacy package)
     if shutil.which('arp'):
         log.debug("Using 'arp -n' for ARP cache lookup (ip command not found)")
-        return (['arp', '-n'], 'arp')
+        return (['arp', '-n'], 'arp -n')
 
     # Neither available - return ip and let it fail with clear error
     log.warning("Neither 'ip' nor 'arp' command found - ARP cache lookup may fail")

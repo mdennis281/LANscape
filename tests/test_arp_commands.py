@@ -175,7 +175,7 @@ class TestMacResolverARP:
 
         mock_check_output.assert_called_once()
         call_args = mock_check_output.call_args
-        assert "arp 192.168.1.1" in call_args[0][0]
+        assert "arp -n 192.168.1.1" in call_args[0][0]
         assert 'aa:bb:cc:dd:ee:ff' in result
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')

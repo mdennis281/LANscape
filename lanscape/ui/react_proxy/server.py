@@ -402,10 +402,37 @@ def start_webapp_server(
     webapp_dir = REACT_BUILD_DIR
 
     if not webapp_dir.exists():
-        webapp_dir.mkdir(parents=True, exist_ok=True)
-        log.warning('React UI build directory not found - created empty directory')
+        try:
+            webapp_dir.mkdir(parents=True, exist_ok=True)
+            log.warning('React UI build directory not found - created empty directory')
+        except OSError as exc:
+            # Do not crash startup if we cannot create the UI directory
+            # (e.g. read-only site-packages). The HTTP server will still start.
+            log.warning(
+                'React UI build directory %s could not be created (%s). '
+                'Continuing without bundled UI assets.',
+                webapp_dir,
+                exc,
+            )
 
-    if not any(webapp_dir.iterdir()):
+    is_empty = False
+    if not webapp_dir.exists():
+        # Directory still doesn't exist (e.g. mkdir failed), treat as empty
+        is_empty = True
+    else:
+        try:
+            is_empty = not any(webapp_dir.iterdir())
+        except OSError as exc:
+            # Directory exists but is not accessible; treat as missing assets
+            log.warning(
+                'React UI build directory %s is not accessible (%s). '
+                'The webapp will display an error page.',
+                webapp_dir,
+                exc,
+            )
+            is_empty = True
+
+    if is_empty:
         log.warning(
             'React UI build is missing. The webapp will display an error page. '
             'Reinstall with: pip install --force-reinstall lanscape'

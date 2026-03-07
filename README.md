@@ -28,9 +28,9 @@ Docker:
 Health: 
 
 ![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest) 
+![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 ![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=pypi%20pkg) 
 ![docker](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-docker.yml?label=docker%20pkg)
-![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 
 ---
 

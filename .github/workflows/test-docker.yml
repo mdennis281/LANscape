@@ -33,14 +33,13 @@ jobs:
           file: docker/Dockerfile
           platforms: linux/amd64
           push: false
+          load: true
           tags: lanscape:test
           cache-from: type=gha,scope=test-amd64
           cache-to: type=gha,mode=max,scope=test-amd64
 
       - name: Verify image starts
         run: |
-          docker load < /dev/stdin <<< "$(docker buildx build --file docker/Dockerfile --platform linux/amd64 --load -t lanscape:test .)" 2>/dev/null || \
-            docker buildx build --file docker/Dockerfile --platform linux/amd64 --load -t lanscape:test .
           docker run -d --name lanscape-test -p 5001:5001 -p 8766:8766 lanscape:test
           echo "Waiting for container to start..."
           sleep 10

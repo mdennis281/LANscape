@@ -13,7 +13,6 @@ Stats:
 
 ![Version](https://img.shields.io/pypi/v/lanscape)
 ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
-![GHCR Downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fipitio.github.io%2Fbackage%2Fmdennis281%2Flanscape.json&query=%24.downloads&label=GHCR%20pulls&logo=github)
 
 Latest release: 
 
@@ -23,14 +22,14 @@ Latest release:
 
 Docker: 
 
-![lanscape](https://ghcr-badge.egpl.dev/mdennis281/lanscape/latest_tag?label=lanscape%20%28amd64%29)
-![lanscape-arm](https://ghcr-badge.egpl.dev/mdennis281/lanscape-arm/latest_tag?label=lanscape-arm%20%28arm64%29)
+![lanscape](https://ghcr-badge.egpl.dev/mdennis281/lanscape/latest_tag?label=lanscape%20%28amd64%29&ignore=*rc*&ignore=*b[0-9]*&ignore=*a[0-9]*)
+![lanscape-arm](https://ghcr-badge.egpl.dev/mdennis281/lanscape-arm/latest_tag?label=lanscape-arm%20%28arm64%29&ignore=*rc*&ignore=*b[0-9]*&ignore=*a[0-9]*)
 
 Health: 
 
 ![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest) 
-![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) 
-![docker](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-docker.yml?label=docker)
+![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=pypi pkg) 
+![docker](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-docker.yml?label=docker pkg)
 ![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 
 ---

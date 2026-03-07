@@ -22,8 +22,8 @@ Latest release:
 
 Docker: 
 
-![lanscape](https://ghcr-badge.egpl.dev/mdennis281/lanscape/latest_tag?label=lanscape%20%28amd64%29&ignore=*rc*,*b[0-9]*,*a[0-9]*)
-![lanscape-arm](https://ghcr-badge.egpl.dev/mdennis281/lanscape-arm/latest_tag?label=lanscape-arm%20%28arm64%29&ignore=*rc*,*b[0-9]*,*a[0-9]*)
+![lanscape](https://ghcr-badge.egpl.dev/mdennis281/lanscape/latest_tag?label=lanscape%20%28amd64%29&ignore=*rc*,*b*,*a*)
+![lanscape-arm](https://ghcr-badge.egpl.dev/mdennis281/lanscape-arm/latest_tag?label=lanscape-arm%20%28arm64%29&ignore=*rc*,*b*,*a*)
 
 Health: 
 

@@ -73,7 +73,7 @@ python -m lanscape --ws-server --ws-port 9000
 
 ## Docker (Linux Only)
 
-Docker is recommended for **Linux hosts only**. Network scanning requires `--network host` mode, which only works properly on Linux. For Windows/Mac, use `pip install lanscape` instead.
+Docker only works on **Linux hosts only**. Network scanning requires `--network host` mode, which only works properly on Linux. For Windows/Mac, use `pip install lanscape` instead.
 
 ### Images
 

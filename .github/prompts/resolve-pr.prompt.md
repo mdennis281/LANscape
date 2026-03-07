@@ -1,4 +1,3 @@
-```prompt
 ---
 agent: agent
 ---
@@ -114,10 +113,10 @@ Common failure categories and resolution strategies:
 
 | Category | Indicators | Resolution |
 |----------|-----------|------------|
-| **Lint failure** | `pylint`, `autopep8`, score below threshold | Fix lint issues per `.github/prompts/Linting.prompt.md` |
+| **Lint failure** | `pylint`, `autopep8`, score below threshold | Fix lint issues per `.github/prompts/linting.prompt.md` |
 | **Test failure** | `pytest`, `FAILED`, assertion errors | Read the failing test, understand the assertion, fix the code or test |
 | **Build/Package failure** | `twine`, `build`, `sdist` | Check `pyproject.toml`, fix packaging config |
-| **Docker build failure** | `docker`, `COPY`, `RUN` | Check `Dockerfile` and `docker-entrypoint.sh` |
+| **Docker build failure** | `docker`, `COPY`, `RUN` | Check `docker/Dockerfile`, `docker/Dockerfile.arm64`, and `docker/docker-entrypoint.sh` |
 | **Dependency failure** | `pip install`, version conflicts | Update dependency pins in `pyproject.toml` |
 | **Timeout** | `timed_out` conclusion | Check for infinite loops, network issues, or increase timeout |
 
@@ -163,4 +162,3 @@ After pushing the fix, the CI will re-run automatically. If the user wants immed
 - After implementing fixes, always run tests before resolving threads or committing.
 - Use `mcp_gitkraken_git_add_or_commit` for commits. Messages should reference the PR context: `"Address PR #<number> feedback"` or `"Fix CI: <description>"`
 - Skip `isOutdated: true` review threads unless the comment is clearly still relevant to current code.
-```

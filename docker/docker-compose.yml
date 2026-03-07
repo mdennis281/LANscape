@@ -1,0 +1,69 @@
+# LANscape Docker Compose Configuration
+# 
+# NOTE: Docker is recommended for Linux only. Network scanning requires
+#       --network host mode, which doesn't work on Docker Desktop (Windows/Mac).
+#       For Windows/Mac, use: pip install lanscape
+#
+# Images:
+#   AMD64 (x86_64): ghcr.io/mdennis281/lanscape:latest
+#   ARM64 (aarch64): ghcr.io/mdennis281/lanscape-arm:latest
+#
+# Usage:
+#   docker compose up -d                              # Start AMD64 (default)
+#   docker compose --profile arm64 up -d lanscape-arm  # Start ARM64 only
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop LANscape
+#
+# Network modes:
+#   Host mode (Linux only, default) — full scanning (ARP + ICMP + TCP).
+#     No port mapping needed; the container shares the host network stack.
+#   Bridge mode — limited to TCP port scanning only (no ARP/device discovery).
+#     Uncomment 'ports' and comment out 'network_mode: host' below.
+#
+# Access the UI at http://localhost:5001
+
+x-common: &common
+  restart: unless-stopped
+  
+  # Host networking (Linux only) — required for full ARP/ICMP scanning
+  network_mode: host
+  
+  # Bridge mode alternative (works everywhere, but limited to TCP scanning):
+  # Comment out 'network_mode: host' above and uncomment 'ports' below.
+  # ports:
+  #   - "5001:5001"   # Web UI
+  #   - "8766:8766"   # WebSocket
+  
+  cap_add:
+    - NET_RAW
+    - NET_ADMIN
+  environment:
+    - LANSCAPE_UI_PORT=5001
+    - LANSCAPE_WS_PORT=8766
+    - LANSCAPE_LOG_LEVEL=INFO
+    - LANSCAPE_MDNS=true
+    # - LANSCAPE_WS_ONLY=false
+    # - LANSCAPE_LOG_FILE=/app/logs/lanscape.log
+  # volumes:
+  #   - ./logs:/app/logs
+  healthcheck:
+    test: ["CMD", "python", "-c", "import os, urllib.request; port = os.environ.get('LANSCAPE_UI_PORT', '5001'); urllib.request.urlopen('http://localhost:%s/' % port)"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+
+services:
+  # AMD64 (x86_64) - starts by default with `docker compose up -d`
+  lanscape:
+    <<: *common
+    image: ghcr.io/mdennis281/lanscape:latest
+    container_name: lanscape
+
+  # ARM64 (aarch64) - Raspberry Pi, Apple Silicon, AWS Graviton, etc.
+  # Start with: docker compose --profile arm64 up -d
+  lanscape-arm:
+    <<: *common
+    image: ghcr.io/mdennis281/lanscape-arm:latest
+    container_name: lanscape-arm
+    profiles: ["arm64"]

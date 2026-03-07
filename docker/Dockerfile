@@ -1,14 +1,15 @@
-# LANscape Docker Image
+# LANscape Docker Image (AMD64)
 # Single-stage build - installs from PyPI for simplicity and consistency
 
 ARG VERSION
 
-FROM python:3.12-slim
+FROM --platform=linux/amd64 python:3.12-slim
 
 LABEL org.opencontainers.image.title="LANscape"
 LABEL org.opencontainers.image.description="A Python-based local network scanner with web UI"
 LABEL org.opencontainers.image.source="https://github.com/mdennis281/LANscape"
 LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.architecture="amd64"
 
 # Install runtime dependencies for network scanning
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,11 +43,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/' % os.environ.get('LANSCAPE_UI_PORT', '5001'))" || exit 1
 
 # Scapy ARP scanning requires root (see docs/arp-issues.md)
-# Container is sandboxed via Docker; cap_add in docker-compose.yml
+# Container is sandboxed via Docker; cap_add in docker/docker-compose.yml
 # grants NET_RAW and NET_ADMIN capabilities.
 
 # Entry point script to handle env vars
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY docker/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["docker-entrypoint.sh"]

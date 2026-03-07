@@ -1,0 +1,74 @@
+name: Code Quality - Docker build test
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'docker/**'
+      - '.github/workflows/test-docker.yml'
+      - '.dockerignore'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build AMD64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: lanscape:test
+          cache-from: type=gha,scope=test-amd64
+          cache-to: type=gha,mode=max,scope=test-amd64
+
+      - name: Verify image starts
+        run: |
+          docker load < /dev/stdin <<< "$(docker buildx build --file docker/Dockerfile --platform linux/amd64 --load -t lanscape:test .)" 2>/dev/null || \
+            docker buildx build --file docker/Dockerfile --platform linux/amd64 --load -t lanscape:test .
+          docker run -d --name lanscape-test -p 5001:5001 -p 8766:8766 lanscape:test
+          echo "Waiting for container to start..."
+          sleep 10
+          docker logs lanscape-test
+          docker ps --filter name=lanscape-test --format "{{.Status}}" | grep -q "Up" || \
+            (echo "Container is not running"; docker logs lanscape-test; exit 1)
+          echo "Container started successfully"
+          docker stop lanscape-test
+
+  build-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.arm64
+          platforms: linux/arm64
+          push: false
+          tags: lanscape-arm:test
+          cache-from: type=gha,scope=test-arm64
+          cache-to: type=gha,mode=max,scope=test-arm64

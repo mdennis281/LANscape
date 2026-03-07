@@ -9,19 +9,31 @@
 #   ARM64 (aarch64): ghcr.io/mdennis281/lanscape-arm:latest
 #
 # Usage:
-#   docker compose up -d              # Start LANscape (uses your platform's service)
+#   docker compose up -d              # Start LANscape (amd64, default)
+#   docker compose --profile arm64 up -d   # Start LANscape (arm64)
 #   docker compose logs -f            # View logs
 #   docker compose down               # Stop LANscape
 #
-# By default, the amd64 service is active.
-# To run the ARM64 variant instead, use:
-#   docker compose up -d lanscape-arm
+# Network modes:
+#   Host mode (Linux only, default) — full scanning (ARP + ICMP + TCP).
+#     No port mapping needed; the container shares the host network stack.
+#   Bridge mode — limited to TCP port scanning only (no ARP/device discovery).
+#     Uncomment 'ports' and comment out 'network_mode: host' below.
 #
 # Access the UI at http://localhost:5001
 
 x-common: &common
   restart: unless-stopped
+  
+  # Host networking (Linux only) — required for full ARP/ICMP scanning
   network_mode: host
+  
+  # Bridge mode alternative (works everywhere, but limited to TCP scanning):
+  # Comment out 'network_mode: host' above and uncomment 'ports' below.
+  # ports:
+  #   - "5001:5001"   # Web UI
+  #   - "8766:8766"   # WebSocket
+  
   cap_add:
     - NET_RAW
     - NET_ADMIN
@@ -42,14 +54,14 @@ x-common: &common
     start_period: 10s
 
 services:
-  # AMD64 (x86_64) - default for most servers and desktops
+  # AMD64 (x86_64) - starts by default with `docker compose up -d`
   lanscape:
     <<: *common
     image: ghcr.io/mdennis281/lanscape:latest
     container_name: lanscape
-    profiles: ["", "amd64"]
 
   # ARM64 (aarch64) - Raspberry Pi, Apple Silicon, AWS Graviton, etc.
+  # Start with: docker compose --profile arm64 up -d
   lanscape-arm:
     <<: *common
     image: ghcr.io/mdennis281/lanscape-arm:latest

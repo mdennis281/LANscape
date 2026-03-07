@@ -13,7 +13,7 @@ Stats:
 
 ![Version](https://img.shields.io/pypi/v/lanscape)
 ![Monthly Downloads](https://img.shields.io/pypi/dm/lanscape)
-![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fmdennis281%2Flanscape-blue?logo=docker)
+![GHCR Downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fipitio.github.io%2Fbackage%2Fmdennis281%2Flanscape.json&query=%24.downloads&label=GHCR%20pulls&logo=github)
 
 Latest release: 
 
@@ -21,10 +21,16 @@ Latest release:
 ![RC](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*rc*&label=RC)
 ![Beta](https://img.shields.io/github/v/tag/mdennis281/LANScape?filter=pre-releases%2F*b*&label=Beta)
 
+Docker: 
+
+![lanscape](https://ghcr-badge.egpl.dev/mdennis281/lanscape/latest_tag?label=lanscape%20%28amd64%29)
+![lanscape-arm](https://ghcr-badge.egpl.dev/mdennis281/lanscape-arm/latest_tag?label=lanscape-arm%20%28arm64%29)
+
 Health: 
 
 ![pytest](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test.yml?branch=main&label=pytest) 
 ![packaging](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-package.yml?label=packaging) 
+![docker](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/test-docker.yml?label=docker)
 ![pylint](https://img.shields.io/github/actions/workflow/status/mdennis281/LANscape/pylint.yml?branch=main&label=pylint)
 
 ---
@@ -101,8 +107,8 @@ Or use Docker Compose:
 
 ```sh
 curl -O https://raw.githubusercontent.com/mdennis281/LANscape/main/docker/docker-compose.yml
-docker compose up -d                   # AMD64 (default)
-docker compose up -d lanscape-arm      # ARM64
+docker compose up -d                              # AMD64 (default)
+docker compose --profile arm64 up -d              # ARM64
 ```
 
 Access the UI at `http://localhost:5001`
@@ -121,6 +127,30 @@ docker run -d --name lanscape \
   ghcr.io/mdennis281/lanscape:latest
 ```
 
+### Required Ports
+
+LANscape uses two ports that must be reachable for the UI and live scan updates to work:
+
+| Port | Purpose |
+|------|---------|
+| `5001` | Web UI (HTTP) |
+| `8766` | WebSocket (live scan data) |
+
+With `--network host` (Linux), both ports are automatically available on the host — no extra flags needed.
+
+In **bridge mode** (or Docker Desktop on Windows/Mac), you must publish them explicitly:
+
+```sh
+docker run -d --name lanscape \
+  -p 5001:5001 \
+  -p 8766:8766 \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/mdennis281/lanscape:latest
+```
+
+> **Note:** Bridge mode limits scanning to TCP port probing only — ARP/ICMP device discovery requires `--network host` on Linux.
+
 ### Environment Variables
 
 | Variable | Default | Description |
@@ -132,7 +162,7 @@ docker run -d --name lanscape \
 | `LANSCAPE_WS_ONLY` | `false` | WebSocket-only mode (`true`/`false`) |
 | `LANSCAPE_LOG_FILE` | `None` | Path to log file (optional) |
 
-> **Note:** Network scanning requires `--network host` mode for ARP/device discovery. Without it, you won't see MAC addresses/hostnames
+If you change `LANSCAPE_UI_PORT` or `LANSCAPE_WS_PORT`, update your `-p` mappings (bridge mode) or firewall rules accordingly.
 
 ## Troubleshooting
 

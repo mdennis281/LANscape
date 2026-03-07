@@ -70,6 +70,16 @@ python -m lanscape --ws-server --ws-port 9000
 
 Docker is recommended for **Linux hosts only**. Network scanning requires `--network host` mode, which only works properly on Linux. For Windows/Mac, use `pip install lanscape` instead.
 
+### Images
+
+| Architecture | Image | Platforms |
+|-------------|-------|-----------|
+| **AMD64** (x86_64) | `ghcr.io/mdennis281/lanscape:latest` | Most servers, desktops |
+| **ARM64** (aarch64) | `ghcr.io/mdennis281/lanscape-arm:latest` | Raspberry Pi, Apple Silicon, AWS Graviton |
+
+### Quick Start
+
+**AMD64:**
 ```sh
 docker run -d --name lanscape \
   --network host \
@@ -78,11 +88,21 @@ docker run -d --name lanscape \
   ghcr.io/mdennis281/lanscape:latest
 ```
 
+**ARM64:**
+```sh
+docker run -d --name lanscape \
+  --network host \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/mdennis281/lanscape-arm:latest
+```
+
 Or use Docker Compose:
 
 ```sh
-curl -O https://raw.githubusercontent.com/mdennis281/LANscape/main/docker-compose.yml
-docker compose up -d
+curl -O https://raw.githubusercontent.com/mdennis281/LANscape/main/docker/docker-compose.yml
+docker compose up -d                   # AMD64 (default)
+docker compose up -d lanscape-arm      # ARM64
 ```
 
 Access the UI at `http://localhost:5001`

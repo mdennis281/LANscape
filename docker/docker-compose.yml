@@ -1,0 +1,57 @@
+# LANscape Docker Compose Configuration
+# 
+# NOTE: Docker is recommended for Linux only. Network scanning requires
+#       --network host mode, which doesn't work on Docker Desktop (Windows/Mac).
+#       For Windows/Mac, use: pip install lanscape
+#
+# Images:
+#   AMD64 (x86_64): ghcr.io/mdennis281/lanscape:latest
+#   ARM64 (aarch64): ghcr.io/mdennis281/lanscape-arm:latest
+#
+# Usage:
+#   docker compose up -d              # Start LANscape (uses your platform's service)
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop LANscape
+#
+# By default, the amd64 service is active.
+# To run the ARM64 variant instead, use:
+#   docker compose up -d lanscape-arm
+#
+# Access the UI at http://localhost:5001
+
+x-common: &common
+  restart: unless-stopped
+  network_mode: host
+  cap_add:
+    - NET_RAW
+    - NET_ADMIN
+  environment:
+    - LANSCAPE_UI_PORT=5001
+    - LANSCAPE_WS_PORT=8766
+    - LANSCAPE_LOG_LEVEL=INFO
+    - LANSCAPE_MDNS=true
+    # - LANSCAPE_WS_ONLY=false
+    # - LANSCAPE_LOG_FILE=/app/logs/lanscape.log
+  # volumes:
+  #   - ./logs:/app/logs
+  healthcheck:
+    test: ["CMD", "python", "-c", "import os, urllib.request; port = os.environ.get('LANSCAPE_UI_PORT', '5001'); urllib.request.urlopen('http://localhost:%s/' % port)"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+
+services:
+  # AMD64 (x86_64) - default for most servers and desktops
+  lanscape:
+    <<: *common
+    image: ghcr.io/mdennis281/lanscape:latest
+    container_name: lanscape
+    profiles: ["", "amd64"]
+
+  # ARM64 (aarch64) - Raspberry Pi, Apple Silicon, AWS Graviton, etc.
+  lanscape-arm:
+    <<: *common
+    image: ghcr.io/mdennis281/lanscape-arm:latest
+    container_name: lanscape-arm
+    profiles: ["arm64"]

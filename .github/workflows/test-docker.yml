@@ -68,6 +68,18 @@ jobs:
           file: docker/Dockerfile.arm64
           platforms: linux/arm64
           push: false
+          load: true
           tags: lanscape-arm:test
           cache-from: type=gha,scope=test-arm64
           cache-to: type=gha,mode=max,scope=test-arm64
+
+      - name: Verify ARM64 image starts
+        run: |
+          docker run --platform linux/arm64 -d --name lanscape-arm-test -p 5001:5001 -p 8766:8766 lanscape-arm:test
+          echo "Waiting for ARM64 container to start..."
+          sleep 20
+          docker logs lanscape-arm-test
+          docker ps --filter name=lanscape-arm-test --format "{{.Status}}" | grep -q "Up" || \
+            (echo "ARM64 container is not running"; docker logs lanscape-arm-test; exit 1)
+          echo "ARM64 container started successfully"
+          docker stop lanscape-arm-test

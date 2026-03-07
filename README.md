@@ -107,7 +107,7 @@ Or use Docker Compose:
 ```sh
 curl -O https://raw.githubusercontent.com/mdennis281/LANscape/main/docker/docker-compose.yml
 docker compose up -d                              # AMD64 (default)
-docker compose --profile arm64 up -d              # ARM64
+docker compose --profile arm64 up -d lanscape-arm # ARM64
 ```
 
 Access the UI at `http://localhost:5001`

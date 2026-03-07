@@ -9,8 +9,8 @@
 #   ARM64 (aarch64): ghcr.io/mdennis281/lanscape-arm:latest
 #
 # Usage:
-#   docker compose up -d              # Start LANscape (amd64, default)
-#   docker compose --profile arm64 up -d   # Start LANscape (arm64)
+#   docker compose up -d                              # Start AMD64 (default)
+#   docker compose --profile arm64 up -d lanscape-arm  # Start ARM64 only
 #   docker compose logs -f            # View logs
 #   docker compose down               # Stop LANscape
 #

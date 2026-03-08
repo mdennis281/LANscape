@@ -1,0 +1,46 @@
+name: Cleanup Old Pre-Releases
+
+on:
+  schedule:
+    # 1st of every month at 6:00 AM UTC
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: "Delete pre-releases older than this many days"
+        required: false
+        default: "90"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for tag dates
+
+      - name: Fetch all tags
+        run: git fetch --tags --force
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pydantic
+
+      - name: Run pre-release cleanup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MAX_AGE="${{ inputs.max_age_days || '90' }}"
+          echo "Cleaning up pre-releases older than ${MAX_AGE} days..."
+          python scripts/cleanup_prereleases.py --max-age-days "$MAX_AGE"

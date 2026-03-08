@@ -752,15 +752,8 @@ class TestServiceScanErrorPropagation:
         mock_loop.run_until_complete.side_effect = asyncio.TimeoutError()
         mock_loop.close = MagicMock()
 
-        with (
-            patch("lanscape.core.service_scan.scanner.asyncio.get_running_loop",
-                  side_effect=RuntimeError),
-            patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
-                  return_value=mock_loop),
-            patch("lanscape.core.service_scan.scanner.asyncio.set_event_loop"),
-            patch("lanscape.core.service_scan.scanner.asyncio.all_tasks",
-                  return_value=set()),
-        ):
+        with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
+                   return_value=mock_loop):
             cfg = ServiceScanConfig(timeout=0.5)
             result = scan_service("127.0.0.1", 99999, cfg)
             assert result.service == "Unknown"
@@ -773,15 +766,8 @@ class TestServiceScanErrorPropagation:
         mock_loop.run_until_complete.side_effect = RuntimeError("test boom")
         mock_loop.close = MagicMock()
 
-        with (
-            patch("lanscape.core.service_scan.scanner.asyncio.get_running_loop",
-                  side_effect=RuntimeError),
-            patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
-                  return_value=mock_loop),
-            patch("lanscape.core.service_scan.scanner.asyncio.set_event_loop"),
-            patch("lanscape.core.service_scan.scanner.asyncio.all_tasks",
-                  return_value=set()),
-        ):
+        with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
+                   return_value=mock_loop):
             cfg = ServiceScanConfig(timeout=0.5)
             result = scan_service("127.0.0.1", 99999, cfg)
             assert result.service == "Unknown"

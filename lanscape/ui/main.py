@@ -1,6 +1,7 @@
 """Main entry point for the LANscape application when running as a module."""
 import socket
 import logging
+import time
 import traceback
 
 from lanscape.core.logger import configure_logging
@@ -126,7 +127,6 @@ def validate_port_available(port: int, flag_name: str, retries: int = 10,
         if attempt < retries - 1:
             log.debug(f'Port {port} in use, retrying in {delay}s '
                       f'({attempt + 1}/{retries})')
-            import time  # pylint: disable=import-outside-toplevel
             time.sleep(delay)
     raise OSError(
         f"Port {port} is already in use. "

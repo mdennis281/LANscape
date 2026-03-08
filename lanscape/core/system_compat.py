@@ -181,11 +181,14 @@ def _get_ip_address_unix(interface: str) -> Optional[str]:
     try:
         import fcntl  # pylint: disable=import-outside-toplevel,import-error
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return socket.inet_ntoa(fcntl.ioctl(
-            sock.fileno(),
-            0x8915,  # SIOCGIFADDR
-            struct.pack('256s', interface[:15].encode('utf-8'))
-        )[20:24])
+        try:
+            return socket.inet_ntoa(fcntl.ioctl(
+                sock.fileno(),
+                0x8915,  # SIOCGIFADDR
+                struct.pack('256s', interface[:15].encode('utf-8'))
+            )[20:24])
+        finally:
+            sock.close()
     except (IOError, ImportError):
         return None
 
@@ -208,11 +211,14 @@ def _get_netmask_unix(interface: str) -> Optional[str]:
     try:
         import fcntl  # pylint: disable=import-outside-toplevel,import-error
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return socket.inet_ntoa(fcntl.ioctl(
-            sock.fileno(),
-            0x891b,  # SIOCGIFNETMASK
-            struct.pack('256s', interface[:15].encode('utf-8'))
-        )[20:24])
+        try:
+            return socket.inet_ntoa(fcntl.ioctl(
+                sock.fileno(),
+                0x891b,  # SIOCGIFNETMASK
+                struct.pack('256s', interface[:15].encode('utf-8'))
+            )[20:24])
+        finally:
+            sock.close()
     except (IOError, ImportError):
         return None
 

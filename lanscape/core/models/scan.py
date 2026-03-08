@@ -116,7 +116,7 @@ class ScanSummary(BaseModel):
         default_factory=list,
         description="Services identified across all devices"
     )
-    warnings: List[dict] = Field(
+    warnings: List[ScanWarningInfo] = Field(
         default_factory=list,
         description="Warnings generated during scan"
     )

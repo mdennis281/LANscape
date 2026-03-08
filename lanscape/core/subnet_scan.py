@@ -1,11 +1,6 @@
-"""
-Network subnet scanning module for LANscape.
-Provides classes for performing network discovery, device scanning, and port scanning.
-Handles scan management, result tracking, and scan termination.
-"""
+"""Subnet scanning: device discovery, port scanning, and result management."""
 
 # Standard library imports
-import os
 import uuid
 import logging
 import ipaddress
@@ -32,6 +27,7 @@ from lanscape.core.models import (
 from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController
 )
+from lanscape.core.system_compat import clear_screen
 
 
 class SubnetScanner():
@@ -91,10 +87,10 @@ class SubnetScanner():
 
         def on_device_error(job_id: str, error: Exception, tb_str: str):
             """Callback for permanent device scan failures."""
-            self.results.errors.append({
-                'basic': f"Error scanning IP {job_id}: {error}",
-                'traceback': tb_str,
-            })
+            self.results.errors.append(ScanErrorInfo(
+                basic=f"Error scanning IP {job_id}: {error}",
+                traceback=tb_str,
+            ))
 
         retry_manager = ThreadPoolRetryManager(
             max_workers=self.cfg.t_cnt('isalive'),
@@ -287,7 +283,7 @@ class SubnetScanner():
             buffer += f'Scanned: {self.results.devices_scanned}/{self.results.devices_total}'
             buffer += f' - {percent}%\n'
             buffer += str(self.job_stats)
-            os.system('cls' if os.name == 'nt' else 'clear')
+            clear_screen()
             print(buffer)
             sleep(sleep_sec)
 
@@ -318,10 +314,10 @@ class SubnetScanner():
 
         def on_port_scan_error(job_id: str, error: Exception, tb_str: str):
             """Callback for permanent port scan failures."""
-            self.results.errors.append({
-                'basic': f"Error scanning ports on {job_id}: {error}",
-                'traceback': tb_str,
-            })
+            self.results.errors.append(ScanErrorInfo(
+                basic=f"Error scanning ports on {job_id}: {error}",
+                traceback=tb_str,
+            ))
 
         retry_manager = ThreadPoolRetryManager(
             max_workers=self.cfg.t_cnt('port_scan'),
@@ -395,11 +391,11 @@ class SubnetScanner():
             warning_type: Type of warning (e.g., 'multiplier_reduced')
             warning_data: Dict with warning details
         """
-        self.results.warnings.append({
-            'type': warning_type,
-            'stage': self.results.stage,
+        self.results.warnings.append(ScanWarningInfo(
+            type=warning_type,
+            stage=self.results.stage,
             **warning_data
-        })
+        ))
         self.log.warning(f'Scan warning [{warning_type}]: {warning_data.get("message", "")}')
 
 
@@ -425,8 +421,8 @@ class ScannerResults:
         self.devices: List[Device] = []
 
         # Status tracking
-        self.errors: List[str] = []
-        self.warnings: List[dict] = []  # Warnings like multiplier reductions
+        self.errors: List[ScanErrorInfo] = []
+        self.warnings: List[ScanWarningInfo] = []
         self.running: bool = False
         self.start_time: float = time()
         self.end_time: int = None
@@ -478,32 +474,6 @@ class ScannerResults:
         Returns:
             ScanMetadata: Current scan metadata for status updates
         """
-        # Convert error dicts to ScanErrorInfo models
-        error_infos = [
-            ScanErrorInfo(basic=err.get('basic', str(err)), traceback=err.get('traceback'))
-            if isinstance(err, dict) else ScanErrorInfo(basic=str(err))
-            for err in self.errors
-        ]
-
-        # Convert warning dicts to ScanWarningInfo models
-        warning_infos = [
-            ScanWarningInfo(
-                type=warn.get('type', 'unknown'),
-                message=warn.get('message', str(warn)),
-                old_multiplier=warn.get('old_multiplier'),
-                new_multiplier=warn.get('new_multiplier'),
-                decrease_percent=warn.get('decrease_percent'),
-                timestamp=warn.get('timestamp'),
-                failed_job=warn.get('failed_job'),
-                error_message=warn.get('error_message'),
-                stage=warn.get('stage'),
-                retry_attempt=warn.get('retry_attempt'),
-                max_retries=warn.get('max_retries'),
-            )
-            if isinstance(warn, dict) else ScanWarningInfo(type='unknown', message=str(warn))
-            for warn in self.warnings
-        ]
-
         ports_scanned = self.scan.job_stats.finished.get(
             'SubnetScanner._test_port', 0)
         ports_total = self.devices_alive * self.port_list_length
@@ -524,8 +494,8 @@ class ScannerResults:
             start_time=self.start_time,
             end_time=self.end_time,
             run_time=int(round(self.get_runtime(), 0)),
-            errors=error_infos,
-            warnings=warning_infos
+            errors=self.errors,
+            warnings=self.warnings
         )
 
     def to_results(self) -> ScanResults:

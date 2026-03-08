@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from lanscape.core.net_tools import Device
+from lanscape.core.net_tools.device import MacSelector
 from lanscape.core.errors import DeviceError
 from lanscape.core.service_scan import ServiceScanResult
 from lanscape.core.scan_config import ServiceScanConfig
@@ -31,7 +32,7 @@ class TestDeviceScanServiceErrorPropagation:
     def test_scan_service_exception_caught(self, device: Device, cfg: ServiceScanConfig):
         """When scan_service() raises, the error is appended to caught_errors."""
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             side_effect=RuntimeError("connection failed"),
         ):
             device.scan_service(80, cfg)
@@ -52,7 +53,7 @@ class TestDeviceScanServiceErrorPropagation:
             error="Timeout scanning 192.168.1.100:80",
         )
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             return_value=mock_result,
         ):
             device.scan_service(80, cfg)
@@ -73,7 +74,7 @@ class TestDeviceScanServiceErrorPropagation:
             error="Timeout scanning 192.168.1.100:443",
         )
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             return_value=mock_result,
         ):
             device.scan_service(443, cfg)
@@ -99,7 +100,7 @@ class TestDeviceScanServiceErrorPropagation:
             probes_received=1,
         )
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             return_value=mock_result,
         ):
             device.scan_service(80, cfg)
@@ -113,7 +114,7 @@ class TestDeviceScanServiceErrorPropagation:
     ):
         """When scan_service() raises, no service data should be recorded."""
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             side_effect=OSError("network unreachable"),
         ):
             device.scan_service(22, cfg)
@@ -121,3 +122,41 @@ class TestDeviceScanServiceErrorPropagation:
         assert len(device.caught_errors) == 1
         assert device.services == {}
         assert device.service_info == []
+
+
+class TestMacSelector:
+    """Tests for MacSelector.choose_mac resilience and correctness."""
+
+    def test_choose_mac_single(self):
+        """Single MAC should be returned immediately."""
+        sel = MacSelector()
+        assert sel.choose_mac(["AA:BB:CC:DD:EE:FF"]) == "AA:BB:CC:DD:EE:FF"
+
+    def test_choose_mac_least_seen(self):
+        """Should return the MAC seen the fewest times."""
+        sel = MacSelector()
+        sel.import_macs(["AA:AA:AA:AA:AA:AA", "BB:BB:BB:BB:BB:BB"])
+        sel.import_macs(["AA:AA:AA:AA:AA:AA"])  # AA seen twice
+        result = sel.choose_mac(["AA:AA:AA:AA:AA:AA", "BB:BB:BB:BB:BB:BB"])
+        assert result == "BB:BB:BB:BB:BB:BB"
+
+    def test_choose_mac_unknown_mac_no_keyerror(self):
+        """MACs not previously imported should not raise KeyError."""
+        sel = MacSelector()
+        sel.import_macs(["AA:AA:AA:AA:AA:AA"])
+        # CC was never imported — should safely default to count 0
+        result = sel.choose_mac(["AA:AA:AA:AA:AA:AA", "CC:CC:CC:CC:CC:CC"])
+        assert result == "CC:CC:CC:CC:CC:CC"
+
+    def test_choose_mac_all_unknown(self):
+        """All unknown MACs should still return one without error."""
+        sel = MacSelector()
+        result = sel.choose_mac(["XX:XX:XX:XX:XX:XX", "YY:YY:YY:YY:YY:YY"])
+        assert result in ("XX:XX:XX:XX:XX:XX", "YY:YY:YY:YY:YY:YY")
+
+    def test_clear_resets_counts(self):
+        """Clear should reset all MAC counts."""
+        sel = MacSelector()
+        sel.import_macs(["AA:AA:AA:AA:AA:AA"])
+        sel.clear()
+        assert not sel.macs

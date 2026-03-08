@@ -1,14 +1,4 @@
-"""
-IP address parsing module for network scanning operations.
-
-This module provides utilities for parsing various IP address formats including:
-- Single IP addresses
-- CIDR notation subnets
-- IP ranges with hyphens (e.g., 192.168.1.1-192.168.1.10)
-- Shorthand IP ranges (e.g., 192.168.1.1-10)
-
-It also includes validation to prevent processing excessively large IP ranges.
-"""
+"""IP address parsing utilities (single, CIDR, ranges)."""
 import ipaddress
 
 from lanscape.core.errors import SubnetTooLargeError

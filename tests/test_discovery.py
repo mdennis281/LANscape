@@ -7,6 +7,8 @@ import json
 import socket
 from unittest.mock import MagicMock, patch
 
+from zeroconf import ServiceStateChange
+
 from lanscape.ui.react_proxy.discovery import (
     DiscoveredInstance,
     DiscoverResponse,
@@ -424,7 +426,6 @@ class TestDiscoveryServiceBrowseCallback:
 
     def test_add_service(self):
         """Test that an Added event populates the instances dict."""
-        from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
         svc = self._make_service()
         mock_zc = MagicMock()
         mock_zc.get_service_info.return_value = self._make_mock_info()
@@ -440,7 +441,6 @@ class TestDiscoveryServiceBrowseCallback:
 
     def test_remove_service(self):
         """Test that a Removed event removes the instance."""
-        from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
         svc = self._make_service()
 
         # Pre-populate
@@ -458,7 +458,6 @@ class TestDiscoveryServiceBrowseCallback:
 
     def test_no_addresses_skips(self):
         """Test that a service with no resolved addresses is ignored."""
-        from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
         svc = self._make_service()
         mock_zc = MagicMock()
         mock_info = self._make_mock_info()
@@ -474,7 +473,6 @@ class TestDiscoveryServiceBrowseCallback:
 
     def test_none_info_retries_then_skips(self):
         """Test that a None service info is retried 3 times then skipped."""
-        from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
         svc = self._make_service()
         mock_zc = MagicMock()
         mock_zc.get_service_info.return_value = None
@@ -490,7 +488,6 @@ class TestDiscoveryServiceBrowseCallback:
 
     def test_retry_succeeds_on_second_attempt(self):
         """Test that a service is resolved when retry succeeds."""
-        from zeroconf import ServiceStateChange  # pylint: disable=import-outside-toplevel
         svc = self._make_service()
         mock_zc = MagicMock()
         # First call returns None, second succeeds

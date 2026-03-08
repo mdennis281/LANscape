@@ -2,15 +2,15 @@
 
 import argparse
 import sys
-from dataclasses import dataclass, fields
 from typing import Any, Dict, Optional
+
+from pydantic import BaseModel
 
 from lanscape.core.version_manager import get_installed_version
 
 
-@dataclass
-class RuntimeArgs:
-    """Class representing runtime arguments for the application."""
+class RuntimeArgs(BaseModel):
+    """Runtime arguments for the application."""
     ui_port: int = 5001
     logfile: Optional[str] = None
     loglevel: str = 'INFO'
@@ -61,8 +61,7 @@ def parse_args() -> RuntimeArgs:
     # Convert the Namespace to a dictionary
     args_dict: Dict[str, Any] = vars(args)
 
-    field_names = {field.name for field in fields(
-        RuntimeArgs)}  # Get dataclass field names
+    field_names = set(RuntimeArgs.model_fields)  # Get model field names
 
     if args.debug:
         args_dict['loglevel'] = 'DEBUG'

@@ -247,7 +247,7 @@ def test_aggressive_no_global_timeout_starvation():
         )
 
         with patch(
-            'lanscape.core.service_scan._try_probe',
+            'lanscape.core.service_scan.probes._try_probe',
             side_effect=_slow_probe,
         ):
             result = await _multi_probe_generic("127.0.0.1", 99999, cfg)
@@ -510,7 +510,7 @@ class TestTLSEscalation:
         async def run():
             raw = b"\x16\x03\x01\x00\x05hello"  # TLS Handshake record
             decoded = raw.decode("utf-8", errors="replace")
-            with patch('lanscape.core.service_scan._try_ssl_probe',
+            with patch('lanscape.core.service_scan.probes._try_ssl_probe',
                        new_callable=AsyncMock) as mock_ssl:
                 mock_ssl.return_value = (b"HTTP/1.1 200 OK", "HTTP/1.1 200 OK")
                 result = await _handle_tls_escalation(
@@ -529,7 +529,7 @@ class TestTLSEscalation:
                 "<html><title>400 The plain HTTP request was sent to HTTPS port</title>"
             )
             raw = response.encode()
-            with patch('lanscape.core.service_scan._try_ssl_probe',
+            with patch('lanscape.core.service_scan.probes._try_ssl_probe',
                        new_callable=AsyncMock) as mock_ssl:
                 mock_ssl.return_value = (b"HTTP/1.1 200 OK", "HTTP/1.1 200 OK")
                 result = await _handle_tls_escalation(
@@ -548,7 +548,7 @@ class TestTLSEscalation:
                 "The plain HTTP request was sent to HTTPS port"
             )
             raw = response.encode()
-            with patch('lanscape.core.service_scan._try_ssl_probe',
+            with patch('lanscape.core.service_scan.probes._try_ssl_probe',
                        new_callable=AsyncMock) as mock_ssl:
                 mock_ssl.return_value = (None, None)
                 result = await _handle_tls_escalation(
@@ -566,7 +566,7 @@ class TestTLSEscalation:
                 "Location: https://example.com/\r\n"
             )
             raw = response.encode()
-            with patch('lanscape.core.service_scan._try_ssl_probe',
+            with patch('lanscape.core.service_scan.probes._try_ssl_probe',
                        new_callable=AsyncMock) as mock_ssl:
                 mock_ssl.return_value = (b"HTTP/1.1 200 OK", "HTTP/1.1 200 OK")
                 result = await _handle_tls_escalation(
@@ -584,7 +584,7 @@ class TestTLSEscalation:
                 "Location: https://other-server.com/\r\n"
             )
             raw = response.encode()
-            with patch('lanscape.core.service_scan._try_ssl_probe',
+            with patch('lanscape.core.service_scan.probes._try_ssl_probe',
                        new_callable=AsyncMock) as mock_ssl:
                 mock_ssl.return_value = (None, None)
                 result = await _handle_tls_escalation(
@@ -631,7 +631,7 @@ class TestDNSProbes:
         for strategy in ServiceScanStrategy:
             probes = get_port_probes(53, strategy)
             dns_payloads = [p for p in probes if p and isinstance(p, bytes)
-                           and b"\xAA\xBB" in p]
+                            and b"\xAA\xBB" in p]
             assert len(dns_payloads) > 0, f"DNS probe missing for port 53 in {strategy}"
 
 
@@ -752,15 +752,9 @@ class TestServiceScanErrorPropagation:
         mock_loop.run_until_complete.side_effect = asyncio.TimeoutError()
         mock_loop.close = MagicMock()
 
-        with (
-            patch("lanscape.core.service_scan.asyncio.get_running_loop",
-                  side_effect=RuntimeError),
-            patch("lanscape.core.service_scan.asyncio.new_event_loop",
-                  return_value=mock_loop),
-            patch("lanscape.core.service_scan.asyncio.set_event_loop"),
-            patch("lanscape.core.service_scan.asyncio.all_tasks",
-                  return_value=set()),
-        ):
+        with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
+                   return_value=mock_loop), \
+             patch("lanscape.core.service_scan.scanner.asyncio.set_event_loop"):
             cfg = ServiceScanConfig(timeout=0.5)
             result = scan_service("127.0.0.1", 99999, cfg)
             assert result.service == "Unknown"
@@ -773,15 +767,9 @@ class TestServiceScanErrorPropagation:
         mock_loop.run_until_complete.side_effect = RuntimeError("test boom")
         mock_loop.close = MagicMock()
 
-        with (
-            patch("lanscape.core.service_scan.asyncio.get_running_loop",
-                  side_effect=RuntimeError),
-            patch("lanscape.core.service_scan.asyncio.new_event_loop",
-                  return_value=mock_loop),
-            patch("lanscape.core.service_scan.asyncio.set_event_loop"),
-            patch("lanscape.core.service_scan.asyncio.all_tasks",
-                  return_value=set()),
-        ):
+        with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
+                   return_value=mock_loop), \
+             patch("lanscape.core.service_scan.scanner.asyncio.set_event_loop"):
             cfg = ServiceScanConfig(timeout=0.5)
             result = scan_service("127.0.0.1", 99999, cfg)
             assert result.service == "Unknown"

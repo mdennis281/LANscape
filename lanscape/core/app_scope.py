@@ -31,7 +31,7 @@ class ResourceManager:
         return json.loads(self.get(asset_name))
 
     def get_jsonc(self, asset_name: str):
-        """AI Slop to get JSONC (JSON with comments) content of an asset as a JSON object."""
+        """Parse a JSONC (JSON with comments) asset into a Python object."""
         content = self.get(asset_name)
 
         def strip_jsonc_lines(text):

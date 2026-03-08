@@ -1,9 +1,4 @@
-"""
-Custom exceptions used by the lanscape application.
-
-This module contains custom exception classes for handling various error cases
-in the network scanning and device management operations.
-"""
+"""Custom exceptions for LANscape."""
 
 
 class SubnetTooLargeError(Exception):
@@ -34,8 +29,7 @@ class DeviceError(Exception):
             tb = self.base.__traceback__
             frame = tb.tb_frame
             return frame.f_code.co_name
-        except Exception as e:
-            print(e)
+        except Exception:
             return 'unknown'
 
     def __str__(self):

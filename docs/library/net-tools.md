@@ -4,6 +4,8 @@
 
 Network utility functions for discovering subnets on your machine, checking ARP support, and hostname resolution.
 
+Internally, `net_tools` is a package split into `device.py` (Device model, hostname resolution) and `subnet_utils.py` (subnet detection, ARP support). All public symbols are re-exported from the package root, so imports remain unchanged.
+
 ## Import
 
 ```python

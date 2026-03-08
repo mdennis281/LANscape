@@ -1,6 +1,4 @@
-"""
-Local network scanner
-"""
+"""Local network scanner"""
 # Scanner core functionality
 from lanscape.core.subnet_scan import (
     SubnetScanner,
@@ -23,7 +21,19 @@ from lanscape.core.scan_config import (
 
 from lanscape.core.port_manager import PortManager
 
-from lanscape.core import net_tools
+# Network utilities and device model
+from lanscape.core import net_tools  # noqa: F401 – namespace import for `lanscape.net_tools`
+from lanscape.core.net_tools import (
+    Device,
+    get_network_subnet,
+    get_all_network_subnets,
+    smart_select_primary_subnet,
+    is_internal_block,
+    is_arp_supported,
+    scan_config_uses_arp,
+)
+
+from lanscape.core.errors import DeviceError
 
 # Threadpool retry utilities
 from lanscape.core.threadpool_retry import (

@@ -1,6 +1,7 @@
 """Main entry point for the LANscape application when running as a module."""
 import socket
 import logging
+import time
 import traceback
 
 from lanscape.core.logger import configure_logging
@@ -11,16 +12,17 @@ from lanscape.core.version_manager import (
 from lanscape.ui.ws.server import run_server
 from lanscape.ui.react_proxy import start_webapp_server
 
-# do this so any logs generated on import are displayed
-args = parse_args()
-configure_logging(args.loglevel, args.logfile)
-
-
 log = logging.getLogger('core')
+
+# Module-level reference so helper functions can access it after main() sets it.
+args = None  # pylint: disable=invalid-name
 
 
 def main():
     """Core entry point for running lanscape as a module."""
+    global args  # pylint: disable=global-statement
+    args = parse_args()
+    configure_logging(args.loglevel, args.logfile)
     try:
         _main()
     except KeyboardInterrupt:
@@ -111,16 +113,26 @@ def is_port_available(port: int) -> bool:
         return s.connect_ex(('localhost', port)) != 0
 
 
-def validate_port_available(port: int, flag_name: str) -> None:
+def validate_port_available(port: int, flag_name: str, retries: int = 10,
+                            delay: float = 0.5) -> None:
     """
     Validate that an explicitly specified port is available.
-    Raises an error if the port is already in use.
+    Retries briefly to handle hot-reload scenarios where the previous
+    process hasn't released the port yet.
+    Raises an error if the port is still in use after all retries.
     """
-    if not is_port_available(port):
-        raise OSError(
-            f"Port {port} is already in use. "
-            f"Either free the port or remove the {flag_name} flag to auto-select an available port."
-        )
+    for attempt in range(retries):
+        if is_port_available(port):
+            return
+        if attempt < retries - 1:
+            log.debug(f'Port {port} in use, retrying in {delay}s '
+                      f'({attempt + 1}/{retries})')
+            time.sleep(delay)
+    raise OSError(
+        f"Port {port} is already in use. "
+        f"Either free the port or remove the {flag_name} flag to auto-"
+        f"select an available port."
+    )
 
 
 def get_valid_port(port: int) -> int:

@@ -1,11 +1,4 @@
-"""
-Port Manager module for managing port list configurations.
-
-This module provides functionality to create, read, update, and delete port lists
-that are stored as JSON files. Each port list contains port numbers and their
-associated services. The module handles validation of port data and provides
-methods for working with port list configurations.
-"""
+"""Port list CRUD operations (stored as JSON files)."""
 
 import json
 from typing import List
@@ -16,13 +9,7 @@ PORT_DIR = 'ports'
 
 
 class PortManager:
-    """
-    Manager class for port list operations.
-
-    Handles the creation, retrieval, updating, and deletion of port lists.
-    Port lists are stored as JSON files with port numbers as keys and
-    service names as values.
-    """
+    """CRUD manager for port list JSON files."""
 
     def __init__(self):
         """

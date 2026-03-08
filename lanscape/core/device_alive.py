@@ -1,16 +1,10 @@
-"""
-Handles device alive checks using various methods.
-"""
+"""Handles device alive checks using various methods."""
 
-import re
 import socket
 import subprocess
 import time
 from typing import List
-import psutil
 
-from scapy.sendrecv import srp
-from scapy.layers.l2 import ARP, Ether
 from icmplib import ping
 from icmplib.exceptions import SocketPermissionError
 
@@ -20,7 +14,14 @@ from lanscape.core.scan_config import (
     ArpConfig, PokeConfig, ArpCacheConfig
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
-from lanscape.core.system_compat import get_arp_cache_command
+from lanscape.core.system_compat import (
+    get_arp_cache_command,
+    icmp_requires_privileged,
+    get_ping_command,
+    parse_ping_success,
+    extract_mac_from_output,
+    send_arp_request,
+)
 
 
 def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
@@ -54,14 +55,7 @@ def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
 
 
 class IcmpLookup():
-    """Class to handle ICMP ping lookups for device presence.
-
-    Raises:
-        NotImplementedError: If the platform is not supported.
-
-    Returns:
-        bool: True if the device is reachable via ICMP, False otherwise.
-    """
+    """ICMP ping-based device reachability check."""
     @classmethod
     @job_tracker
     def execute(cls, device: Device, cfg: PingConfig) -> bool:
@@ -75,14 +69,13 @@ class IcmpLookup():
             bool: True if the device is reachable via ICMP, False otherwise.
         """
         try:
-            # Try using icmplib first
             for _ in range(cfg.attempts):
                 result = ping(
                     device.ip,
                     count=cfg.ping_count,
                     interval=cfg.retry_delay,
                     timeout=cfg.timeout,
-                    privileged=psutil.WINDOWS  # Use privileged mode on Windows
+                    privileged=icmp_requires_privileged()
                 )
                 if result.is_alive:
                     device.alive = True
@@ -94,28 +87,11 @@ class IcmpLookup():
 
     @classmethod
     def _ping_fallback(cls, device: Device, cfg: PingConfig) -> bool:
-        """Fallback ping using system ping command via subprocess.
-
-        Args:
-            device (Device): The device to ping.
-            cfg (PingConfig): The ping configuration.
-
-        Returns:
-            bool: True if the device responds to ping, False otherwise.
-        """
-        cmd = []
-
-        if psutil.WINDOWS:
-            # -n count, -w timeout in ms
-            cmd = ['ping', '-n', str(cfg.ping_count), '-w', str(int(cfg.timeout * 1000)), device.ip]
-        else:  # Linux, macOS, and other Unix-like systems
-            # -c count, -W timeout in s
-            cmd = ['ping', '-c', str(cfg.ping_count), '-W', str(int(cfg.timeout)), device.ip]
+        """Fallback ping using system ping command via subprocess."""
+        cmd = get_ping_command(cfg.ping_count, int(cfg.timeout * 1000), device.ip)
 
         for r in range(cfg.attempts):
             try:
-                # Remove check=True to handle return codes manually
-                # Add timeout to prevent hanging
                 timeout_val = cfg.timeout * cfg.ping_count + 5
                 proc = subprocess.run(
                     cmd,
@@ -123,27 +99,12 @@ class IcmpLookup():
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     timeout=timeout_val,
-                    check=False  # Handle return codes manually
+                    check=False
                 )
 
-                # Check if ping was successful
-                if proc.returncode == 0:
-                    output = proc.stdout.lower()
-
-                    # Windows/Linux both include "TTL" on a successful reply
-                    if psutil.WINDOWS or psutil.LINUX:
-                        if 'ttl' in output:
-                            device.alive = True
-                            return True  # Early return on success
-
-                    # some distributions of Linux and macOS
-                    if psutil.MACOS or psutil.LINUX:
-                        bad = '100.0% packet loss'
-                        good = 'ping statistics'
-                        # mac doesnt include TTL, so we check good is there, and bad is not
-                        if good in output and bad not in output:
-                            device.alive = True
-                            return True  # Early return on success
+                if proc.returncode == 0 and parse_ping_success(proc.stdout):
+                    device.alive = True
+                    return True
 
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
                     FileNotFoundError) as e:
@@ -209,17 +170,8 @@ class ArpCacheLookup():
 
     @classmethod
     def _extract_mac_address(cls, arp_resp: str) -> List[str]:
-        """
-        Extract MAC addresses from ARP output.
-
-        Args:
-            arp_resp (str): The ARP command output.
-
-        Returns:
-            List[str]: A list of extracted MAC addresses (may be empty).
-        """
-        arp_resp = arp_resp.replace('-', ':')
-        return re.findall(r'..:..:..:..:..:..', arp_resp)
+        """Extract MAC addresses from ARP output."""
+        return extract_mac_from_output(arp_resp)
 
 
 class ArpLookup():
@@ -247,11 +199,7 @@ class ArpLookup():
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
         def do_arp_lookup():
-            arp_request = ARP(pdst=device.ip)
-            broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-            packet = broadcast / arp_request
-
-            answered, _ = srp(packet, timeout=cfg.timeout, verbose=False)
+            answered, _ = send_arp_request(device.ip, timeout=cfg.timeout)
             alive = any(resp.psrc == device.ip for _, resp in answered)
             macs = []
             if alive:

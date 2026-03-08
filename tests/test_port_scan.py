@@ -216,7 +216,7 @@ def test_socket_timeout_setting(mock_socket_class, test_device):
 def test_retry_delay_timing(test_device):
     """Test that retry delay is respected."""
     # We'll use a mock to avoid actually waiting
-    with patch('lanscape.core.net_tools.sleep') as mock_sleep:
+    with patch('lanscape.core.net_tools.device.sleep') as mock_sleep:
         with patch('socket.socket') as mock_socket_class:
             mock_socket = MagicMock()
             mock_socket_class.return_value = mock_socket

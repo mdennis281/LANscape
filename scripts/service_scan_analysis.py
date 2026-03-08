@@ -6,6 +6,7 @@ Runs an aggressive service scan on a subnet and collects detailed data
 about service identification results to help improve the service scanning logic.
 """
 
+import argparse
 import json
 import sys
 from collections import defaultdict
@@ -377,7 +378,6 @@ def save_analysis(analysis: Dict[str, Any], filename: str = None):
 
 def main():
     """Main entry point."""
-    import argparse  # pylint: disable=import-outside-toplevel
     parser = argparse.ArgumentParser(description='Service Scan Analysis')
     parser.add_argument('subnet', nargs='?', default='10.0.0.0/24',
                         help='Subnet to scan (default: 10.0.0.0/24)')

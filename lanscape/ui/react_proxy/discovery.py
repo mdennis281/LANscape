@@ -27,6 +27,7 @@ from zeroconf import (
 )
 
 from lanscape.core.version_manager import get_installed_version
+from lanscape.core.system_compat import VIRTUAL_IFACE_NAMES
 
 log = logging.getLogger('Discovery')
 
@@ -36,16 +37,6 @@ log = logging.getLogger('Discovery')
 logging.getLogger('zeroconf').setLevel(logging.CRITICAL)
 
 SERVICE_TYPE = '_lanscape._tcp.local.'
-
-
-# Interface name substrings that indicate non-LAN adapters.
-# Covers: loopback, VMware, VirtualBox, Docker, Hyper-V/WSL,
-# ZeroTier, Tailscale, WireGuard, TUN/TAP, Cisco VPN.
-_VIRTUAL_IFACE_NAMES = (
-    'loop', 'vmnet', 'vbox', 'docker', 'virtual', 'veth',
-    'vethernet', 'zerotier', 'tailscale', 'tun', 'tap',
-    'wg', 'utun', 'virbr', 'br-', 'ham',
-)
 
 # Subnet prefixes that are almost never a real LAN:
 # 192.168.137.0/24 = Windows ICS (Internet Connection Sharing).
@@ -68,7 +59,7 @@ def _get_local_addresses() -> list[bytes]:
         if not iface_stats or not iface_stats.isup:
             continue
         # Skip common virtual / overlay interfaces
-        if any(v in iface.lower() for v in _VIRTUAL_IFACE_NAMES):
+        if any(v in iface.lower() for v in VIRTUAL_IFACE_NAMES):
             continue
 
         for addr in addrs:
@@ -106,7 +97,7 @@ def _get_local_subnets() -> list[ipaddress.IPv4Network]:
         iface_stats = stats.get(iface)
         if not iface_stats or not iface_stats.isup:
             continue
-        if any(v in iface.lower() for v in _VIRTUAL_IFACE_NAMES):
+        if any(v in iface.lower() for v in VIRTUAL_IFACE_NAMES):
             continue
 
         for addr in addrs:

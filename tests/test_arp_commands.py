@@ -142,10 +142,9 @@ class TestMacResolverARP:
     """Tests for MacResolver._get_mac_by_arp"""
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')
-    @patch('lanscape.core.mac_lookup.platform.system')
-    def test_windows_uses_arp_a(self, mock_system, mock_check_output):
+    @patch('lanscape.core.mac_lookup.get_arp_lookup_command', return_value='arp -a 192.168.1.1')
+    def test_windows_uses_arp_a(self, _mock_cmd, mock_check_output):
         """Windows should use 'arp -a' command."""
-        mock_system.return_value = "Windows"
         mock_check_output.return_value = b"192.168.1.1  00-11-22-33-44-55  dynamic"
 
         resolver = MacResolver()
@@ -157,12 +156,10 @@ class TestMacResolverARP:
         assert '00:11:22:33:44:55' in result
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')
-    @patch('lanscape.core.system_compat.shutil.which')
-    @patch('lanscape.core.mac_lookup.platform.system')
-    def test_linux_uses_ip_neigh_when_available(self, mock_system, mock_which, mock_check_output):
+    @patch('lanscape.core.mac_lookup.get_arp_lookup_command',
+           return_value='ip neigh show 192.168.1.1')
+    def test_linux_uses_ip_neigh_when_available(self, _mock_cmd, mock_check_output):
         """Linux should use 'ip neigh show' when ip command is available."""
-        mock_system.return_value = "Linux"
-        mock_which.side_effect = lambda cmd: '/usr/sbin/ip' if cmd == 'ip' else None
         mock_check_output.return_value = b"192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE"
 
         resolver = MacResolver()
@@ -174,12 +171,9 @@ class TestMacResolverARP:
         assert 'aa:bb:cc:dd:ee:ff' in result
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')
-    @patch('lanscape.core.system_compat.shutil.which')
-    @patch('lanscape.core.mac_lookup.platform.system')
-    def test_linux_falls_back_to_arp(self, mock_system, mock_which, mock_check_output):
+    @patch('lanscape.core.mac_lookup.get_arp_lookup_command', return_value='arp -n 192.168.1.1')
+    def test_linux_falls_back_to_arp(self, _mock_cmd, mock_check_output):
         """Linux should fall back to 'arp' when ip command is not available."""
-        mock_system.return_value = "Linux"
-        mock_which.side_effect = lambda cmd: '/usr/sbin/arp' if cmd == 'arp' else None
         mock_check_output.return_value = b"192.168.1.1 ether aa:bb:cc:dd:ee:ff C eth0"
 
         resolver = MacResolver()
@@ -191,10 +185,9 @@ class TestMacResolverARP:
         assert 'aa:bb:cc:dd:ee:ff' in result
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')
-    @patch('lanscape.core.mac_lookup.platform.system')
-    def test_macos_uses_arp(self, mock_system, mock_check_output):
+    @patch('lanscape.core.mac_lookup.get_arp_lookup_command', return_value='arp 192.168.1.1')
+    def test_macos_uses_arp(self, _mock_cmd, mock_check_output):
         """macOS should use 'arp' command."""
-        mock_system.return_value = "Darwin"
         mock_check_output.return_value = b"? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0"
 
         resolver = MacResolver()
@@ -206,12 +199,10 @@ class TestMacResolverARP:
         assert 'aa:bb:cc:dd:ee:ff' in result
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')
-    @patch('lanscape.core.system_compat.shutil.which')
-    @patch('lanscape.core.mac_lookup.platform.system')
-    def test_handles_command_failure(self, mock_system, mock_which, mock_check_output):
+    @patch('lanscape.core.mac_lookup.get_arp_lookup_command',
+           return_value='ip neigh show 192.168.1.1')
+    def test_handles_command_failure(self, _mock_cmd, mock_check_output):
         """Should return empty list and log error on command failure."""
-        mock_system.return_value = "Linux"
-        mock_which.side_effect = lambda cmd: f'/usr/sbin/{cmd}'
         mock_check_output.side_effect = Exception("Command failed")
 
         resolver = MacResolver()

@@ -1,8 +1,4 @@
-"""
-Configuration module for network scanning operations.
-Provides classes and utilities to configure different types of network scans
-including ping scans, ARP scans, and port scanning.
-"""
+"""Configuration module for network scanning operations."""
 
 import os
 from typing import List, Dict
@@ -15,39 +11,29 @@ from lanscape.core.port_manager import PortManager
 from lanscape.core.ip_parser import parse_ip_input
 
 
-class PingConfig(BaseModel):
-    """
-    Configuration settings for ICMP ping-based network scanning.
+class ConfigBase(BaseModel):
+    """Base class for all scan configuration models.
 
-    Controls parameters such as the number of ping attempts, count per ping,
-    timeout values, and retry delays to optimize ping scanning behavior.
+    Provides ``from_dict`` / ``to_dict`` so subclasses don't need to
+    repeat the same one-liner wrappers around Pydantic.
     """
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Create an instance from a dictionary."""
+        return cls.model_validate(data)
+
+    def to_dict(self) -> dict:
+        """Serialise to a plain dictionary."""
+        return self.model_dump()
+
+
+class PingConfig(ConfigBase):
+    """Configuration for ICMP ping scanning."""
     attempts: int = 2
     ping_count: int = 1
     timeout: float = 1.0
     retry_delay: float = 0.25
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'PingConfig':
-        """
-        Create a PingConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing PingConfig parameters
-
-        Returns:
-            A new PingConfig instance with the provided settings
-        """
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict:
-        """
-        Convert the PingConfig instance to a dictionary.
-
-        Returns:
-            Dictionary representation of the PingConfig
-        """
-        return self.model_dump()
 
     def __str__(self):
         return (
@@ -58,100 +44,28 @@ class PingConfig(BaseModel):
         )
 
 
-class ArpConfig(BaseModel):
-    """
-    Configuration for ARP scanning.
-    """
+class ArpConfig(ConfigBase):
+    """Configuration for ARP scanning."""
     attempts: int = 1
     timeout: float = 2.0
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'ArpConfig':
-        """
-        Create an ArpConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing ArpConfig parameters
-
-        Returns:
-            A new ArpConfig instance with the provided settings
-        """
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict:
-        """
-        Convert the ArpConfig instance to a dictionary.
-
-        Returns:
-            Dictionary representation of the ArpConfig
-        """
-        return self.model_dump()
 
     def __str__(self):
         return f'ArpCfg(timeout={self.timeout}, attempts={self.attempts})'
 
 
-class ArpCacheConfig(BaseModel):
-    """Config for fetching from ARP cache"""
+class ArpCacheConfig(ConfigBase):
+    """Configuration for ARP cache lookups."""
     attempts: int = 1
     wait_before: float = 0.2
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'ArpCacheConfig':
-        """
-        Create an ArpCacheConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing ArpCacheConfig parameters
-
-        Returns:
-            A new ArpCacheConfig instance with the provided settings
-        """
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict:
-        """
-        Convert the ArpCacheConfig instance to a dictionary.
-
-        Returns:
-            Dictionary representation of the ArpCacheConfig
-        """
-        return self.model_dump()
 
     def __str__(self):
         return f'ArpCacheCfg(wait_before={self.wait_before}, attempts={self.attempts})'
 
 
-class PokeConfig(BaseModel):
-    """
-    Poking essentially involves sending a TCP packet to a specific port on a device
-    to elicit a response. Not so much expecting a response, but it should at least
-    trigger an ARP request.
-    """
+class PokeConfig(ConfigBase):
+    """Configuration for TCP poke (triggers ARP cache population)."""
     attempts: int = 1
     timeout: float = 2.0
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'PokeConfig':
-        """
-        Create a PokeConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing PokeConfig parameters
-
-        Returns:
-            A new PokeConfig instance with the provided settings
-        """
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict:
-        """
-        Convert the PokeConfig instance to a dictionary.
-
-        Returns:
-            Dictionary representation of the PokeConfig
-        """
-        return self.model_dump()
 
 
 class ServiceScanStrategy(Enum):
@@ -167,69 +81,21 @@ class ServiceScanStrategy(Enum):
     AGGRESSIVE = 'AGGRESSIVE'
 
 
-class ServiceScanConfig(BaseModel):
-    """
-    Configuration for service scanning on open ports.
-    """
+class ServiceScanConfig(ConfigBase):
+    """Configuration for service scanning on open ports."""
     timeout: float = 5.0
     lookup_type: ServiceScanStrategy = ServiceScanStrategy.BASIC
     max_concurrent_probes: int = 10
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'ServiceScanConfig':
-        """
-        Create a ServiceScanConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing ServiceScanConfig parameters
-
-        Returns:
-            A new ServiceScanConfig instance with the provided settings
-        """
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict:
-        """
-        Convert the ServiceScanConfig instance to a dictionary.
-
-        Returns:
-            Dictionary representation of the ServiceScanConfig
-        """
-        return self.model_dump()
 
     def __str__(self):
         return f'ServiceScanCfg(timeout={self.timeout})'
 
 
-class PortScanConfig(BaseModel):
-    """
-    Configuration for port scanning.
-    """
+class PortScanConfig(ConfigBase):
+    """Configuration for port scanning."""
     timeout: float = 1.0
     retries: int = 0
     retry_delay: float = 0.1
-
-    @classmethod
-    def from_dict(cls, data: dict) -> 'PortScanConfig':
-        """
-        Create a PortScanConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing PortScanConfig parameters
-
-        Returns:
-            A new PortScanConfig instance with the provided settings
-        """
-        return cls.model_validate(data)
-
-    def to_dict(self) -> dict:
-        """
-        Convert the PortScanConfig instance to a dictionary.
-
-        Returns:
-            Dictionary representation of the PortScanConfig
-        """
-        return self.model_dump()
 
     def __str__(self):
         return f'PortScanCfg(timeout={self.timeout}, retry_delay={self.retry_delay})'
@@ -249,13 +115,8 @@ class ScanType(Enum):
     ICMP_THEN_ARP = 'ICMP_THEN_ARP'
 
 
-class ScanConfig(BaseModel):
-    """
-    Main configuration class for network scanning operations.
-
-    Contains settings for subnet targets, port ranges, thread counts,
-    scan tasks to perform, and configurations for different scan methods.
-    """
+class ScanConfig(ConfigBase):
+    """Main configuration for a network scan operation."""
     subnet: str
     port_list: str
     t_multiplier: float = 1.0
@@ -295,22 +156,11 @@ class ScanConfig(BaseModel):
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ScanConfig':
-        """
-        Create a ScanConfig instance from a dictionary.
-
-        Args:
-            data: Dictionary containing ScanConfig parameters
-
-        Returns:
-            A new ScanConfig instance with the provided settings
-        """
-
+        """Create a ScanConfig from a dictionary."""
         return cls.model_validate(data)
 
     def to_dict(self) -> dict:
-        """
-        Convert the ScanConfig instance to a json-serializable dictionary.
-        """
+        """Serialise to a JSON-compatible dictionary."""
         return self.model_dump(mode="json")
 
     def get_ports(self) -> List[int]:

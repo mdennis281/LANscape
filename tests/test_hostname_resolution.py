@@ -118,7 +118,7 @@ class TestGetHostname:
         """Create a test Device instance."""
         return Device(ip="192.168.1.100", alive=True)
 
-    @patch('lanscape.core.net_tools.socket.gethostbyaddr')
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
     def test_reverse_dns_success(self, mock_dns, device):
         """Reverse DNS succeeds — should return hostname immediately."""
         mock_dns.return_value = ('myrouter.local', [], ['192.168.1.100'])
@@ -128,9 +128,9 @@ class TestGetHostname:
         assert result == 'myrouter.local'
         mock_dns.assert_called_once_with('192.168.1.100')
 
-    @patch('lanscape.core.net_tools.platform.system', return_value='Windows')
-    @patch('lanscape.core.net_tools.socket.gethostbyaddr')
-    def test_windows_no_fallbacks(self, mock_dns, mock_platform, device):
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=True)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
+    def test_windows_no_fallbacks(self, mock_dns, mock_os_handles, device):
         """On Windows, if DNS fails, should return None without trying fallbacks."""
         mock_dns.side_effect = socket.herror('Host not found')
 
@@ -140,10 +140,10 @@ class TestGetHostname:
 
     @patch.object(Device, '_resolve_netbios', return_value=None)
     @patch.object(Device, '_resolve_mdns', return_value='livingroom-pi.local')
-    @patch('lanscape.core.net_tools.platform.system', return_value='Linux')
-    @patch('lanscape.core.net_tools.socket.gethostbyaddr')
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
     def test_mdns_fallback_success(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self, mock_dns, mock_platform, mock_mdns, mock_netbios, device
+        self, mock_dns, mock_os_handles, mock_mdns, mock_netbios, device
     ):
         """mDNS fallback resolves hostname when DNS fails on Linux."""
         mock_dns.side_effect = socket.herror('Host not found')
@@ -154,10 +154,10 @@ class TestGetHostname:
 
     @patch.object(Device, '_resolve_netbios', return_value='DESKTOP-ABC')
     @patch.object(Device, '_resolve_mdns', return_value=None)
-    @patch('lanscape.core.net_tools.platform.system', return_value='Linux')
-    @patch('lanscape.core.net_tools.socket.gethostbyaddr')
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
     def test_netbios_fallback_success(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self, mock_dns, mock_platform, mock_mdns, mock_netbios, device
+        self, mock_dns, mock_os_handles, mock_mdns, mock_netbios, device
     ):
         """NetBIOS fallback resolves hostname when DNS and mDNS fail."""
         mock_dns.side_effect = socket.herror('Host not found')
@@ -168,10 +168,10 @@ class TestGetHostname:
 
     @patch.object(Device, '_resolve_netbios', return_value=None)
     @patch.object(Device, '_resolve_mdns', return_value=None)
-    @patch('lanscape.core.net_tools.platform.system', return_value='Linux')
-    @patch('lanscape.core.net_tools.socket.gethostbyaddr')
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
     def test_all_methods_fail(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self, mock_dns, mock_platform, mock_mdns, mock_netbios, device
+        self, mock_dns, mock_os_handles, mock_mdns, mock_netbios, device
     ):
         """All resolution methods fail — should return None."""
         mock_dns.side_effect = socket.herror('Host not found')
@@ -182,10 +182,10 @@ class TestGetHostname:
 
     @patch.object(Device, '_resolve_netbios', return_value=None)
     @patch.object(Device, '_resolve_mdns', return_value='macbook.local')
-    @patch('lanscape.core.net_tools.platform.system', return_value='Darwin')
-    @patch('lanscape.core.net_tools.socket.gethostbyaddr')
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
     def test_macos_tries_fallbacks(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self, mock_dns, mock_platform, mock_mdns, mock_netbios, device
+        self, mock_dns, mock_os_handles, mock_mdns, mock_netbios, device
     ):
         """macOS should also attempt mDNS/NetBIOS fallbacks."""
         mock_dns.side_effect = socket.herror('Host not found')
@@ -207,7 +207,7 @@ class TestResolveMdns:
         """Create a test Device instance."""
         return Device(ip="10.0.0.5", alive=True)
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_success(self, mock_socket_cls, device):
         """Valid mDNS PTR response returns the hostname."""
         mock_sock = MagicMock()
@@ -222,7 +222,7 @@ class TestResolveMdns:
         mock_sock.sendto.assert_called_once()
         mock_sock.close.assert_called_once()
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_timeout(self, mock_socket_cls, device):
         """Socket timeout returns None gracefully."""
         mock_sock = MagicMock()
@@ -232,7 +232,7 @@ class TestResolveMdns:
         assert device._resolve_mdns() is None
         mock_sock.close.assert_called_once()
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_oserror(self, mock_socket_cls, device):
         """OSError returns None gracefully."""
         mock_sock = MagicMock()
@@ -242,7 +242,7 @@ class TestResolveMdns:
         assert device._resolve_mdns() is None
         mock_sock.close.assert_called_once()
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_non_response_packet(self, mock_socket_cls, device):
         """A query echo (QR=0) is ignored, returning None."""
         mock_sock = MagicMock()
@@ -255,7 +255,7 @@ class TestResolveMdns:
 
         assert device._resolve_mdns() is None
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_sets_multicast_ttl(self, mock_socket_cls, device):
         """Verifies the socket sets the multicast TTL to 255."""
         mock_sock = MagicMock()
@@ -285,7 +285,7 @@ class TestResolveNetbios:
         """Create a test Device instance."""
         return Device(ip="10.0.0.5", alive=True)
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_success(self, mock_socket_cls, device):
         """Valid NBSTAT response returns the machine name."""
         mock_sock = MagicMock()
@@ -301,7 +301,7 @@ class TestResolveNetbios:
         mock_sock.sendto.assert_called_once()
         mock_sock.close.assert_called_once()
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_timeout(self, mock_socket_cls, device):
         """Socket timeout returns None gracefully."""
         mock_sock = MagicMock()
@@ -311,7 +311,7 @@ class TestResolveNetbios:
         assert device._resolve_netbios() is None
         mock_sock.close.assert_called_once()
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_oserror(self, mock_socket_cls, device):
         """OSError returns None gracefully."""
         mock_sock = MagicMock()
@@ -321,7 +321,7 @@ class TestResolveNetbios:
         assert device._resolve_netbios() is None
         mock_sock.close.assert_called_once()
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_no_unique_name(self, mock_socket_cls, device):
         """Response with only GROUP names returns None."""
         mock_sock = MagicMock()
@@ -335,7 +335,7 @@ class TestResolveNetbios:
 
         assert device._resolve_netbios() is None
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_wildcard_name_ignored(self, mock_socket_cls, device):
         """Wildcard (*) NetBIOS names are skipped."""
         mock_sock = MagicMock()
@@ -348,7 +348,7 @@ class TestResolveNetbios:
 
         assert device._resolve_netbios() is None
 
-    @patch('lanscape.core.net_tools.socket.socket')
+    @patch('lanscape.core.net_tools.device.socket.socket')
     def test_sends_to_port_137(self, mock_socket_cls, device):
         """Verifies the NBSTAT request is sent to UDP port 137."""
         mock_sock = MagicMock()

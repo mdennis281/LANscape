@@ -31,7 +31,7 @@ class TestDeviceScanServiceErrorPropagation:
     def test_scan_service_exception_caught(self, device: Device, cfg: ServiceScanConfig):
         """When scan_service() raises, the error is appended to caught_errors."""
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             side_effect=RuntimeError("connection failed"),
         ):
             device.scan_service(80, cfg)
@@ -52,7 +52,7 @@ class TestDeviceScanServiceErrorPropagation:
             error="Timeout scanning 192.168.1.100:80",
         )
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             return_value=mock_result,
         ):
             device.scan_service(80, cfg)
@@ -73,7 +73,7 @@ class TestDeviceScanServiceErrorPropagation:
             error="Timeout scanning 192.168.1.100:443",
         )
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             return_value=mock_result,
         ):
             device.scan_service(443, cfg)
@@ -99,7 +99,7 @@ class TestDeviceScanServiceErrorPropagation:
             probes_received=1,
         )
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             return_value=mock_result,
         ):
             device.scan_service(80, cfg)
@@ -113,7 +113,7 @@ class TestDeviceScanServiceErrorPropagation:
     ):
         """When scan_service() raises, no service data should be recorded."""
         with patch(
-            "lanscape.core.net_tools.scan_service",
+            "lanscape.core.net_tools.device.scan_service",
             side_effect=OSError("network unreachable"),
         ):
             device.scan_service(22, cfg)

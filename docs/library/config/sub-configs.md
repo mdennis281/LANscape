@@ -1,6 +1,6 @@
 # Sub-Configs
 
-Protocol-specific configuration models used by [`ScanConfig`](scan-config.md). All are Pydantic `BaseModel` subclasses with `from_dict()` and `to_dict()` methods.
+Protocol-specific configuration models used by [`ScanConfig`](scan-config.md). All inherit from `ConfigBase` (a Pydantic `BaseModel` subclass) which provides shared `from_dict()` and `to_dict()` methods.
 
 ---
 

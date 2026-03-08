@@ -28,8 +28,8 @@ from lanscape import ScannerResults
 | `stage` | `str` | Current scan stage string |
 | `start_time` | `float` | Unix timestamp when the scan started |
 | `end_time` | `float \| None` | Unix timestamp when the scan ended |
-| `errors` | `List[dict]` | Scan-level errors (`{"basic": ..., "traceback": ...}`) |
-| `warnings` | `List[dict]` | Scan-level warnings (e.g., multiplier reductions) |
+| `errors` | `List[ScanErrorInfo]` | Scan-level errors (see [`ScanErrorInfo`](../models/overview.md#scanerrorinfo)) |
+| `warnings` | `List[ScanWarningInfo]` | Scan-level warnings (see [`ScanWarningInfo`](../models/overview.md#scanwarninginfo)) |
 
 ## Methods
 
@@ -78,7 +78,7 @@ Get a lightweight summary of the scan.
 - `metadata` — full `ScanMetadata`
 - `ports_found` — sorted list of all unique open ports
 - `services_found` — sorted list of all unique service names
-- `warnings` — raw warning dicts
+- `warnings` — scan-level warnings as `ScanWarningInfo` models
 
 ---
 

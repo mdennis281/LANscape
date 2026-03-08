@@ -31,7 +31,7 @@ def _make_scanner(port_scan_config: PortScanConfig | None = None, **kwargs) -> S
         cfg_kwargs['port_scan_config'] = port_scan_config
 
     with patch('lanscape.core.scan_config.parse_ip_input') as mock_parse, \
-         patch('lanscape.core.scan_config.PortManager') as mock_pm:
+            patch('lanscape.core.scan_config.PortManager') as mock_pm:
         mock_parse.return_value = [f'10.0.0.{i}' for i in range(1, 15)]
         mock_pm.return_value.get_port_list.return_value = {
             p: None for p in range(1, 51)  # 50 ports

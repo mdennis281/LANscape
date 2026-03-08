@@ -121,13 +121,13 @@ Parse the `subnet` string into individual IP addresses.
 
 ### `from_dict(data: dict) -> ScanConfig` *(classmethod)*
 
-Create a `ScanConfig` from a dictionary. Uses Pydantic's `model_validate()`.
+Create a `ScanConfig` from a dictionary. Uses Pydantic's `model_validate()`. Inherited from `ConfigBase`.
 
 ---
 
 ### `to_dict() -> dict`
 
-Serialize the config to a JSON-safe dictionary. Uses Pydantic's `model_dump(mode="json")`.
+Serialize the config to a JSON-safe dictionary. Overrides the `ConfigBase` default to use `model_dump(mode="json")` for JSON-safe output (e.g., enum values serialized as strings).
 
 ## Default Presets
 

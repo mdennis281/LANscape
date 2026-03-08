@@ -1,12 +1,4 @@
-"""
-ThreadPool retry manager for resilient concurrent operations.
-
-Provides a wrapper around ThreadPoolExecutor that handles:
-- Automatic retry of failed jobs with configurable retry count
-- Dynamic thread count reduction on failures (via multiplier)
-- Debouncing of multiplier reduction to prevent rapid decreases
-- Failed jobs are requeued to the back of the work queue
-"""
+"""ThreadPool retry manager for resilient concurrent operations."""
 
 import logging
 import traceback
@@ -15,6 +7,8 @@ from dataclasses import dataclass, field
 from typing import Callable, Any, Dict, List, TypeVar, Generic, Optional
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from threading import Lock
+
+from pydantic import BaseModel
 
 
 T = TypeVar('T')  # Return type of the job function
@@ -35,13 +29,12 @@ class RetryJob(Generic[T]):
         return self.func(*self.args, **self.kwargs)
 
 
-@dataclass
-class RetryConfig:
+class RetryConfig(BaseModel):
     """Configuration for retry behavior."""
     max_retries: int = 2
     multiplier_decrease: float = 0.25
     debounce_sec: float = 5.0
-    min_multiplier: float = 0.1  # Don't let multiplier go below 10%
+    min_multiplier: float = 0.1
 
 
 class MultiplierController:

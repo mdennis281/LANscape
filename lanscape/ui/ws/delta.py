@@ -1,9 +1,4 @@
-"""
-Delta tracking for efficient scan result updates.
-
-Uses content hashing to detect changes and only send updated data
-to clients, reducing bandwidth and improving performance.
-"""
+"""Delta tracking for efficient scan result updates via content hashing."""
 
 import json
 import hashlib
@@ -13,13 +8,7 @@ from pydantic import BaseModel
 
 
 class DeltaState(BaseModel):
-    """
-    Represents the state of a tracked item.
-
-    Attributes:
-        hash: Content hash of the serialized data
-        data: The actual data being tracked
-    """
+    """Tracked item with content hash and data."""
     hash: str
     data: Any
 

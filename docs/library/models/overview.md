@@ -164,7 +164,7 @@ Lightweight scan summary for progress display.
 | `metadata` | `ScanMetadata` | *required* | Scan status and progress |
 | `ports_found` | `List[int]` | `[]` | All unique open ports found across all devices |
 | `services_found` | `List[str]` | `[]` | All unique service names identified |
-| `warnings` | `List[dict]` | `[]` | Raw warning dicts from the scan |
+| `warnings` | `List[ScanWarningInfo]` | `[]` | Scan-level warnings (see [ScanWarningInfo](#scanwarninginfo)) |
 
 ---
 

@@ -753,7 +753,8 @@ class TestServiceScanErrorPropagation:
         mock_loop.close = MagicMock()
 
         with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
-                   return_value=mock_loop):
+                   return_value=mock_loop), \
+             patch("lanscape.core.service_scan.scanner.asyncio.set_event_loop"):
             cfg = ServiceScanConfig(timeout=0.5)
             result = scan_service("127.0.0.1", 99999, cfg)
             assert result.service == "Unknown"
@@ -767,7 +768,8 @@ class TestServiceScanErrorPropagation:
         mock_loop.close = MagicMock()
 
         with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
-                   return_value=mock_loop):
+                   return_value=mock_loop), \
+             patch("lanscape.core.service_scan.scanner.asyncio.set_event_loop"):
             cfg = ServiceScanConfig(timeout=0.5)
             result = scan_service("127.0.0.1", 99999, cfg)
             assert result.service == "Unknown"

@@ -134,12 +134,12 @@ class TestGetGithubReleases:  # pylint: disable=missing-function-docstring
     @patch("scripts.cleanup_prereleases.run_command")
     def test_command_failure_returns_empty(self, mock_run: MagicMock) -> None:
         mock_run.side_effect = subprocess.CalledProcessError(1, "gh")
-        assert get_github_releases() == {}
+        assert not get_github_releases()
 
     @patch("scripts.cleanup_prereleases.run_command")
     def test_invalid_json_returns_empty(self, mock_run: MagicMock) -> None:
         mock_run.return_value = _mock_run("not json")
-        assert get_github_releases() == {}
+        assert not get_github_releases()
 
 
 # ---------------------------------------------------------------------------

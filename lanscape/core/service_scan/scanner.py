@@ -84,6 +84,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
             )
 
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         return loop.run_until_complete(_async_scan_service(ip, port, cfg=cfg))
     except Exception as e:
@@ -94,4 +95,5 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
             error=f"Event loop error scanning {ip}:{port}: {e}",
         )
     finally:
+        asyncio.set_event_loop(None)
         loop.close()

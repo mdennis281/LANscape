@@ -430,8 +430,9 @@ class MacSelector:
         lowest = 9999
         lowest_i = -1
         for mac in macs:
-            if self.macs[mac] < lowest:
-                lowest = self.macs[mac]
+            count = self.macs.get(mac, 0)
+            if count < lowest:
+                lowest = count
                 lowest_i = macs.index(mac)
         return macs[lowest_i] if lowest_i != -1 else None
 

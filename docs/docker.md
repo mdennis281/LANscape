@@ -2,7 +2,7 @@
 
 LANscape is available as a Docker image for Linux hosts. Because network scanning requires direct access to the LAN (ARP, ICMP, broadcast traffic), Docker's network isolation works against you here — **`--network host` mode is required**, and that only works on Linux.
 
-> **Windows / macOS users:** Docker Desktop runs containers inside a Linux VM, so `--network host` exposes the VM's network — not your physical LAN. Use `pip install lanscape` or the [Electron app](https://github.com/mdennis281/lanscape-ui) instead.
+> **Windows / macOS users:** Docker Desktop runs containers inside a Linux VM, so `--network host` exposes the VM's network — not your physical LAN. Use `pip install lanscape` instead.
 
 ---
 

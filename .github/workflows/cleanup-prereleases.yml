@@ -1,4 +1,4 @@
-name: Cleanup Old Pre-Releases
+name: Chore - Cleanup Old Pre-Releases
 
 on:
   schedule:

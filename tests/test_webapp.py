@@ -1,14 +1,18 @@
 """
 Tests for the react_proxy module - serving the bundled React UI.
 """
+import json
 import shutil
 import tempfile
+import threading
 import urllib.request
+from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
+from lanscape.ui.react_proxy.discovery import DiscoveredInstance
 from lanscape.ui.react_proxy.server import (
     start_webapp_server,
     SPAHandler,
@@ -133,8 +137,7 @@ class TestSPAHandler:
 
     def test_spa_handler_inherits_simple_handler(self):
         """Test SPAHandler inherits from SimpleHTTPRequestHandler."""
-        from http.server import SimpleHTTPRequestHandler as Base  # pylint: disable=import-outside-toplevel
-        assert issubclass(SPAHandler, Base)
+        assert issubclass(SPAHandler, SimpleHTTPRequestHandler)
 
 
 class TestWebappServerController:
@@ -192,7 +195,6 @@ class TestCacheHeaders:
     @staticmethod
     def _make_server(temp_webapp_dir):
         """Start a test server and return (base_url, server, thread)."""
-        import threading  # pylint: disable=import-outside-toplevel
         server = start_static_server(temp_webapp_dir, 0)
         base_url = f'http://127.0.0.1:{server.server_address[1]}'
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -246,7 +248,6 @@ class TestDiscoverEndpoint:
     @staticmethod
     def _make_server(temp_webapp_dir):
         """Start a test server and return (base_url, server)."""
-        import threading  # pylint: disable=import-outside-toplevel
         server = start_static_server(temp_webapp_dir, 0)
         base_url = f'http://127.0.0.1:{server.server_address[1]}'
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -255,14 +256,13 @@ class TestDiscoverEndpoint:
 
     def test_discover_returns_json(self, temp_webapp_dir):
         """Test that /api/discover returns valid JSON with expected keys."""
-        import json as _json  # pylint: disable=import-outside-toplevel
         SPAHandler.discovery = None
         SPAHandler.mdns_enabled = True
         SPAHandler.default_route = 'http://localhost:5001'
         base_url, server = self._make_server(temp_webapp_dir)
         try:
             with urllib.request.urlopen(f'{base_url}/api/discover') as resp:
-                data = _json.loads(resp.read())
+                data = json.loads(resp.read())
             assert 'mdns_enabled' in data
             assert 'default_route' in data
             assert 'instances' in data
@@ -275,14 +275,13 @@ class TestDiscoverEndpoint:
 
     def test_discover_mdns_disabled(self, temp_webapp_dir):
         """Test that /api/discover reflects mdns_enabled=False."""
-        import json as _json  # pylint: disable=import-outside-toplevel
         SPAHandler.discovery = None
         SPAHandler.mdns_enabled = False
         SPAHandler.default_route = 'http://10.0.0.5:8080'
         base_url, server = self._make_server(temp_webapp_dir)
         try:
             with urllib.request.urlopen(f'{base_url}/api/discover') as resp:
-                data = _json.loads(resp.read())
+                data = json.loads(resp.read())
             assert data['mdns_enabled'] is False
             assert data['default_route'] == 'http://10.0.0.5:8080'
             assert data['instances'] == []
@@ -292,12 +291,6 @@ class TestDiscoverEndpoint:
 
     def test_discover_with_instances(self, temp_webapp_dir):
         """Test that /api/discover includes discovered instances."""
-        import json as _json  # pylint: disable=import-outside-toplevel
-        from unittest.mock import MagicMock  # pylint: disable=import-outside-toplevel
-        from lanscape.ui.react_proxy.discovery import (  # pylint: disable=import-outside-toplevel
-            DiscoveredInstance,
-        )
-
         mock_discovery = MagicMock()
         mock_discovery.get_instances.return_value = [
             DiscoveredInstance(
@@ -314,7 +307,7 @@ class TestDiscoverEndpoint:
         base_url, server = self._make_server(temp_webapp_dir)
         try:
             with urllib.request.urlopen(f'{base_url}/api/discover') as resp:
-                data = _json.loads(resp.read())
+                data = json.loads(resp.read())
             assert len(data['instances']) == 1
             assert data['instances'][0]['host'] == '10.0.0.2'
             assert data['instances'][0]['hostname'] == 'test-host'

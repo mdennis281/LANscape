@@ -7,6 +7,7 @@ can remain platform-agnostic.
 """
 
 import logging
+import os
 import re
 import shutil
 import socket
@@ -325,5 +326,4 @@ def _parse_unix_route_output(output: str) -> Optional[str]:
 
 def clear_screen() -> None:
     """Clear the terminal (debug utility)."""
-    import os  # pylint: disable=import-outside-toplevel
     os.system('cls' if psutil.WINDOWS else 'clear')

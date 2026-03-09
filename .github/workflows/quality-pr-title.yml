@@ -1,5 +1,8 @@
 name: Quality - PR Title
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]

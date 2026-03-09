@@ -1,4 +1,4 @@
-name: Release Trigger - Main Push
+name: Release - Main Push
 
 on:
   push:
@@ -44,7 +44,7 @@ jobs:
   create-release:
     needs: tag
     if: ${{ needs.tag.outputs.version != '' }}
-    uses: ./.github/workflows/create-release.yml
+    uses: ./.github/workflows/release-create-github.yml
     with:
       version: ${{ needs.tag.outputs.version }}
       tag_name: ${{ needs.tag.outputs.tag_name }}
@@ -54,7 +54,7 @@ jobs:
   trigger-ui-build:
     needs: [tag, create-release]
     if: ${{ always() && needs.tag.outputs.version != '' }}
-    uses: ./.github/workflows/trigger-ui-build.yml
+    uses: ./.github/workflows/release-ui-build.yml
     with:
       version: ${{ needs.tag.outputs.version }}
       is_prerelease: "false"
@@ -64,7 +64,7 @@ jobs:
   publish:
     needs: [tag, create-release, trigger-ui-build]
     if: ${{ always() && needs.tag.outputs.version != '' && needs.trigger-ui-build.result == 'success' }}
-    uses: ./.github/workflows/pypi-publish.yml
+    uses: ./.github/workflows/release-pypi-publish.yml
     with:
       branch: ${{ github.ref_name }}
       version: ${{ needs.tag.outputs.version }}
@@ -73,7 +73,7 @@ jobs:
   docker-publish:
     needs: [tag, publish]
     if: ${{ always() && needs.tag.outputs.version != '' && needs.publish.result == 'success' }}
-    uses: ./.github/workflows/docker-publish.yml
+    uses: ./.github/workflows/release-docker-publish.yml
     with:
       version: ${{ needs.tag.outputs.version }}
       is_prerelease: "false"

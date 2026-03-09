@@ -78,7 +78,7 @@ fi
 echo ""
 
 if [ "$UI_BRANCH" = "main" ]; then
-    # Standard path: push git tag, auto-triggers package.yml with ui_branch=main
+    # Standard path: push git tag, auto-triggers release-trigger-tag-push.yml with ui_branch=main
     if [[ "$VERSION" == *a* || "$VERSION" == *b* || "$VERSION" == *rc* ]]; then
         echo "Pre-release version detected: $VERSION"
         TAG="pre-releases/$VERSION"
@@ -101,7 +101,7 @@ else
         exit 1
     fi
 
-    gh workflow run package.yml --field "version=$VERSION" --field "ui_branch=$UI_BRANCH"
+    gh workflow run release-trigger-tag-push.yml --field "version=$VERSION" --field "ui_branch=$UI_BRANCH"
 
     echo ""
     echo "Workflow dispatched successfully!"

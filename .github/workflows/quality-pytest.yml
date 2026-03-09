@@ -1,4 +1,4 @@
-name: Code Quality - Pytest Tests
+name: Quality - Pytest
 
 on:
   pull_request:

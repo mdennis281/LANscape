@@ -1,4 +1,4 @@
-name: Code Quality - Docker build test
+name: Quality - Docker Build
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'docker/**'
-      - '.github/workflows/test-docker.yml'
+      - '.github/workflows/quality-docker.yml'
       - '.dockerignore'
 
 permissions:

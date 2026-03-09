@@ -1,4 +1,4 @@
-name: Code Quality - Packaging test
+name: Quality - Packaging
 
 on:
   pull_request:

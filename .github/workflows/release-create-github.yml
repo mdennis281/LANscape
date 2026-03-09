@@ -1,4 +1,4 @@
-name: Create GitHub Release with AI Summary
+name: Release - Create GitHub
 
 on:
   workflow_call:

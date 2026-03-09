@@ -1,0 +1,77 @@
+name: Quality - PR Title
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # need full history for tag comparison
+
+      - name: Validate PR title format
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR title: '$PR_TITLE'"
+
+          # Must match: X.Y.Z - <description>
+          if ! echo "$PR_TITLE" | grep -qP '^\d+\.\d+\.\d+\s*-\s*.+'; then
+            echo "::error::PR title must follow the format: X.Y.Z - Description"
+            echo ""
+            echo "Examples:"
+            echo "  3.4.1 - Fix ARP table parsing on macOS"
+            echo "  4.0.0 - Major refactor of discovery engine"
+            exit 1
+          fi
+
+          echo "Format OK"
+
+      - name: Check version is higher than latest release
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Extract version from PR title
+          PR_VERSION=$(echo "$PR_TITLE" | grep -oP '^\d+\.\d+\.\d+')
+          echo "PR version: $PR_VERSION"
+
+          # Get the latest release tag (releases/X.Y.Z)
+          LATEST_TAG=$(git tag --list 'releases/*' --sort=-v:refname | head -n 1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous release tags found — skipping comparison."
+            exit 0
+          fi
+
+          LATEST_VERSION=${LATEST_TAG#releases/}
+          echo "Latest release: $LATEST_VERSION"
+
+          # Compare semver components
+          IFS='.' read -r PR_MAJOR PR_MINOR PR_PATCH <<< "$PR_VERSION"
+          IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$LATEST_VERSION"
+
+          HIGHER=false
+          if [ "$PR_MAJOR" -gt "$CUR_MAJOR" ]; then
+            HIGHER=true
+          elif [ "$PR_MAJOR" -eq "$CUR_MAJOR" ]; then
+            if [ "$PR_MINOR" -gt "$CUR_MINOR" ]; then
+              HIGHER=true
+            elif [ "$PR_MINOR" -eq "$CUR_MINOR" ] && [ "$PR_PATCH" -gt "$CUR_PATCH" ]; then
+              HIGHER=true
+            fi
+          fi
+
+          if [ "$HIGHER" = true ]; then
+            echo "Version $PR_VERSION > $LATEST_VERSION — OK"
+          else
+            echo "::error::PR version ($PR_VERSION) must be higher than the latest release ($LATEST_VERSION)."
+            exit 1
+          fi

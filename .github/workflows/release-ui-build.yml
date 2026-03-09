@@ -1,4 +1,4 @@
-name: Build UI & Bundle Artifact
+name: Release - UI Build
 
 on:
   workflow_call:

@@ -1,5 +1,5 @@
 
-name: Code Quality - Pylint
+name: Quality - Pylint
 
 on:
   push:

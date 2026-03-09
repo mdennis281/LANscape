@@ -56,7 +56,7 @@ if ($UIBranch -eq "") {
 Write-Host ""
 
 if ($UIBranch -eq "main") {
-    # Standard path: push git tag, auto-triggers package.yml with ui_branch=main
+    # Standard path: push git tag, auto-triggers release-trigger-tag-push.yml with ui_branch=main
     if ($Version -like "*a*" -or $Version -like "*b*" -or $Version -like "*rc*") {
         Write-Host "Pre-release version detected: $Version"
         $tag = "pre-releases/$Version"
@@ -79,7 +79,7 @@ if ($UIBranch -eq "main") {
         exit 1
     }
 
-    gh workflow run package.yml --field "version=$Version" --field "ui_branch=$UIBranch"
+    gh workflow run release-trigger-tag-push.yml --field "version=$Version" --field "ui_branch=$UIBranch"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: Failed to trigger workflow. Ensure you are authenticated: gh auth login"

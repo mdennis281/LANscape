@@ -1,4 +1,4 @@
-name: Sync Docs to Wiki
+name: Chore - Wiki Sync
 
 on:
   push:

@@ -52,6 +52,6 @@ Set these in your GitHub repository settings:
 
 ### Workflow Files
 
-- `.github/workflows/tag-on-main-push.yml` - Main workflow that tags releases and orchestrates the release process
-- `.github/workflows/create-release.yml` - Reusable workflow that creates GitHub releases with AI-generated descriptions  
-- `.github/workflows/pypi-publish.yml` - Reusable workflow that publishes packages to PyPI
+- `.github/workflows/release-trigger-main-push.yml` - Main workflow that tags releases and orchestrates the release process
+- `.github/workflows/release-create-github.yml` - Reusable workflow that creates GitHub releases with AI-generated descriptions  
+- `.github/workflows/release-pypi-publish.yml` - Reusable workflow that publishes packages to PyPI

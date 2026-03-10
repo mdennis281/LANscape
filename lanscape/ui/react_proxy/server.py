@@ -85,6 +85,20 @@ class SPAHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(html)
 
+    def handle_one_request(self) -> None:
+        """Handle a single HTTP request, suppressing client disconnect errors."""
+        try:
+            super().handle_one_request()
+        except ConnectionResetError:
+            # Client disconnected mid-request (e.g., browser refresh) - harmless
+            pass
+        except OSError as exc:
+            # Windows-specific: 10054=connection reset, 10053=connection aborted
+            if getattr(exc, 'winerror', None) in (10054, 10053):
+                pass
+            else:
+                raise
+
     # -----------------------------------------------------------------
     # API endpoint handlers
     # -----------------------------------------------------------------

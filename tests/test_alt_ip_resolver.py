@@ -8,6 +8,7 @@ Covers:
 - Deduplication and exclusion logic
 - Top-level resolve_alt_ips orchestration
 - Graceful fallback on errors
+- System-compat helpers: neighbor dump commands, NDP ping, interface scopes
 """
 # pylint: disable=protected-access,import-outside-toplevel,unused-argument
 
@@ -19,9 +20,14 @@ from lanscape.core.alt_ip_resolver import (
     resolve_alt_ips,
     _eui64_link_local,
     _alt_ips_from_dns,
-    _extract_ips_for_mac,
     _deduplicate,
-    _neighbor_dump_command,
+    _prime_ndp_cache,
+)
+from lanscape.core.system_compat import (
+    extract_ips_for_mac,
+    get_neighbor_dump_command,
+    get_ipv6_interface_scopes,
+    get_ndp_ping_command,
 )
 
 
@@ -100,7 +106,7 @@ class TestEui64LinkLocal:
 
 
 class TestExtractIpsForMac:
-    """Tests for _extract_ips_for_mac()."""
+    """Tests for extract_ips_for_mac() (system_compat)."""
 
     def test_linux_ip_neigh_v6(self):
         """Parse Linux 'ip -6 neigh show' output for IPv6."""
@@ -109,7 +115,7 @@ class TestExtractIpsForMac:
             "2001:db8::100 dev eth0 lladdr aa:bb:cc:dd:ee:ff STALE\n"
             "fe80::2 dev eth0 lladdr 11:22:33:44:55:66 REACHABLE\n"
         )
-        result = _extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=True)
+        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=True)
         assert 'fe80::1' in result
         assert '2001:db8::100' in result
         assert 'fe80::2' not in result  # different MAC
@@ -121,7 +127,7 @@ class TestExtractIpsForMac:
             "10.0.0.5 dev eth0 lladdr aa:bb:cc:dd:ee:ff STALE\n"
             "192.168.1.2 dev eth0 lladdr 11:22:33:44:55:66 DELAY\n"
         )
-        result = _extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
+        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
         assert '192.168.1.1' in result
         assert '10.0.0.5' in result
         assert '192.168.1.2' not in result
@@ -132,25 +138,25 @@ class TestExtractIpsForMac:
             "  192.168.1.1         aa-bb-cc-dd-ee-ff     dynamic\n"
             "  192.168.1.100       11-22-33-44-55-66     dynamic\n"
         )
-        result = _extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
+        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
         assert '192.168.1.1' in result
         assert '192.168.1.100' not in result
 
     def test_no_matching_mac(self):
         """Output with no matching MAC returns empty."""
         output = "10.0.0.1 dev eth0 lladdr 11:22:33:44:55:66 REACHABLE\n"
-        result = _extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
+        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
         assert not result
 
     def test_loopback_excluded(self):
         """Loopback addresses should be excluded."""
         output = "127.0.0.1 dev lo lladdr aa:bb:cc:dd:ee:ff PERMANENT\n"
-        result = _extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
+        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
         assert not result
 
     def test_empty_output(self):
         """Empty output returns empty list."""
-        assert not _extract_ips_for_mac('', 'aa:bb:cc:dd:ee:ff', want_v6=True)
+        assert not extract_ips_for_mac('', 'aa:bb:cc:dd:ee:ff', want_v6=True)
 
 
 # ===========================================================================
@@ -159,53 +165,186 @@ class TestExtractIpsForMac:
 
 
 class TestNeighborDumpCommand:
-    """Tests for _neighbor_dump_command()."""
+    """Tests for get_neighbor_dump_command() (system_compat)."""
 
-    @patch('lanscape.core.alt_ip_resolver.psutil')
+    @patch('lanscape.core.system_compat.psutil')
     def test_windows_v6(self, mock_psutil):
         """Windows IPv6 dump uses netsh."""
         mock_psutil.WINDOWS = True
         mock_psutil.LINUX = False
         mock_psutil.MACOS = False
-        cmd = _neighbor_dump_command(want_v6=True)
+        cmd = get_neighbor_dump_command(want_v6=True)
         assert 'netsh' in cmd
         assert 'ipv6' in cmd
 
-    @patch('lanscape.core.alt_ip_resolver.psutil')
+    @patch('lanscape.core.system_compat.psutil')
     def test_linux_v6(self, mock_psutil):
         """Linux IPv6 dump uses ip -6 neigh show."""
         mock_psutil.WINDOWS = False
         mock_psutil.LINUX = True
         mock_psutil.MACOS = False
-        cmd = _neighbor_dump_command(want_v6=True)
+        cmd = get_neighbor_dump_command(want_v6=True)
         assert cmd == 'ip -6 neigh show'
 
-    @patch('lanscape.core.alt_ip_resolver.psutil')
+    @patch('lanscape.core.system_compat.psutil')
     def test_linux_v4(self, mock_psutil):
         """Linux IPv4 dump uses ip -4 neigh show."""
         mock_psutil.WINDOWS = False
         mock_psutil.LINUX = True
         mock_psutil.MACOS = False
-        cmd = _neighbor_dump_command(want_v6=False)
+        cmd = get_neighbor_dump_command(want_v6=False)
         assert cmd == 'ip -4 neigh show'
 
-    @patch('lanscape.core.alt_ip_resolver.psutil')
+    @patch('lanscape.core.system_compat.psutil')
     def test_macos_v6(self, mock_psutil):
         """macOS IPv6 dump uses ndp."""
         mock_psutil.WINDOWS = False
         mock_psutil.LINUX = False
         mock_psutil.MACOS = True
-        cmd = _neighbor_dump_command(want_v6=True)
+        cmd = get_neighbor_dump_command(want_v6=True)
         assert 'ndp' in cmd
 
-    @patch('lanscape.core.alt_ip_resolver.psutil')
+    @patch('lanscape.core.system_compat.psutil')
     def test_macos_v4(self, mock_psutil):
         """macOS IPv4 dump uses arp."""
         mock_psutil.WINDOWS = False
         mock_psutil.LINUX = False
         mock_psutil.MACOS = True
-        cmd = _neighbor_dump_command(want_v6=False)
+        cmd = get_neighbor_dump_command(want_v6=False)
         assert 'arp' in cmd
+
+
+# ===========================================================================
+# NDP cache priming
+# ===========================================================================
+
+
+class TestNdpCachePriming:
+    """Tests for _prime_ndp_cache and related helpers."""
+
+    def setup_method(self):
+        """Reset the global priming flag before each test."""
+        import lanscape.core.alt_ip_resolver as mod
+        mod._ndp_primed = False
+
+    @patch('lanscape.core.system_compat.psutil')
+    def test_get_scopes_windows(self, mock_psutil):
+        """Windows scopes are parsed from netsh interface indices."""
+        mock_psutil.WINDOWS = True
+        mock_psutil.LINUX = False
+        mock_psutil.MACOS = False
+
+        netsh_output = (
+            "Idx     Met  MTU  State        Name\n"
+            "---  ------  ---  ----------  -----\n"
+            "  1      75  999  connected   Loopback Pseudo-Interface 1\n"
+            " 10      25  1500  connected   Ethernet\n"
+            "  8      25  1500  disconnected  Wi-Fi\n"
+        )
+        with patch('lanscape.core.system_compat.subprocess.check_output',
+                   return_value=netsh_output.encode()):
+            scopes = get_ipv6_interface_scopes()
+        # Loopback excluded, disconnected excluded
+        assert '10' in scopes
+        assert '1' not in scopes
+        assert '8' not in scopes
+
+    @patch('lanscape.core.system_compat.psutil')
+    def test_get_scopes_linux(self, mock_psutil):
+        """Linux scopes are interface names with IPv6 and up status."""
+        mock_psutil.WINDOWS = False
+        mock_psutil.LINUX = True
+        mock_psutil.MACOS = False
+
+        mock_psutil.net_if_addrs.return_value = {
+            'eth0': [type('A', (), {'family': socket.AF_INET6,
+                                    'address': 'fe80::1'})()],
+            'lo': [type('A', (), {'family': socket.AF_INET6,
+                                  'address': '::1'})()],
+        }
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': type('S', (), {'isup': True})(),
+            'lo': type('S', (), {'isup': True})(),
+        }
+
+        scopes = get_ipv6_interface_scopes()
+        assert 'eth0' in scopes
+        assert 'lo' not in scopes  # ::1 loopback excluded
+
+    @patch('lanscape.core.system_compat.psutil')
+    def test_ndp_ping_command_windows(self, mock_psutil):
+        """Windows NDP ping uses ping -6."""
+        mock_psutil.WINDOWS = True
+        mock_psutil.MACOS = False
+        cmd = get_ndp_ping_command('ff02::1%10')
+        assert 'ping -6' in cmd
+        assert 'ff02::1%10' in cmd
+
+    @patch('lanscape.core.system_compat.psutil')
+    def test_ndp_ping_command_linux(self, mock_psutil):
+        """Linux NDP ping uses ping -6."""
+        mock_psutil.WINDOWS = False
+        mock_psutil.MACOS = False
+        cmd = get_ndp_ping_command('ff02::1%eth0')
+        assert 'ping -6' in cmd
+        assert 'ff02::1%eth0' in cmd
+
+    @patch('lanscape.core.system_compat.psutil')
+    def test_ndp_ping_command_macos(self, mock_psutil):
+        """macOS NDP ping uses ping6."""
+        mock_psutil.WINDOWS = False
+        mock_psutil.MACOS = True
+        cmd = get_ndp_ping_command('ff02::1%en0')
+        assert 'ping6' in cmd
+
+    @patch('lanscape.core.alt_ip_resolver.subprocess.run')
+    @patch('lanscape.core.alt_ip_resolver.get_ipv6_interface_scopes',
+           return_value=['10', '20'])
+    @patch('lanscape.core.alt_ip_resolver.time.sleep')
+    def test_prime_ndp_cache_pings_all_scopes(self, mock_sleep, mock_scopes, mock_run):
+        """Priming should ping ff02::1 on every discovered scope."""
+        _prime_ndp_cache()
+        assert mock_run.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch('lanscape.core.alt_ip_resolver.subprocess.run')
+    @patch('lanscape.core.alt_ip_resolver.get_ipv6_interface_scopes',
+           return_value=['10'])
+    @patch('lanscape.core.alt_ip_resolver.time.sleep')
+    def test_prime_ndp_cache_runs_once(self, mock_sleep, mock_scopes, mock_run):
+        """Priming should only run once (idempotent)."""
+        _prime_ndp_cache()
+        _prime_ndp_cache()
+        _prime_ndp_cache()
+        assert mock_run.call_count == 1
+
+    @patch('lanscape.core.alt_ip_resolver.get_ipv6_interface_scopes',
+           return_value=[])
+    def test_prime_no_interfaces(self, mock_scopes):
+        """No interfaces should not raise an error."""
+        _prime_ndp_cache()  # Should complete without error
+
+    @patch('lanscape.core.alt_ip_resolver._prime_ndp_cache')
+    @patch('lanscape.core.alt_ip_resolver.subprocess.check_output',
+           return_value=b'fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE\n')
+    @patch('lanscape.core.alt_ip_resolver.get_neighbor_dump_command',
+           return_value='ip -6 neigh show')
+    def test_neighbor_cache_primes_for_v6(self, mock_cmd, mock_check, mock_prime):
+        """Looking for IPv6 entries should trigger NDP priming."""
+        from lanscape.core.alt_ip_resolver import _alt_ips_from_neighbor_cache
+        _alt_ips_from_neighbor_cache('aa:bb:cc:dd:ee:ff', scanning_v6=False)
+        mock_prime.assert_called_once()
+
+    @patch('lanscape.core.alt_ip_resolver._prime_ndp_cache')
+    @patch('lanscape.core.alt_ip_resolver.subprocess.check_output',
+           return_value=b'192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE\n')
+    @patch('lanscape.core.alt_ip_resolver.get_neighbor_dump_command',
+           return_value='ip -4 neigh show')
+    def test_neighbor_cache_skips_prime_for_v4(self, mock_cmd, mock_check, mock_prime):
+        """Looking for IPv4 entries should NOT trigger NDP priming."""
+        from lanscape.core.alt_ip_resolver import _alt_ips_from_neighbor_cache
+        _alt_ips_from_neighbor_cache('aa:bb:cc:dd:ee:ff', scanning_v6=True)
+        mock_prime.assert_not_called()
 
 
 # ===========================================================================
@@ -416,7 +555,7 @@ class TestDeviceResolveAltIps:
     @patch('lanscape.core.net_tools.device.resolve_alt_ips',
            return_value=['fe80::1', '2001:db8::100'])
     def test_populates_alt_ips(self, mock_resolve):
-        """Device._resolve_alt_ips should populate alt_ips field."""
+        """Device._resolve_alt_ips should populate alt_ips and classify IPs."""
         from lanscape.core.net_tools import Device
         device = Device(
             ip='192.168.1.1',
@@ -426,6 +565,8 @@ class TestDeviceResolveAltIps:
         )
         device._resolve_alt_ips()
         assert device.alt_ips == ['fe80::1', '2001:db8::100']
+        assert device.ipv4_addresses == ['192.168.1.1']
+        assert device.ipv6_addresses == ['fe80::1', '2001:db8::100']
         mock_resolve.assert_called_once_with(
             '192.168.1.1', ['aa:bb:cc:dd:ee:ff'], 'myhost.local'
         )
@@ -438,19 +579,34 @@ class TestDeviceResolveAltIps:
         device = Device(ip='192.168.1.1', alive=True)
         device._resolve_alt_ips()
         assert not device.alt_ips
+        # Primary IP still classified even on error
+        assert device.ipv4_addresses == ['192.168.1.1']
+        assert device.ipv6_addresses == []
 
     @patch('lanscape.core.net_tools.device.resolve_alt_ips', return_value=['fe80::1'])
     def test_to_result_includes_alt_ips(self, mock_resolve):
-        """DeviceResult should include alt_ips from Device."""
+        """DeviceResult should include ipv4/ipv6 addresses from Device."""
         from lanscape.core.net_tools import Device
         device = Device(ip='192.168.1.1', alive=True)
         device._resolve_alt_ips()
         result = device.to_result()
-        assert result.alt_ips == ['fe80::1']
+        assert result.ipv4_addresses == ['192.168.1.1']
+        assert result.ipv6_addresses == ['fe80::1']
 
     def test_to_result_empty_alt_ips_default(self):
-        """DeviceResult should default to empty alt_ips."""
+        """DeviceResult should default to empty ipv4/ipv6 address lists."""
         from lanscape.core.net_tools import Device
         device = Device(ip='192.168.1.1')
         result = device.to_result()
-        assert not result.alt_ips
+        assert not result.ipv4_addresses
+        assert not result.ipv6_addresses
+
+    @patch('lanscape.core.net_tools.device.resolve_alt_ips',
+           return_value=['10.0.0.5', 'fe80::abc'])
+    def test_classifies_mixed_alt_ips(self, mock_resolve):
+        """Mixed IPv4+IPv6 alt_ips should be classified correctly."""
+        from lanscape.core.net_tools import Device
+        device = Device(ip='fe80::1', alive=True, macs=['aa:bb:cc:dd:ee:ff'])
+        device._resolve_alt_ips()
+        assert device.ipv4_addresses == ['10.0.0.5']
+        assert device.ipv6_addresses == ['fe80::1', 'fe80::abc']

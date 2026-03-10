@@ -70,7 +70,7 @@ def get_network_subnet(interface=None) -> str | None:
 
 
 def get_all_network_subnets() -> List[dict]:
-    """Return a list of ``{subnet, address_cnt}`` dicts for every active network interface."""
+    """Return a list of ``{subnet, address_cnt, interface}`` dicts for every active interface."""
     addrs = psutil.net_if_addrs()
     gateways = psutil.net_if_stats()
     subnets = []
@@ -83,7 +83,8 @@ def get_all_network_subnets() -> List[dict]:
                 if subnet:
                     subnets.append({
                         'subnet': subnet,
-                        'address_cnt': get_address_count(subnet)
+                        'address_cnt': get_address_count(subnet),
+                        'interface': interface,
                     })
 
     return subnets

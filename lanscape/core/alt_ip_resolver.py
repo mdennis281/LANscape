@@ -9,14 +9,19 @@ All helpers are fail-safe — errors are logged and empty lists returned.
 
 import ipaddress
 import logging
-import re
 import socket
 import subprocess
+import threading
+import time
 from typing import List
 
-import psutil
-
-from lanscape.core.system_compat import is_ipv6
+from lanscape.core.system_compat import (
+    is_ipv6,
+    extract_ips_for_mac,
+    get_ipv6_interface_scopes,
+    get_ndp_ping_command,
+    get_neighbor_dump_command,
+)
 
 log = logging.getLogger('AltIPResolver')
 
@@ -59,87 +64,74 @@ def resolve_alt_ips(ip: str, macs: List[str], hostname: str | None) -> List[str]
     return _deduplicate(alt, exclude=ip)
 
 
+# ─── NDP cache priming ──────────────────────────────────────────────
+
+_ndp_primed = False
+_ndp_prime_lock = threading.Lock()
+
+
+def _prime_ndp_cache() -> None:
+    """Ping ``ff02::1`` on active interfaces to populate the IPv6 NDP cache.
+
+    The NDP neighbor table is only populated for devices the host has
+    recently communicated with over IPv6.  By sending an ICMPv6 echo to
+    the link-local all-nodes multicast group, every IPv6-capable device on
+    the segment replies, causing the OS to record their link-layer (MAC)
+    addresses in the NDP cache.
+
+    This function is idempotent — it runs once per process and is
+    thread-safe.
+    """
+    global _ndp_primed  # pylint: disable=global-statement
+    with _ndp_prime_lock:
+        if _ndp_primed:
+            return
+        _ndp_primed = True
+
+    scopes = get_ipv6_interface_scopes()
+    if not scopes:
+        log.debug("No active IPv6 interfaces found for NDP priming")
+        return
+
+    for scope in scopes:
+        target = f"ff02::1%{scope}"
+        try:
+            cmd = get_ndp_ping_command(target)
+            subprocess.run(   # pylint: disable=subprocess-run-check
+                cmd, shell=True, timeout=6,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except Exception:  # pylint: disable=broad-except
+            pass  # Best-effort; failures are expected on some interfaces
+
+    # Brief pause so the OS can finish recording NDP entries
+    time.sleep(0.5)
+    log.debug("NDP cache primed on %d interface(s)", len(scopes))
+
+
 # ─── Neighbor-cache correlation ─────────────────────────────────────
 
 def _alt_ips_from_neighbor_cache(mac: str, scanning_v6: bool) -> List[str]:
     """Search the opposite-protocol neighbor table for *mac*.
 
     When scanning IPv4 we query the IPv6 neighbor table, and vice versa.
+    If looking for IPv6 entries, the NDP cache is primed first (once per
+    process) to maximise coverage.
     """
     try:
-        cmd = _neighbor_dump_command(want_v6=not scanning_v6)
+        want_v6 = not scanning_v6
+        if want_v6:
+            _prime_ndp_cache()
+        cmd = get_neighbor_dump_command(want_v6)
         if not cmd:
             return []
         output = subprocess.check_output(
             cmd, shell=True, timeout=5, stderr=subprocess.DEVNULL,
         ).decode(errors='replace')
-        return _extract_ips_for_mac(output, mac, want_v6=not scanning_v6)
+        return extract_ips_for_mac(output, mac, want_v6)
     except Exception as exc:  # pylint: disable=broad-except
         log.debug("Neighbor-cache lookup failed: %s", exc)
         return []
-
-
-# Command lookup: (want_v6, platform) -> shell command
-_NEIGHBOR_CMDS: dict[tuple[bool, str], str] = {
-    (True, 'windows'): 'netsh interface ipv6 show neighbors',
-    (True, 'linux'):   'ip -6 neigh show',
-    (True, 'macos'):   'ndp -an',
-    (False, 'windows'): 'arp -a',
-    (False, 'linux'):   'ip -4 neigh show',
-    (False, 'macos'):   'arp -an',
-}
-
-
-def _neighbor_dump_command(want_v6: bool) -> str | None:
-    """Return a shell command that dumps the full neighbor table for the target protocol."""
-    if psutil.WINDOWS:
-        platform = 'windows'
-    elif psutil.LINUX:
-        platform = 'linux'
-    elif psutil.MACOS:
-        platform = 'macos'
-    else:
-        return None
-    return _NEIGHBOR_CMDS.get((want_v6, platform))
-
-
-_IP4_RE = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3})')
-_IP6_RE = re.compile(r'([0-9a-fA-F:]{3,}(?:::[0-9a-fA-F]{1,4}|:[0-9a-fA-F]{1,4}){1,})')
-
-
-def _extract_ips_for_mac(
-    output: str, mac: str, want_v6: bool
-) -> List[str]:
-    """Parse neighbor-table output and return IPs associated with *mac*."""
-    results: list[str] = []
-    mac_lower = mac.lower().replace('-', ':')
-
-    for line in output.splitlines():
-        line_lower = line.lower().replace('-', ':')
-        if mac_lower not in line_lower:
-            continue
-
-        pattern = _IP6_RE if want_v6 else _IP4_RE
-        match = pattern.search(line)
-        if not match:
-            continue
-
-        candidate = match.group(1)
-        try:
-            addr = ipaddress.ip_address(candidate.split('%')[0])
-        except ValueError:
-            continue
-
-        if want_v6 and addr.version != 6:
-            continue
-        if not want_v6 and addr.version != 4:
-            continue
-        if addr.is_loopback:
-            continue
-
-        results.append(str(addr))
-
-    return results
 
 
 # ─── EUI-64 link-local derivation ──────────────────────────────────

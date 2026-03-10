@@ -56,12 +56,13 @@ Get all network subnets on the system, including both IPv4 and IPv6 interfaces. 
 |-----|------|-------------|
 | `"subnet"` | `str` | Subnet in CIDR notation (IPv4 or IPv6) |
 | `"address_cnt"` | `int` | Number of IPs in the subnet |
+| `"interface"` | `str` | Name of the network interface (e.g., `"eth0"`, `"Wi-Fi"`) |
 
 ```python
 subnets = net_tools.get_all_network_subnets()
 # [
-#   {"subnet": "192.168.1.0/24", "address_cnt": 254},
-#   {"subnet": "fd00::/64", "address_cnt": 18446744073709551614},
+#   {"subnet": "192.168.1.0/24", "address_cnt": 254, "interface": "eth0"},
+#   {"subnet": "fd00::/64", "address_cnt": 18446744073709551614, "interface": "eth0"},
 #   ...
 # ]
 ```
@@ -115,7 +116,7 @@ from lanscape import ScanManager, ScanConfig, net_tools
 # List all subnets on the machine
 subnets = net_tools.get_all_network_subnets()
 for s in subnets:
-    print(f"  {s['subnet']}  ({s['address_cnt']} hosts)")
+    print(f"  {s['subnet']} on {s['interface']}  ({s['address_cnt']} hosts)")
 
 # Auto-pick the best one
 primary = net_tools.smart_select_primary_subnet(subnets)
@@ -151,7 +152,7 @@ On **Linux and macOS**, if reverse DNS fails, LANscape tries mDNS then NetBIOS a
 
 ## Cross-Protocol IP Resolution (Alt IPs)
 
-After hostname and MAC resolution, LANscape discovers **alternate IP addresses** for each device. If a device was scanned via IPv4, the resolver looks for its IPv6 addresses, and vice versa. Results are stored in `DeviceResult.alt_ips`.
+After hostname and MAC resolution, LANscape discovers **alternate IP addresses** for each device. If a device was scanned via IPv4, the resolver looks for its IPv6 addresses, and vice versa. The primary scanned IP and any discovered alt IPs are then classified into `DeviceResult.ipv4_addresses` and `DeviceResult.ipv6_addresses`.
 
 This happens automatically during scanning — no configuration needed.
 
@@ -159,11 +160,14 @@ This happens automatically during scanning — no configuration needed.
 
 | Strategy | Direction | Description |
 |----------|-----------|-------------|
+| **NDP cache priming** | IPv4 → IPv6 | Pings `ff02::1` (all-nodes multicast) on active interfaces to populate the NDP neighbor table before querying it. Runs once per process. |
 | Neighbor-cache correlation | Both | Queries the OS neighbor table (ARP for IPv4, NDP for IPv6) for entries sharing the same MAC |
 | EUI-64 link-local derivation | IPv4 → IPv6 | Derives the `fe80::` link-local address from the device's MAC using modified EUI-64 |
 | DNS `getaddrinfo` | Both | Queries A or AAAA records for the resolved hostname |
 
-All strategies are best-effort and fail silently. If a network has no IPv6 support, `alt_ips` will simply be an empty list.
+All strategies are best-effort and fail silently. If a network has no IPv6 support, `ipv6_addresses` will only contain the primary IP (when scanning an IPv6 subnet) or be empty.
+
+> **Why NDP priming?** The IPv6 NDP neighbor table is only populated for devices the host has recently communicated with over IPv6. Without priming, most devices discovered via an IPv4 scan would have no IPv6 neighbor entries. The multicast ping triggers NDP responses from all IPv6-capable devices on the link, dramatically increasing coverage.
 
 ### Standalone Usage
 
@@ -181,11 +185,13 @@ alt = resolve_alt_ips(
 # ['fe80::a8bb:ccff:fedd:eeff', '2001:db8::100']
 ```
 
-### Example: Accessing Alt IPs from Scan Results
+### Example: Accessing IP Addresses from Scan Results
 
 ```python
 for device in scan.results.to_results().devices:
     print(f"{device.ip} ({device.hostname})")
-    if device.alt_ips:
-        print(f"  Also known as: {', '.join(device.alt_ips)}")
+    if device.ipv4_addresses:
+        print(f"  IPv4: {', '.join(device.ipv4_addresses)}")
+    if device.ipv6_addresses:
+        print(f"  IPv6: {', '.join(device.ipv6_addresses)}")
 ```

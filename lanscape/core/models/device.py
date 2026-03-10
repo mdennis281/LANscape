@@ -77,9 +77,13 @@ class DeviceResult(BaseModel):
         default_factory=list,
         description="Errors encountered during scanning"
     )
-    alt_ips: List[str] = Field(
+    ipv4_addresses: List[str] = Field(
         default_factory=list,
-        description="Alternate IP addresses (cross-protocol: IPv4<->IPv6)"
+        description="All discovered IPv4 addresses for this device"
+    )
+    ipv6_addresses: List[str] = Field(
+        default_factory=list,
+        description="All discovered IPv6 addresses for this device"
     )
 
     @computed_field  # type: ignore[misc]
@@ -107,7 +111,8 @@ class DeviceResult(BaseModel):
                     {"port": 80, "service": "HTTP", "response": "HTTP/1.1 200 OK\\nServer: nginx"}
                 ],
                 "errors": [],
-                "alt_ips": ["fe80::1a2b:3c4d:5e6f:7890"]
+                "ipv4_addresses": ["192.168.1.100"],
+                "ipv6_addresses": ["fe80::1a2b:3c4d:5e6f:7890"]
             }
         }
     }

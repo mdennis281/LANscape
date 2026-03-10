@@ -6,6 +6,7 @@ All OS-branching code should live here so the rest of the codebase
 can remain platform-agnostic.
 """
 
+import ipaddress
 import logging
 import os
 import re
@@ -108,6 +109,132 @@ def _get_ipv6_neighbor_command(ip: str) -> str:
     if psutil.MACOS:
         return f"ndp -an | grep {ip}"
     return f"ip -6 neigh show {ip}"
+
+
+# ─── Neighbor-table dump (full table) ──────────────────────────────
+
+# (want_v6, platform) → shell command for dumping the full neighbor table.
+_NEIGHBOR_DUMP_CMDS: dict[tuple[bool, str], str] = {
+    (True, 'windows'): 'netsh interface ipv6 show neighbors',
+    (True, 'linux'): 'ip -6 neigh show',
+    (True, 'macos'): 'ndp -an',
+    (False, 'windows'): 'arp -a',
+    (False, 'linux'): 'ip -4 neigh show',
+    (False, 'macos'): 'arp -an',
+}
+
+
+def get_neighbor_dump_command(want_v6: bool) -> str | None:
+    """Return a shell command that dumps the full neighbor table for a protocol.
+
+    *want_v6* selects IPv6 (``True``) or IPv4 (``False``) entries.
+    Returns ``None`` on unsupported platforms.
+    """
+    if psutil.WINDOWS:
+        platform = 'windows'
+    elif psutil.LINUX:
+        platform = 'linux'
+    elif psutil.MACOS:
+        platform = 'macos'
+    else:
+        return None
+    return _NEIGHBOR_DUMP_CMDS.get((want_v6, platform))
+
+
+# ─── Neighbor-table output parsing ─────────────────────────────────
+
+_IP4_RE = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3})')
+_IP6_RE = re.compile(r'([0-9a-fA-F:]{3,}(?:::[0-9a-fA-F]{1,4}|:[0-9a-fA-F]{1,4}){1,})')
+
+
+def extract_ips_for_mac(output: str, mac: str, want_v6: bool) -> List[str]:
+    """Parse neighbor-table output and return IPs associated with *mac*.
+
+    Handles output from Linux ``ip neigh``, Windows ``arp``/``netsh``,
+    and macOS ``arp``/``ndp``.  MAC comparisons are case-insensitive and
+    normalise dash separators to colons.
+    """
+    results: list[str] = []
+    mac_lower = mac.lower().replace('-', ':')
+
+    for line in output.splitlines():
+        line_lower = line.lower().replace('-', ':')
+        if mac_lower not in line_lower:
+            continue
+
+        pattern = _IP6_RE if want_v6 else _IP4_RE
+        match = pattern.search(line)
+        if not match:
+            continue
+
+        candidate = match.group(1)
+        try:
+            addr = ipaddress.ip_address(candidate.split('%')[0])
+        except ValueError:
+            continue
+
+        if want_v6 and addr.version != 6:
+            continue
+        if not want_v6 and addr.version != 4:
+            continue
+        if addr.is_loopback:
+            continue
+
+        results.append(str(addr))
+
+    return results
+
+
+# ─── NDP / IPv6 interface helpers ───────────────────────────────────
+
+def get_ipv6_interface_scopes() -> List[str]:
+    """Return scope identifiers for ``ff02::1%<scope>`` multicast pings.
+
+    On Windows the scope is the numeric interface index; on Linux/macOS
+    it is the interface name.  Only active, non-loopback interfaces with
+    IPv6 connectivity are returned.
+    """
+    scopes: list[str] = []
+
+    if psutil.WINDOWS:
+        try:
+            out = subprocess.check_output(
+                'netsh interface ipv6 show interfaces',
+                shell=True, timeout=5, stderr=subprocess.DEVNULL,
+            ).decode(errors='replace')
+            for line in out.splitlines():
+                parts = line.split()
+                # Format: Idx  Met  MTU  State  Name
+                if len(parts) >= 5 and parts[3].lower() == 'connected':
+                    idx = parts[0]
+                    name = ' '.join(parts[4:])
+                    if 'loopback' not in name.lower():
+                        scopes.append(idx)
+        except Exception:  # pylint: disable=broad-except
+            pass
+    else:
+        for name, addrs in psutil.net_if_addrs().items():
+            has_v6 = any(
+                a.family == socket.AF_INET6
+                and a.address
+                and not a.address.startswith('::1')
+                for a in addrs
+            )
+            if has_v6:
+                stats = psutil.net_if_stats().get(name)
+                if stats and stats.isup:
+                    scopes.append(name)
+
+    return scopes
+
+
+def get_ndp_ping_command(target: str) -> str:
+    """Return a shell command to ICMPv6-ping *target* (e.g. ``ff02::1%scope``)."""
+    if psutil.WINDOWS:
+        return f"ping -6 -n 2 -w 1000 {target}"
+    if psutil.MACOS:
+        return f"ping6 -c 2 -W 2 {target}"
+    return f"ping -6 -c 2 -W 2 {target}"
 
 
 # ─── MAC address extraction ────────────────────────────────────────

@@ -161,6 +161,8 @@ class Device(BaseModel):
     caught_errors: List[DeviceError] = []
     job_stats: Optional[Dict] = None
     alt_ips: List[str] = []
+    ipv4_addresses: List[str] = []
+    ipv6_addresses: List[str] = []
 
     _log: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger('Device'))
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -441,6 +443,11 @@ class Device(BaseModel):
             self._log.debug("Alt-IP resolution failed for %s: %s", self.ip, exc)
             self.alt_ips = []
 
+        # Classify primary IP + alt IPs into protocol buckets
+        all_ips = [self.ip] + self.alt_ips
+        self.ipv4_addresses = [ip for ip in all_ips if not is_ipv6(ip)]
+        self.ipv6_addresses = [ip for ip in all_ips if is_ipv6(ip)]
+
     def to_result(self) -> DeviceResult:
         """Convert this Device to a DeviceResult for API/WebSocket responses."""
         error_infos = []
@@ -470,7 +477,8 @@ class Device(BaseModel):
             services=self.services,
             service_info=self.service_info,
             errors=error_infos,
-            alt_ips=self.alt_ips,
+            ipv4_addresses=self.ipv4_addresses,
+            ipv6_addresses=self.ipv6_addresses,
         )
 
 

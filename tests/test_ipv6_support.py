@@ -31,6 +31,11 @@ from lanscape.core.device_alive import (
 )
 from lanscape.core.mac_lookup import MacResolver
 from lanscape.core.net_tools import Device
+from lanscape.core.net_tools.subnet_utils import (
+    _get_ipv6_prefix,
+    _is_scannable_ipv6,
+    network_from_snicaddr,
+)
 from lanscape.core.scan_config import (
     ArpCacheConfig,
     ArpConfig,
@@ -499,3 +504,73 @@ class TestMixedIpSorting:
         )
         # IPv4 (version 4) sorts before IPv6 (version 6)
         assert sorted_addrs == ['10.0.0.1', '192.168.1.1', '::1', '2001:db8::1']
+
+
+# ===========================================================================
+# IPv6 subnet discovery
+# ===========================================================================
+
+
+class TestIpv6SubnetDiscovery:
+    """Tests for IPv6 prefix detection and filtering in subnet_utils."""
+
+    def test_get_ipv6_prefix_with_netmask(self):
+        """When netmask is provided (Linux), use it."""
+        assert _get_ipv6_prefix('2001:db8::1', '64') == 64
+        assert _get_ipv6_prefix('2001:db8::1', '128') == 128
+
+    def test_get_ipv6_prefix_link_local_default(self):
+        """Link-local addresses default to /10."""
+        assert _get_ipv6_prefix('fe80::1', None) == 10
+        assert _get_ipv6_prefix('FE80::abcd', None) == 10
+
+    def test_get_ipv6_prefix_loopback(self):
+        """Loopback ::1 should be /128."""
+        assert _get_ipv6_prefix('::1', None) == 128
+
+    def test_get_ipv6_prefix_global_default(self):
+        """Global addresses default to /64 when netmask is None."""
+        assert _get_ipv6_prefix('2001:db8::1', None) == 64
+        assert _get_ipv6_prefix('2601:2c5:4000:20e9::18c2', None) == 64
+
+    def test_is_scannable_ipv6_global(self):
+        """Global IPv6 addresses are scannable."""
+        assert _is_scannable_ipv6('2001:db8::1') is True
+        assert _is_scannable_ipv6('2601:2c5:4000:20e9::18c2') is True
+
+    def test_is_scannable_ipv6_link_local(self):
+        """Link-local addresses are not scannable."""
+        assert _is_scannable_ipv6('fe80::1') is False
+        assert _is_scannable_ipv6('FE80::abcd') is False
+        assert _is_scannable_ipv6('fe80::1%eth0') is False  # With zone ID
+
+    def test_is_scannable_ipv6_loopback(self):
+        """Loopback is not scannable."""
+        assert _is_scannable_ipv6('::1') is False
+
+    def test_network_from_snicaddr_ipv6_global(self):
+        """Global IPv6 snicaddr should return network/prefix."""
+        mock_snic = MagicMock()
+        mock_snic.family = socket.AF_INET6
+        mock_snic.address = '2001:db8::1'
+        mock_snic.netmask = None  # Windows case
+        result = network_from_snicaddr(mock_snic)
+        assert result == '2001:db8::/64'
+
+    def test_network_from_snicaddr_ipv6_link_local_filtered(self):
+        """Link-local IPv6 snicaddr should return None."""
+        mock_snic = MagicMock()
+        mock_snic.family = socket.AF_INET6
+        mock_snic.address = 'fe80::1'
+        mock_snic.netmask = None
+        result = network_from_snicaddr(mock_snic)
+        assert result is None
+
+    def test_network_from_snicaddr_ipv6_with_zone_id(self):
+        """Zone IDs should be stripped from IPv6 addresses."""
+        mock_snic = MagicMock()
+        mock_snic.family = socket.AF_INET6
+        mock_snic.address = '2001:db8::1%eth0'
+        mock_snic.netmask = '64'
+        result = network_from_snicaddr(mock_snic)
+        assert result == '2001:db8::/64'

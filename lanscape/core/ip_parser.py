@@ -43,7 +43,7 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
         if '/' in entry:
             net = ipaddress.ip_network(entry, strict=False)
             if net.num_addresses > MAX_IPS_ALLOWED:
-                raise SubnetTooLargeError(ip_input)
+                raise SubnetTooLargeError(ip_input, net.num_addresses)
             for ip in net.hosts():
                 ip_ranges.append(ip)
 
@@ -56,7 +56,7 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
             ip_ranges.append(ipaddress.ip_address(entry))
 
         if len(ip_ranges) > MAX_IPS_ALLOWED:
-            raise SubnetTooLargeError(ip_input)
+            raise SubnetTooLargeError(ip_input, len(ip_ranges))
     return ip_ranges
 
 

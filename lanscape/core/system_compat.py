@@ -497,3 +497,45 @@ def _parse_unix_route_output(output: str) -> Optional[str]:
 def clear_screen() -> None:
     """Clear the terminal (debug utility)."""
     os.system('cls' if psutil.WINDOWS else 'clear')
+
+
+def configure_asyncio_exception_handler(loop) -> None:
+    """
+    Configure a custom exception handler for asyncio event loops.
+
+    On Windows, the ProactorEventLoop raises ConnectionResetError during
+    socket cleanup when a connection is forcibly closed by the remote host.
+    This is a known issue (WinError 10054) that occurs in internal callbacks
+    like ``_call_connection_lost()`` and should be suppressed.
+
+    Args:
+        loop: The asyncio event loop to configure
+    """
+    if not psutil.WINDOWS:
+        return  # Only needed on Windows
+
+    original_handler = loop.get_exception_handler()
+
+    def _windows_exception_handler(loop, context):
+        exc = context.get('exception')
+
+        # Suppress ConnectionResetError (WinError 10054) during socket cleanup
+        if isinstance(exc, ConnectionResetError):
+            # This is expected when connections are forcibly closed
+            return
+
+        # Suppress OSError with specific Windows error codes during cleanup
+        if isinstance(exc, OSError) and getattr(exc, 'winerror', None) in (
+            10054,  # Connection reset by remote host
+            10053,  # Connection aborted by local software
+            10038,  # Operation on non-socket
+        ):
+            return
+
+        # For all other exceptions, use the original handler or default
+        if original_handler:
+            original_handler(loop, context)
+        else:
+            loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_windows_exception_handler)

@@ -66,7 +66,7 @@ def resolve_alt_ips(ip: str, macs: List[str], hostname: str | None) -> List[str]
 
 # ─── NDP cache priming ──────────────────────────────────────────────
 
-_ndp_primed = False
+_ndp_primed = False  # pylint: disable=invalid-name  # mutable flag, not a constant
 _ndp_prime_lock = threading.Lock()
 
 

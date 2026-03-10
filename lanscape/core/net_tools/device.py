@@ -389,7 +389,24 @@ class Device(BaseModel):
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             sock.settimeout(2.0)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 255)
-            sock.sendto(request, ('ff02::fb', 5353))
+
+            # Determine scope_id for link-local multicast (ff02::fb) based on
+            # the interface used to reach the target IPv6 address.
+            scope_id = 0
+            try:
+                info = socket.getaddrinfo(
+                    str(addr), 0, socket.AF_INET6, socket.SOCK_DGRAM
+                )
+                if info and len(info[0]) >= 5 and len(info[0][4]) >= 4:
+                    scope_id = info[0][4][3]
+            except OSError:
+                scope_id = 0
+
+            if scope_id:
+                sock.sendto(request, ('ff02::fb', 5353, 0, scope_id))
+            else:
+                sock.sendto(request, ('ff02::fb', 5353))
+
             data, _ = sock.recvfrom(1500)
             return _parse_mdns_ptr_response(data)
         except (socket.timeout, OSError):

@@ -40,7 +40,7 @@ def _get_ipv6_prefix(addr: str, netmask: str | None) -> int:
 
     On Linux/macOS, psutil provides the prefix in netmask.
     On Windows, netmask is None - we use common defaults:
-    - /10 for link-local (fe80::)
+    - /10 for link-local (fe80::/10 range)
     - /64 for global addresses (most common)
     """
     if netmask is not None:
@@ -50,21 +50,27 @@ def _get_ipv6_prefix(addr: str, netmask: str | None) -> int:
             pass
 
     # Windows fallback: determine prefix from address type
-    addr_lower = addr.lower()
-    if addr_lower.startswith('fe80:'):
-        return 10  # Link-local /10 range
-    if addr_lower == '::1':
-        return 128  # Loopback is a single host
+    try:
+        addr_obj = ipaddress.IPv6Address(addr.split('%')[0])
+        if addr_obj.is_link_local:
+            return 10  # Link-local /10 range
+        if addr_obj.is_loopback:
+            return 128  # Loopback is a single host
+    except ValueError:
+        pass
     return 64  # Assume /64 for global (most common prefix)
 
 
 def _is_scannable_ipv6(addr: str) -> bool:
     """Return True if the IPv6 address is in a scannable range (not link-local/loopback)."""
-    addr_lower = addr.lower().split('%')[0]  # Strip zone ID
-    if addr_lower.startswith('fe80:'):
-        return False  # Link-local - not scannable across network
-    if addr_lower == '::1':
-        return False  # Loopback
+    try:
+        addr_obj = ipaddress.IPv6Address(addr.split('%')[0])
+        if addr_obj.is_link_local:
+            return False  # Link-local - not scannable across network
+        if addr_obj.is_loopback:
+            return False  # Loopback
+    except ValueError:
+        return False
     return True
 
 
@@ -138,9 +144,12 @@ def get_all_network_subnets() -> List[dict]:
                     if key in seen:
                         continue
                     seen.add(key)
+                    # Cap address_cnt to avoid JS integer overflow for large IPv6 subnets
+                    raw_count = get_address_count(subnet)
+                    capped_count = min(raw_count, MAX_IPS_ALLOWED)
                     subnets.append({
                         'subnet': subnet,
-                        'address_cnt': get_address_count(subnet),
+                        'address_cnt': capped_count,
                         'interface': interface,
                     })
 

@@ -101,13 +101,22 @@ def get_arp_lookup_command(ip: str) -> str:
 
 
 def _get_ipv6_neighbor_command(ip: str) -> str:
-    """Get the platform-appropriate IPv6 neighbor cache command for a single IP."""
+    """Get the platform-appropriate IPv6 neighbor cache command for a single IP.
+
+    Note: For Windows and macOS, we return the full neighbor table and rely on
+    Python-side parsing to perform an exact IP match, avoiding fragile shell-level
+    substring filters (e.g., `findstr {ip}` / `grep {ip}`) that can incorrectly
+    match partial IPv6 addresses.
+    """
     if psutil.WINDOWS:
-        return f"netsh interface ipv6 show neighbors | findstr {ip}"
+        # Full table; caller must perform exact IP matching when parsing.
+        return "netsh interface ipv6 show neighbors"
     if psutil.LINUX:
+        # `ip -6 neigh show {ip}` already performs an exact lookup for the IP.
         return f"ip -6 neigh show {ip}"
     if psutil.MACOS:
-        return f"ndp -an | grep {ip}"
+        # Full table; caller must perform exact IP matching when parsing.
+        return "ndp -an"
     return f"ip -6 neigh show {ip}"
 
 

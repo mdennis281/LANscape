@@ -7,7 +7,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 from lanscape.core.port_manager import PortManager
-from lanscape.core.ip_parser import parse_ip_input
+from lanscape.core.ip_parser import parse_ip_input, IPAddress
 
 
 class ConfigBase(BaseModel):
@@ -171,7 +171,7 @@ class ScanConfig(ConfigBase):
         """
         return PortManager().get_port_list(self.port_list).keys()
 
-    def parse_subnet(self) -> list:
+    def parse_subnet(self) -> List['IPAddress']:
         """
         Parse the configured subnet string into IP address objects.
 

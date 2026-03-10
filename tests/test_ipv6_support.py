@@ -162,7 +162,7 @@ class TestGetArpLookupCommandIpv6:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_ipv6_windows_uses_netsh(self, mock_psutil):
-        """Windows IPv6 should use netsh to query neighbor table."""
+        """Windows IPv6 should use netsh to query full neighbor table."""
         mock_psutil.WINDOWS = True
         mock_psutil.LINUX = False
         mock_psutil.MACOS = False
@@ -170,7 +170,8 @@ class TestGetArpLookupCommandIpv6:
         cmd = get_arp_lookup_command('fe80::1')
         assert 'netsh' in cmd
         assert 'ipv6' in cmd
-        assert 'fe80::1' in cmd
+        # Note: Windows returns full table for Python-side exact IP matching
+        assert cmd == 'netsh interface ipv6 show neighbors'
 
     @patch('lanscape.core.system_compat.psutil')
     def test_ipv6_linux_uses_ip_dash_6(self, mock_psutil):
@@ -184,14 +185,15 @@ class TestGetArpLookupCommandIpv6:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_ipv6_macos_uses_ndp(self, mock_psutil):
-        """macOS IPv6 should use 'ndp -an | grep'."""
+        """macOS IPv6 should use 'ndp -an' for full neighbor table."""
         mock_psutil.WINDOWS = False
         mock_psutil.LINUX = False
         mock_psutil.MACOS = True
 
         cmd = get_arp_lookup_command('::1')
         assert 'ndp' in cmd
-        assert '::1' in cmd
+        # Note: macOS returns full table for Python-side exact IP matching
+        assert cmd == 'ndp -an'
 
 
 class TestGetCandidateInterfacesIpv6:

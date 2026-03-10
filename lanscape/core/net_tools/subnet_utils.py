@@ -34,17 +34,59 @@ def get_host_ip_mask(ip_with_cidr: str) -> str:
     return f'{network.network_address}/{cidr}'
 
 
+def _get_ipv6_prefix(addr: str, netmask: str | None) -> int:
+    """
+    Determine the IPv6 prefix length.
+
+    On Linux/macOS, psutil provides the prefix in netmask.
+    On Windows, netmask is None - we use common defaults:
+    - /10 for link-local (fe80::)
+    - /64 for global addresses (most common)
+    """
+    if netmask is not None:
+        try:
+            return int(netmask)
+        except ValueError:
+            pass
+
+    # Windows fallback: determine prefix from address type
+    addr_lower = addr.lower()
+    if addr_lower.startswith('fe80:'):
+        return 10  # Link-local /10 range
+    if addr_lower == '::1':
+        return 128  # Loopback is a single host
+    return 64  # Assume /64 for global (most common prefix)
+
+
+def _is_scannable_ipv6(addr: str) -> bool:
+    """Return True if the IPv6 address is in a scannable range (not link-local/loopback)."""
+    addr_lower = addr.lower().split('%')[0]  # Strip zone ID
+    if addr_lower.startswith('fe80:'):
+        return False  # Link-local - not scannable across network
+    if addr_lower == '::1':
+        return False  # Loopback
+    return True
+
+
 def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
     """Convert a psutil snicaddr to a ``network/prefix`` string."""
-    if not snicaddr.address or not snicaddr.netmask:
+    if not snicaddr.address:
         return None
 
     if snicaddr.family == socket.AF_INET:
+        if not snicaddr.netmask:
+            return None
         addr = f"{snicaddr.address}/{get_cidr_from_netmask(snicaddr.netmask)}"
         return get_host_ip_mask(addr)
 
     if snicaddr.family == socket.AF_INET6:
-        addr = f"{snicaddr.address}/{snicaddr.netmask}"
+        # Filter out non-scannable IPv6 addresses
+        if not _is_scannable_ipv6(snicaddr.address):
+            return None
+        prefix = _get_ipv6_prefix(snicaddr.address, snicaddr.netmask)
+        # Strip zone ID (e.g., %eth0) if present
+        addr_clean = snicaddr.address.split('%')[0]
+        addr = f"{addr_clean}/{prefix}"
         return get_host_ip_mask(addr)
 
     return f"{snicaddr.address}"
@@ -70,10 +112,14 @@ def get_network_subnet(interface=None) -> str | None:
 
 
 def get_all_network_subnets() -> List[dict]:
-    """Return a list of ``{subnet, address_cnt, interface}`` dicts for every active interface."""
+    """Return a list of ``{subnet, address_cnt, interface}`` dicts for every active interface.
+
+    Deduplicates subnets per interface (multiple IPs on same subnet return one entry).
+    """
     addrs = psutil.net_if_addrs()
     gateways = psutil.net_if_stats()
     subnets = []
+    seen = set()  # Track (subnet, interface) pairs to dedupe
 
     for interface, snicaddrs in addrs.items():
         for snicaddr in snicaddrs:
@@ -81,6 +127,10 @@ def get_all_network_subnets() -> List[dict]:
                     and gateways[interface].isup:
                 subnet = network_from_snicaddr(snicaddr)
                 if subnet:
+                    key = (subnet, interface)
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     subnets.append({
                         'subnet': subnet,
                         'address_cnt': get_address_count(subnet),

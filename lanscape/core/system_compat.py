@@ -294,7 +294,14 @@ def get_ping_command(count: int, timeout_ms: int, ip: str) -> List[str]:
     # Linux, macOS, and other Unix-like systems (-W takes seconds)
     timeout_sec = str(max(1, timeout_ms // 1000))
     if v6:
-        return ['ping6', '-c', str(count), '-W', timeout_sec, ip]
+        # Linux: prefer `ping -6` (works in minimal containers where ping6 may be missing)
+        # macOS/others: use ping6 if available, else fall back to `ping -6`
+        if psutil.LINUX:
+            return ['ping', '-6', '-c', str(count), '-W', timeout_sec, ip]
+        ping6_path = shutil.which('ping6')
+        if ping6_path:
+            return [ping6_path, '-c', str(count), '-W', timeout_sec, ip]
+        return ['ping', '-6', '-c', str(count), '-W', timeout_sec, ip]
     return ['ping', '-c', str(count), '-W', timeout_sec, ip]
 
 
@@ -433,7 +440,8 @@ def get_candidate_interfaces() -> List[str]:
         # Skip loopback
         if any(a.address.startswith('127.') for a in ip_addrs if a.family == socket.AF_INET):
             continue
-        if all(a.address == '::1' for a in ip_addrs if a.family == socket.AF_INET6):
+        v6_addrs = [a for a in ip_addrs if a.family == socket.AF_INET6]
+        if v6_addrs and all(a.address == '::1' for a in v6_addrs):
             continue
 
         if any(name in interface.lower() for name in VIRTUAL_IFACE_NAMES):

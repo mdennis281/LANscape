@@ -134,14 +134,15 @@ class TestGetPingCommandIpv6:
         assert '192.168.1.1' in cmd
 
     @patch('lanscape.core.system_compat.psutil')
-    def test_linux_ipv6_uses_ping6(self, mock_psutil):
-        """Linux IPv6 ping should use 'ping6'."""
+    def test_linux_ipv6_uses_ping_dash_6(self, mock_psutil):
+        """Linux IPv6 ping should use 'ping -6' (works in minimal containers)."""
         mock_psutil.WINDOWS = False
         mock_psutil.LINUX = True
         mock_psutil.MACOS = False
 
         cmd = get_ping_command(2, 3000, 'fe80::1')
-        assert cmd[0] == 'ping6'
+        assert cmd[0] == 'ping'
+        assert '-6' in cmd
         assert 'fe80::1' in cmd
 
     @patch('lanscape.core.system_compat.psutil')

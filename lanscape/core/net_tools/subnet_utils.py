@@ -100,8 +100,15 @@ def get_network_subnet(interface=None) -> str | None:
         addrs = psutil.net_if_addrs()
         if interface in addrs:
             for snicaddr in addrs[interface]:
-                if snicaddr.family in (socket.AF_INET, socket.AF_INET6) \
-                        and snicaddr.address and snicaddr.netmask:
+                # IPv4 requires netmask; IPv6 can infer prefix via _get_ipv6_prefix()
+                if (
+                    snicaddr.family == socket.AF_INET
+                    and snicaddr.address
+                    and snicaddr.netmask
+                ) or (
+                    snicaddr.family == socket.AF_INET6
+                    and snicaddr.address
+                ):
                     subnet = network_from_snicaddr(snicaddr)
                     if subnet:
                         return subnet

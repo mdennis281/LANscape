@@ -139,7 +139,7 @@ class TestArpCacheLookupMacExtraction:
 
 
 class TestMacResolverARP:
-    """Tests for MacResolver._get_mac_by_arp"""
+    """Tests for MacResolver._get_mac_by_neighbor_cache"""
 
     @patch('lanscape.core.mac_lookup.subprocess.check_output')
     @patch('lanscape.core.mac_lookup.get_arp_lookup_command', return_value='arp -a 192.168.1.1')
@@ -148,7 +148,7 @@ class TestMacResolverARP:
         mock_check_output.return_value = b"192.168.1.1  00-11-22-33-44-55  dynamic"
 
         resolver = MacResolver()
-        result = resolver._get_mac_by_arp("192.168.1.1")
+        result = resolver._get_mac_by_neighbor_cache("192.168.1.1")
 
         mock_check_output.assert_called_once()
         call_args = mock_check_output.call_args
@@ -163,7 +163,7 @@ class TestMacResolverARP:
         mock_check_output.return_value = b"192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE"
 
         resolver = MacResolver()
-        result = resolver._get_mac_by_arp("192.168.1.1")
+        result = resolver._get_mac_by_neighbor_cache("192.168.1.1")
 
         mock_check_output.assert_called_once()
         call_args = mock_check_output.call_args
@@ -177,7 +177,7 @@ class TestMacResolverARP:
         mock_check_output.return_value = b"192.168.1.1 ether aa:bb:cc:dd:ee:ff C eth0"
 
         resolver = MacResolver()
-        result = resolver._get_mac_by_arp("192.168.1.1")
+        result = resolver._get_mac_by_neighbor_cache("192.168.1.1")
 
         mock_check_output.assert_called_once()
         call_args = mock_check_output.call_args
@@ -191,7 +191,7 @@ class TestMacResolverARP:
         mock_check_output.return_value = b"? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0"
 
         resolver = MacResolver()
-        result = resolver._get_mac_by_arp("192.168.1.1")
+        result = resolver._get_mac_by_neighbor_cache("192.168.1.1")
 
         mock_check_output.assert_called_once()
         call_args = mock_check_output.call_args
@@ -206,7 +206,7 @@ class TestMacResolverARP:
         mock_check_output.side_effect = Exception("Command failed")
 
         resolver = MacResolver()
-        result = resolver._get_mac_by_arp("192.168.1.1")
+        result = resolver._get_mac_by_neighbor_cache("192.168.1.1")
 
         assert result == []
         assert len(resolver.caught_errors) == 1

@@ -35,6 +35,9 @@ from lanscape.core.net_tools import (
 
 from lanscape.core.errors import DeviceError
 
+# Alt-IP resolution (cross-protocol: IPv4 <-> IPv6)
+from lanscape.core.alt_ip_resolver import resolve_alt_ips
+
 # Threadpool retry utilities
 from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager,

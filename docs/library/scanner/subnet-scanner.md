@@ -34,7 +34,7 @@ Initializes the scanner with:
 |----------|------|-------------|
 | `uid` | `str` | Unique scan identifier (UUID4) |
 | `cfg` | `ScanConfig` | The scan configuration |
-| `subnet` | `List[IPv4Address]` | Parsed list of IPs to scan |
+| `subnet` | `List[IPv4Address \| IPv6Address]` | Parsed list of IPs to scan |
 | `ports` | `List[int]` | Port numbers to test |
 | `subnet_str` | `str` | Original subnet string from config |
 | `running` | `bool` | Whether the scan is actively executing |
@@ -46,8 +46,8 @@ Initializes the scanner with:
 
 Execute the full scan pipeline:
 
-1. **Device discovery** — Tests each IP using the configured `lookup_type` strategies (threaded with automatic retry)
-2. **Port scanning** — Tests configured ports on every alive device (if `task_scan_ports` is `True`)
+1. **Device discovery** — Tests each IP using the configured `lookup_type` strategies (threaded with automatic retry). For IPv6 targets, ARP-based steps are automatically skipped.
+2. **Port scanning** — Tests configured ports on every alive device (if `task_scan_ports` is `True`). Uses `AF_INET6` sockets for IPv6.
 3. **Service detection** — Identifies services on open ports (if `task_scan_port_services` is `True`)
 
 **Returns:** [`ScannerResults`](scanner-results.md) with all discovered devices and metadata.

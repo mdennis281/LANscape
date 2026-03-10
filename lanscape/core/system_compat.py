@@ -23,6 +23,18 @@ from lanscape.core.decorators import run_once
 log = logging.getLogger(__name__)
 
 
+# ─── IPv6 helpers ───────────────────────────────────────────────────
+
+def is_ipv6(ip: str) -> bool:
+    """Return True if *ip* is an IPv6 address string."""
+    return ':' in ip
+
+
+def get_socket_family(ip: str) -> int:
+    """Return ``AF_INET6`` for IPv6 addresses, ``AF_INET`` otherwise."""
+    return socket.AF_INET6 if is_ipv6(ip) else socket.AF_INET
+
+
 # ─── Virtual interface filtering ────────────────────────────────────
 # Canonical list of interface name substrings that indicate non-LAN adapters.
 # Covers: loopback, VMware, VirtualBox, Docker, Hyper-V/WSL, ZeroTier,
@@ -73,13 +85,29 @@ def get_arp_cache_command() -> List[str]:
 
 
 def get_arp_lookup_command(ip: str) -> str:
-    """Get a shell-string ARP command for resolving a single IP's MAC address."""
+    """Get a shell-string command for resolving a single IP's MAC/link-layer address.
+
+    For IPv6 targets, uses the appropriate neighbor-discovery command.
+    """
+    if is_ipv6(ip):
+        return _get_ipv6_neighbor_command(ip)
     if psutil.WINDOWS:
         return f"arp -a {ip}"
     if psutil.LINUX:
         _, cmd_str = get_linux_arp_command()
         return f"{cmd_str} {ip}"
     return f"arp {ip}"
+
+
+def _get_ipv6_neighbor_command(ip: str) -> str:
+    """Get the platform-appropriate IPv6 neighbor cache command for a single IP."""
+    if psutil.WINDOWS:
+        return f"netsh interface ipv6 show neighbors | findstr {ip}"
+    if psutil.LINUX:
+        return f"ip -6 neigh show {ip}"
+    if psutil.MACOS:
+        return f"ndp -an | grep {ip}"
+    return f"ip -6 neigh show {ip}"
 
 
 # ─── MAC address extraction ────────────────────────────────────────
@@ -102,7 +130,12 @@ def send_arp_request(ip: str, timeout: float = 1.0) -> tuple:
 
     Returns the ``(answered, unanswered)`` tuple from ``srp``.
     Imports Scapy lazily so non-Scapy code paths never pay the cost.
+
+    ARP is IPv4-only; calling with an IPv6 address returns ``([], [])``.
     """
+    if is_ipv6(ip):
+        return ([], [])
+
     from scapy.sendrecv import srp          # pylint: disable=import-outside-toplevel
     from scapy.layers.l2 import ARP, Ether  # pylint: disable=import-outside-toplevel
 
@@ -125,11 +158,17 @@ def get_ping_command(count: int, timeout_ms: int, ip: str) -> List[str]:
 
     *timeout_ms* is always in milliseconds; conversion to seconds for
     Unix platforms is handled internally.
+    Handles both IPv4 and IPv6 addresses.
     """
+    v6 = is_ipv6(ip)
     if psutil.WINDOWS:
-        return ['ping', '-n', str(count), '-w', str(timeout_ms), ip]
+        flag = '-6' if v6 else '-4'
+        return ['ping', flag, '-n', str(count), '-w', str(timeout_ms), ip]
     # Linux, macOS, and other Unix-like systems (-W takes seconds)
-    return ['ping', '-c', str(count), '-W', str(max(1, timeout_ms // 1000)), ip]
+    timeout_sec = str(max(1, timeout_ms // 1000))
+    if v6:
+        return ['ping6', '-c', str(count), '-W', timeout_sec, ip]
+    return ['ping', '-c', str(count), '-W', timeout_sec, ip]
 
 
 def parse_ping_success(output: str) -> bool:
@@ -252,18 +291,22 @@ def get_primary_interface() -> Optional[str]:
 
 
 def get_candidate_interfaces() -> List[str]:
-    """Return non-virtual, IPv4-capable, up interfaces."""
+    """Return non-virtual, IP-capable (IPv4 or IPv6), up interfaces."""
     candidates = []
     for interface, addrs in psutil.net_if_addrs().items():
         stats = psutil.net_if_stats().get(interface)
         if not stats or not stats.isup:
             continue
 
-        ipv4_addrs = [a for a in addrs if a.family == socket.AF_INET]
-        if not ipv4_addrs:
+        ip_families = {socket.AF_INET, socket.AF_INET6}
+        ip_addrs = [a for a in addrs if a.family in ip_families]
+        if not ip_addrs:
             continue
 
-        if any(a.address.startswith('127.') for a in ipv4_addrs):
+        # Skip loopback
+        if any(a.address.startswith('127.') for a in ip_addrs if a.family == socket.AF_INET):
+            continue
+        if all(a.address == '::1' for a in ip_addrs if a.family == socket.AF_INET6):
             continue
 
         if any(name in interface.lower() for name in VIRTUAL_IFACE_NAMES):

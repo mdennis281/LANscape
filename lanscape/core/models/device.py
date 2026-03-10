@@ -77,6 +77,10 @@ class DeviceResult(BaseModel):
         default_factory=list,
         description="Errors encountered during scanning"
     )
+    alt_ips: List[str] = Field(
+        default_factory=list,
+        description="Alternate IP addresses (cross-protocol: IPv4<->IPv6)"
+    )
 
     @computed_field  # type: ignore[misc]
     @property
@@ -102,7 +106,8 @@ class DeviceResult(BaseModel):
                     {"port": 22, "service": "SSH", "response": "SSH-2.0-OpenSSH_8.9"},
                     {"port": 80, "service": "HTTP", "response": "HTTP/1.1 200 OK\\nServer: nginx"}
                 ],
-                "errors": []
+                "errors": [],
+                "alt_ips": ["fe80::1a2b:3c4d:5e6f:7890"]
             }
         }
     }

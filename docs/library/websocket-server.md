@@ -148,7 +148,7 @@ Start a new network scan (non-blocking).
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `subnet` | `string` | yes | Target subnet (e.g. `"192.168.1.0/24"`) |
+| `subnet` | `string` | yes | Target subnet — IPv4 or IPv6 (e.g. `"192.168.1.0/24"`, `"fd00::/120"`, `"fd00::1-fd00::ff"`) |
 | `port_list` | `string` | no | Port list name (`"small"`, `"medium"`, `"large"`, or custom) |
 | `lookup_type` | `string[]` | no | Discovery methods (e.g. `["ICMP_THEN_ARP"]`) |
 | `t_multiplier` | `int` | no | Thread multiplier |
@@ -449,7 +449,7 @@ Validate a subnet string and get its host count.
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `subnet` | `string` | yes | Subnet to validate (e.g. `"192.168.1.0/24"`) |
+| `subnet` | `string` | yes | Subnet to validate — IPv4 or IPv6 (e.g. `"192.168.1.0/24"`, `"fd00::/120"`) |
 
 **Response data:**
 

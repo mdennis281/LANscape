@@ -11,6 +11,7 @@ from .system_compat import (
     get_arp_lookup_command,
     extract_mac_from_output,
     send_arp_request,
+    is_ipv6,
 )
 
 
@@ -49,17 +50,18 @@ class MacResolver(JobStatsMixin):
         self.caught_errors: List[DeviceError] = []
 
     def get_macs(self, ip: str) -> List[str]:
-        """Try to get the MAC address using Scapy, fallback to ARP if it fails."""
-        if mac := self._get_mac_by_scapy(ip):
-            log.debug(f"Used Scapy to resolve ip {ip} to mac {mac}")
-            return mac
-        arp = self._get_mac_by_arp(ip)
-        log.debug(f"Used ARP to resolve ip {ip} to mac {arp}")
-        return arp
+        """Try to get the MAC address using Scapy, fallback to ARP/NDP if it fails."""
+        if not is_ipv6(ip):
+            if mac := self._get_mac_by_scapy(ip):
+                log.debug(f"Used Scapy to resolve ip {ip} to mac {mac}")
+                return mac
+        neighbor = self._get_mac_by_neighbor_cache(ip)
+        log.debug(f"Used neighbor cache to resolve ip {ip} to mac {neighbor}")
+        return neighbor
 
     @job_tracker
-    def _get_mac_by_arp(self, ip: str) -> List[str]:
-        """Retrieve MAC addresses using the system ARP command."""
+    def _get_mac_by_neighbor_cache(self, ip: str) -> List[str]:
+        """Retrieve MAC addresses using the system ARP/NDP command."""
         try:
             cmd = get_arp_lookup_command(ip)
             output = subprocess.check_output(cmd, shell=True).decode()

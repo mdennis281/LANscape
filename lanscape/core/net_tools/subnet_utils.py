@@ -58,7 +58,8 @@ def get_network_subnet(interface=None) -> str | None:
         addrs = psutil.net_if_addrs()
         if interface in addrs:
             for snicaddr in addrs[interface]:
-                if snicaddr.family == socket.AF_INET and snicaddr.address and snicaddr.netmask:
+                if snicaddr.family in (socket.AF_INET, socket.AF_INET6) \
+                        and snicaddr.address and snicaddr.netmask:
                     subnet = network_from_snicaddr(snicaddr)
                     if subnet:
                         return subnet
@@ -69,14 +70,15 @@ def get_network_subnet(interface=None) -> str | None:
 
 
 def get_all_network_subnets() -> List[dict]:
-    """Return a list of ``{subnet, address_cnt}`` dicts for every active IPv4 interface."""
+    """Return a list of ``{subnet, address_cnt}`` dicts for every active network interface."""
     addrs = psutil.net_if_addrs()
     gateways = psutil.net_if_stats()
     subnets = []
 
     for interface, snicaddrs in addrs.items():
         for snicaddr in snicaddrs:
-            if snicaddr.family == socket.AF_INET and gateways[interface].isup:
+            if snicaddr.family in (socket.AF_INET, socket.AF_INET6) \
+                    and gateways[interface].isup:
                 subnet = network_from_snicaddr(snicaddr)
                 if subnet:
                     subnets.append({
@@ -136,23 +138,19 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
 
 
 def _is_deprioritized_subnet(subnet: str) -> bool:
-    """Check if a subnet should be deprioritized (loopback, WSL, Docker)."""
+    """Check if a subnet should be deprioritized (loopback, WSL, Docker, link-local)."""
     try:
         network = ipaddress.ip_network(subnet, strict=False)
 
-        loopback = ipaddress.ip_network('127.0.0.0/8')
-        if network.overlaps(loopback):
-            return True
+        deprioritized = [
+            ipaddress.ip_network('127.0.0.0/8'),       # IPv4 loopback
+            ipaddress.ip_network('::1/128'),            # IPv6 loopback
+            ipaddress.ip_network('fe80::/10'),          # IPv6 link-local
+            ipaddress.ip_network('172.27.64.0/20'),     # WSL
+            ipaddress.ip_network('172.17.0.0/16'),      # Docker
+        ]
 
-        wsl_network = ipaddress.ip_network('172.27.64.0/20')
-        if network.overlaps(wsl_network):
-            return True
-
-        docker_network = ipaddress.ip_network('172.17.0.0/16')
-        if network.overlaps(docker_network):
-            return True
-
-        return False
+        return any(network.overlaps(net) for net in deprioritized)
     except ValueError:
         return False
 
@@ -164,11 +162,11 @@ def is_internal_block(subnet: str) -> bool:
             return all(is_internal_block(part.strip()) for part in subnet.split(','))
 
         if '/' in subnet:
-            return ipaddress.IPv4Network(subnet, strict=False).is_private
+            return ipaddress.ip_network(subnet, strict=False).is_private
 
         ip_list = parse_ip_input(subnet)
         sample_ips = ([ip_list[0], ip_list[-1]] if len(ip_list) > 1 else ip_list)
-        return all(ipaddress.IPv4Address(ip).is_private for ip in sample_ips)
+        return all(ipaddress.ip_address(str(ip)).is_private for ip in sample_ips)
 
     except (ValueError, ipaddress.AddressValueError):
         return False

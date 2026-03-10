@@ -21,6 +21,8 @@ from lanscape.core.system_compat import (
     parse_ping_success,
     extract_mac_from_output,
     send_arp_request,
+    is_ipv6,
+    get_socket_family,
 )
 
 
@@ -119,6 +121,7 @@ class IcmpLookup():
 class ArpCacheLookup():
     """
     Class to handle ARP cache lookups for device presence.
+    Not applicable to IPv6 targets (ARP is IPv4-only; IPv6 uses NDP).
     """
 
     @classmethod
@@ -133,6 +136,8 @@ class ArpCacheLookup():
         Returns:
             bool: True if the device is found in the ARP cache, False otherwise.
         """
+        if is_ipv6(device.ip):
+            return device.alive is True
 
         try:
             command = cls._get_platform_arp_command() + [device.ip]
@@ -178,7 +183,7 @@ class ArpLookup():
     """
     Class to handle ARP lookups for device presence.
     NOTE: This lookup method requires elevated privileges to access the ARP cache.
-
+    ARP is IPv4-only; IPv6 targets are skipped.
 
     [Arp Lookup Requirements](/docs/arp-issues.md)
     """
@@ -195,6 +200,9 @@ class ArpLookup():
         Returns:
             bool: True if the device is found via ARP, False otherwise.
         """
+        if is_ipv6(device.ip):
+            return device.alive is True
+
         enforcer_timeout = cfg.timeout * 2
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
@@ -239,8 +247,9 @@ class Poker():
         def do_poke():
             # Use a small set of common ports likely to be filtered but still trigger ARP
             common_ports = [80, 443, 22]
+            family = get_socket_family(device.ip)
             for i in range(cfg.attempts):
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock = socket.socket(family, socket.SOCK_STREAM)
                 sock.settimeout(cfg.timeout)
                 port = common_ports[i % len(common_ports)]
                 sock.connect_ex((device.ip, port))

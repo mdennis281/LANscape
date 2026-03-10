@@ -42,7 +42,7 @@ cfg = ArpConfig(attempts=3, timeout=2.5)
 | `attempts` | `int` | `1` | Number of ARP request attempts |
 | `timeout` | `float` | `2.0` | Timeout in seconds for each ARP request |
 
-> **Note:** ARP scanning requires elevated privileges and only works within the local network segment. Use `net_tools.is_arp_supported()` to check availability.
+> **Note:** ARP scanning requires elevated privileges and only works within the local network segment. Use `net_tools.is_arp_supported()` to check availability. ARP is IPv4-only — for IPv6 targets, this discovery method is automatically skipped.
 
 ---
 
@@ -63,6 +63,8 @@ cfg = ArpCacheConfig(attempts=2, wait_before=0.3)
 | `attempts` | `int` | `1` | Number of ARP cache lookup attempts |
 | `wait_before` | `float` | `0.2` | Seconds to wait before checking the cache (allows ARP entries to populate) |
 
+> **Note:** ARP cache lookups are IPv4-only. For IPv6 targets, this step is automatically skipped. IPv6 MAC resolution uses the system’s NDP (Neighbor Discovery Protocol) neighbor cache instead.
+
 ---
 
 ## PokeConfig
@@ -82,7 +84,7 @@ cfg = PokeConfig(attempts=4, timeout=0.25)
 | `attempts` | `int` | `1` | Number of poke attempts |
 | `timeout` | `float` | `2.0` | Timeout in seconds for each poke |
 
-> **How it works:** The poke doesn't expect a TCP response — it's just enough traffic to populate the local ARP cache, which is then checked for the device's MAC.
+> **How it works:** The poke doesn't expect a TCP response — it's just enough traffic to populate the local ARP cache (or NDP neighbor cache for IPv6), which is then checked for the device's MAC. For IPv6 targets, `AF_INET6` sockets are used automatically.
 
 ---
 

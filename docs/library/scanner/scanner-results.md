@@ -55,7 +55,7 @@ Export the complete scan results.
 
 **Returns:** [`ScanResults`](../models/overview.md#scanresults) — contains:
 - `metadata` — full `ScanMetadata`
-- `devices` — list of `DeviceResult` models sorted by IP address
+- `devices` — list of `DeviceResult` models sorted by IP address (IPv4 first, then IPv6, each group sorted by packed address)
 - `config` — the `ScanConfig` serialized as a dict
 
 **Example:**

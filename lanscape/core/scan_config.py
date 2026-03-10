@@ -2,7 +2,6 @@
 
 import os
 from typing import List, Dict
-import ipaddress
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -172,12 +171,12 @@ class ScanConfig(ConfigBase):
         """
         return PortManager().get_port_list(self.port_list).keys()
 
-    def parse_subnet(self) -> List[ipaddress.IPv4Network]:
+    def parse_subnet(self) -> list:
         """
-        Parse the configured subnet string into IPv4Network objects.
+        Parse the configured subnet string into IP address objects.
 
         Returns:
-            List of IPv4Network objects representing the target networks
+            List of IPv4Address / IPv6Address objects representing the target IPs
         """
         return parse_ip_input(self.subnet)
 

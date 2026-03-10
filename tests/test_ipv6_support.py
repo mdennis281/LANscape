@@ -233,16 +233,34 @@ class TestGetCandidateInterfacesIpv6:
 
 
 class TestArpCacheLookupIpv6:
-    """ArpCacheLookup should skip for IPv6 targets."""
+    """ArpCacheLookup uses NDP cache for IPv6 targets."""
 
-    def test_ipv6_target_skipped(self):
-        """IPv6 device should not trigger ARP cache lookup."""
+    def test_ipv6_uses_ndp_cache(self):
+        """IPv6 device should use NDP neighbor cache lookup."""
         device = Device(ip='2001:db8::1')
         cfg = ArpCacheConfig()
 
-        result = ArpCacheLookup.execute(device, cfg)
+        with patch('lanscape.core.device_alive.get_arp_lookup_command',
+                   return_value='ip -6 neigh show 2001:db8::1'):
+            with patch('lanscape.core.device_alive.subprocess.check_output',
+                       return_value=b'2001:db8::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE'):
+                result = ArpCacheLookup.execute(device, cfg)
 
-        # Should return without changing alive status
+        assert result is True
+        assert device.alive is True
+        assert 'aa:bb:cc:dd:ee:ff' in device.macs
+
+    def test_ipv6_no_neighbor_entry(self):
+        """IPv6 device should remain not-alive when no NDP entry found."""
+        device = Device(ip='2001:db8::1')
+        cfg = ArpCacheConfig()
+
+        with patch('lanscape.core.device_alive.get_arp_lookup_command',
+                   return_value='ip -6 neigh show 2001:db8::1'):
+            with patch('lanscape.core.device_alive.subprocess.check_output',
+                       return_value=b''):
+                result = ArpCacheLookup.execute(device, cfg)
+
         assert result is False
         assert device.alive is None
 
@@ -258,6 +276,19 @@ class TestArpCacheLookupIpv6:
                 ArpCacheLookup.execute(device, cfg)
 
         assert device.alive is True
+
+    def test_ipv6_filter_lines_by_ip(self):
+        """Verifies exact IP matching for IPv6 neighbor table output."""
+        output = """
+2001:db8::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
+2001:db8::10 dev eth0 lladdr 11:22:33:44:55:66 STALE
+2001:db8::100 dev eth0 lladdr 00:11:22:33:44:55 DELAY
+"""
+        result = ArpCacheLookup._filter_lines_by_ip(output, '2001:db8::1')
+        # Should only match the exact IP, not ::10 or ::100
+        assert 'aa:bb:cc:dd:ee:ff' in result
+        assert '11:22:33:44:55:66' not in result
+        assert '00:11:22:33:44:55' not in result
 
 
 class TestArpLookupIpv6:

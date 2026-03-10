@@ -16,6 +16,7 @@ from lanscape.core.scan_config import (
 from lanscape.core.decorators import timeout_enforcer, job_tracker
 from lanscape.core.system_compat import (
     get_arp_cache_command,
+    get_arp_lookup_command,
     icmp_requires_privileged,
     get_ping_command,
     parse_ping_success,
@@ -120,27 +121,33 @@ class IcmpLookup():
 
 class ArpCacheLookup():
     """
-    Class to handle ARP cache lookups for device presence.
-    Not applicable to IPv6 targets (ARP is IPv4-only; IPv6 uses NDP).
+    Class to handle ARP/NDP cache lookups for device presence.
+    Uses ARP cache for IPv4 and NDP neighbor cache for IPv6.
     """
 
     @classmethod
     @job_tracker
     def execute(cls, device: Device, cfg: ArpCacheConfig) -> bool:
         """
-        Perform an ARP cache lookup for the specified device.
+        Perform an ARP/NDP cache lookup for the specified device.
 
         Args:
             device (Device): The device to look up.
 
         Returns:
-            bool: True if the device is found in the ARP cache, False otherwise.
+            bool: True if the device is found in the cache, False otherwise.
         """
-        if is_ipv6(device.ip):
-            return device.alive is True
+        ipv6 = is_ipv6(device.ip)
 
         try:
-            command = cls._get_platform_arp_command() + [device.ip]
+            if ipv6:
+                # IPv6: use shell-based NDP neighbor command
+                command = get_arp_lookup_command(device.ip)
+                use_shell = True
+            else:
+                # IPv4: use list-based ARP command
+                command = cls._get_platform_arp_command() + [device.ip]
+                use_shell = False
         except RuntimeError as e:
             device.caught_errors.append(DeviceError(e))
             return False
@@ -148,10 +155,15 @@ class ArpCacheLookup():
         for _ in range(cfg.attempts):
             time.sleep(cfg.wait_before)
             try:
-                output = subprocess.check_output(command).decode()
+                output = subprocess.check_output(command, shell=use_shell).decode()
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 device.caught_errors.append(DeviceError(e))
                 return False
+
+            # For IPv6 on Windows/macOS, filter to exact IP match
+            if ipv6:
+                output = cls._filter_lines_by_ip(output, device.ip)
+
             macs = cls._extract_mac_address(output)
             if macs:
                 device.macs = macs
@@ -177,6 +189,28 @@ class ArpCacheLookup():
     def _extract_mac_address(cls, arp_resp: str) -> List[str]:
         """Extract MAC addresses from ARP output."""
         return extract_mac_from_output(arp_resp)
+
+    @staticmethod
+    def _filter_lines_by_ip(output: str, target_ip: str) -> str:
+        """Filter neighbor table output to lines containing exact IP match."""
+        import ipaddress
+        try:
+            target_addr = ipaddress.ip_address(target_ip.split('%')[0])
+        except ValueError:
+            return output
+
+        matching_lines = []
+        for line in output.splitlines():
+            for word in line.split():
+                word_clean = word.split('%')[0].rstrip(',')
+                try:
+                    addr = ipaddress.ip_address(word_clean)
+                    if addr == target_addr:
+                        matching_lines.append(line)
+                        break
+                except ValueError:
+                    continue
+        return '\n'.join(matching_lines)
 
 
 class ArpLookup():

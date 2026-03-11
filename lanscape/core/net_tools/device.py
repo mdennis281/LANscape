@@ -23,6 +23,8 @@ from lanscape.core.system_compat import (
     resolve_hostname_avahi,
     resolve_hostname_dnssd,
     resolve_hostname_llmnr,
+    resolve_hostname_getent,
+    resolve_hostname_host_cmd,
 )
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
 
@@ -307,10 +309,12 @@ class Device(BaseModel):
 
         Resolution order:
         1. socket.gethostbyaddr() - standard reverse DNS
-        2. avahi-resolve (Linux) or dns-sd (macOS) - system mDNS daemons
-        3. Raw mDNS PTR query - pure Python multicast
-        4. LLMNR query - for Windows devices on the network
-        5. NetBIOS NBSTAT - IPv4 only, for older Windows devices
+        2. getent hosts (Linux) - uses NSS chain (DNS, mDNS, WINS, etc.)
+        3. avahi-resolve (Linux) or dns-sd (macOS) - system mDNS daemons
+        4. host command - reverse DNS via bind-utils
+        5. Raw mDNS PTR query - pure Python multicast
+        6. LLMNR query - for Windows devices on the network
+        7. NetBIOS NBSTAT - IPv4 only, for older Windows devices
         """
         # 1. Standard reverse DNS
         try:
@@ -323,7 +327,12 @@ class Device(BaseModel):
         if os_handles_hostname_resolution():
             return None
 
-        # 2. System mDNS daemon (avahi on Linux, dns-sd on macOS)
+        # 2. getent hosts (Linux NSS - chains mDNS, DNS, WINS, etc.)
+        hostname = resolve_hostname_getent(self.ip)
+        if hostname:
+            return hostname
+
+        # 3. System mDNS daemon (avahi on Linux, dns-sd on macOS)
         hostname = resolve_hostname_avahi(self.ip)
         if hostname:
             return hostname
@@ -332,17 +341,22 @@ class Device(BaseModel):
         if hostname:
             return hostname
 
-        # 3. Raw mDNS PTR query
+        # 4. host command (reverse DNS)
+        hostname = resolve_hostname_host_cmd(self.ip)
+        if hostname:
+            return hostname
+
+        # 5. Raw mDNS PTR query
         hostname = self._resolve_mdns()
         if hostname:
             return hostname
 
-        # 4. LLMNR (useful for Windows devices)
+        # 6. LLMNR (useful for Windows devices)
         hostname = resolve_hostname_llmnr(self.ip)
         if hostname:
             return hostname
 
-        # 5. NetBIOS (IPv4 only)
+        # 7. NetBIOS (IPv4 only)
         hostname = self._resolve_netbios()
         if hostname:
             return hostname

@@ -137,6 +137,39 @@ class TestArpCacheLookupMacExtraction:
         result = ArpCacheLookup._extract_mac_address("no mac here")
         assert result == []
 
+    def test_filters_out_null_mac(self):
+        """Null MAC (00:00:00:00:00:00) should be filtered out."""
+        output = "192.168.1.1 dev eth0 lladdr 00:00:00:00:00:00 INCOMPLETE"
+        result = ArpCacheLookup._extract_mac_address(output)
+        assert result == []
+
+    def test_filters_out_broadcast_mac(self):
+        """Broadcast MAC (ff:ff:ff:ff:ff:ff) should be filtered out."""
+        output = "224.0.0.1 dev eth0 lladdr ff:ff:ff:ff:ff:ff PERMANENT"
+        result = ArpCacheLookup._extract_mac_address(output)
+        assert result == []
+
+    def test_filters_invalid_but_keeps_valid(self):
+        """Should filter invalid MACs while keeping valid ones."""
+        output = """
+192.168.1.1 dev eth0 lladdr 00:00:00:00:00:00 INCOMPLETE
+192.168.1.2 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
+192.168.1.3 dev eth0 lladdr ff:ff:ff:ff:ff:ff PERMANENT
+192.168.1.4 dev eth0 lladdr 11:22:33:44:55:66 STALE
+        """
+        result = ArpCacheLookup._extract_mac_address(output)
+        assert len(result) == 2
+        assert 'aa:bb:cc:dd:ee:ff' in result
+        assert '11:22:33:44:55:66' in result
+        assert '00:00:00:00:00:00' not in result
+        assert 'ff:ff:ff:ff:ff:ff' not in result
+
+    def test_windows_dash_format_null_mac_filtered(self):
+        """Windows dash format null MAC should also be filtered."""
+        output = "192.168.1.1  00-00-00-00-00-00  invalid"
+        result = ArpCacheLookup._extract_mac_address(output)
+        assert result == []
+
 
 class TestMacResolverARP:
     """Tests for MacResolver._get_mac_by_neighbor_cache"""

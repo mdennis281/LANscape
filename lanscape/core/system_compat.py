@@ -281,13 +281,21 @@ def get_ndp_ping_command(target: str) -> List[str]:
 
 _MAC_RE = re.compile(r'..:..:..:..:..:..')
 
+# Invalid MAC addresses that should be filtered out
+_INVALID_MACS = frozenset({
+    '00:00:00:00:00:00',  # Null/incomplete entry
+    'ff:ff:ff:ff:ff:ff',  # Broadcast address
+})
+
 
 def extract_mac_from_output(output: str) -> List[str]:
     """Extract MAC addresses from command output (normalises ``-`` to ``:``).
 
-    Returns all matches found in *output*.
+    Returns all valid matches found in *output*. Filters out null/broadcast MACs
+    that indicate incomplete or invalid neighbor table entries.
     """
-    return _MAC_RE.findall(output.replace('-', ':'))
+    macs = _MAC_RE.findall(output.replace('-', ':'))
+    return [mac.lower() for mac in macs if mac.lower() not in _INVALID_MACS]
 
 
 # ─── ARP packet helpers (Scapy) ────────────────────────────────────
@@ -452,6 +460,86 @@ def resolve_hostname_dnssd(ip: str, timeout: float = 3.0) -> Optional[str]:
                     if hostname.endswith('.local'):
                         hostname = hostname[:-6]
                     return hostname
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        pass
+    return None
+
+
+def resolve_hostname_getent(ip: str, timeout: float = 2.0) -> Optional[str]:
+    """Resolve hostname via getent hosts (Linux NSS resolution).
+
+    Uses the system's Name Service Switch (NSS) which chains multiple
+    resolution methods including DNS, mDNS (via nss-mdns), WINS, etc.
+    Often more reliable than direct mDNS calls on properly configured systems.
+
+    Returns the hostname or None on failure.
+    """
+    if not psutil.LINUX:
+        return None
+
+    getent_path = shutil.which('getent')
+    if not getent_path:
+        return None
+
+    try:
+        clean_ip = ip.split('%')[0]
+        result = subprocess.run(
+            [getent_path, 'hosts', clean_ip],
+            capture_output=True, text=True, timeout=timeout, check=False
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Output format: "192.168.1.1 hostname hostname.local"
+            parts = result.stdout.strip().split()
+            if len(parts) >= 2:
+                # Take the first hostname (shortest, usually without domain)
+                hostname = parts[1]
+                # Remove common suffixes
+                for suffix in ('.local', '.lan', '.home'):
+                    if hostname.endswith(suffix):
+                        hostname = hostname[:-len(suffix)]
+                        break
+                return hostname
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        pass
+    return None
+
+
+def resolve_hostname_host_cmd(ip: str, timeout: float = 2.0) -> Optional[str]:
+    """Resolve hostname via the 'host' command (reverse DNS lookup).
+
+    Uses the standard DNS 'host' utility available on most Unix systems.
+    Works for both IPv4 and IPv6 addresses.
+
+    Returns the hostname or None on failure.
+    """
+    if psutil.WINDOWS:
+        return None
+
+    host_path = shutil.which('host')
+    if not host_path:
+        return None
+
+    try:
+        clean_ip = ip.split('%')[0]
+        result = subprocess.run(
+            [host_path, clean_ip],
+            capture_output=True, text=True, timeout=timeout, check=False
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Output format: "1.1.168.192.in-addr.arpa domain name pointer hostname.local."
+            # or for IPv6: "...ip6.arpa domain name pointer hostname.local."
+            for line in result.stdout.splitlines():
+                if 'domain name pointer' in line.lower():
+                    # Extract the hostname from the end of the line
+                    parts = line.strip().rstrip('.').split()
+                    if parts:
+                        hostname = parts[-1]
+                        # Remove common suffixes
+                        for suffix in ('.local', '.lan', '.home'):
+                            if hostname.endswith(suffix):
+                                hostname = hostname[:-len(suffix)]
+                                break
+                        return hostname
     except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
         pass
     return None

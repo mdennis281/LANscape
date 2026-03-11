@@ -36,6 +36,32 @@ def get_socket_family(ip: str) -> int:
     return socket.AF_INET6 if is_ipv6(ip) else socket.AF_INET
 
 
+def filter_neighbor_table_output(output: str, target_ip: str) -> str:
+    """Filter neighbor table output to lines containing exact IP match.
+
+    Used for IPv6 neighbor table parsing on Windows/macOS where the command
+    returns full table and shell-level filtering may incorrectly match
+    partial addresses.
+    """
+    try:
+        target_addr = ipaddress.ip_address(target_ip.split('%')[0])
+    except ValueError:
+        return output
+
+    matching_lines = []
+    for line in output.splitlines():
+        for word in line.split():
+            word_clean = word.split('%')[0].rstrip(',')
+            try:
+                addr = ipaddress.ip_address(word_clean)
+                if addr == target_addr:
+                    matching_lines.append(line)
+                    break
+            except ValueError:
+                continue
+    return '\n'.join(matching_lines)
+
+
 # ─── Virtual interface filtering ────────────────────────────────────
 # Canonical list of interface name substrings that indicate non-LAN adapters.
 # Covers: loopback, VMware, VirtualBox, Docker, Hyper-V/WSL, ZeroTier,

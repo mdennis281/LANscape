@@ -24,6 +24,7 @@ from lanscape.core.system_compat import (
     send_arp_request,
     is_ipv6,
     get_socket_family,
+    filter_neighbor_table_output,
 )
 
 
@@ -162,7 +163,7 @@ class ArpCacheLookup():
 
             # For IPv6 on Windows/macOS, filter to exact IP match
             if ipv6:
-                output = cls._filter_lines_by_ip(output, device.ip)
+                output = filter_neighbor_table_output(output, device.ip)
 
             macs = cls._extract_mac_address(output)
             if macs:
@@ -189,28 +190,6 @@ class ArpCacheLookup():
     def _extract_mac_address(cls, arp_resp: str) -> List[str]:
         """Extract MAC addresses from ARP output."""
         return extract_mac_from_output(arp_resp)
-
-    @staticmethod
-    def _filter_lines_by_ip(output: str, target_ip: str) -> str:
-        """Filter neighbor table output to lines containing exact IP match."""
-        import ipaddress
-        try:
-            target_addr = ipaddress.ip_address(target_ip.split('%')[0])
-        except ValueError:
-            return output
-
-        matching_lines = []
-        for line in output.splitlines():
-            for word in line.split():
-                word_clean = word.split('%')[0].rstrip(',')
-                try:
-                    addr = ipaddress.ip_address(word_clean)
-                    if addr == target_addr:
-                        matching_lines.append(line)
-                        break
-                except ValueError:
-                    continue
-        return '\n'.join(matching_lines)
 
 
 class ArpLookup():

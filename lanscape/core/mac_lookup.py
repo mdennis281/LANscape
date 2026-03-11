@@ -12,6 +12,7 @@ from .system_compat import (
     extract_mac_from_output,
     send_arp_request,
     is_ipv6,
+    filter_neighbor_table_output,
 )
 
 
@@ -68,34 +69,11 @@ class MacResolver(JobStatsMixin):
             # For IPv6 on Windows/macOS, the command returns the full table
             # so we need to filter lines that contain an exact IP match
             if is_ipv6(ip):
-                output = self._filter_lines_by_ip(output, ip)
+                output = filter_neighbor_table_output(output, ip)
             return extract_mac_from_output(output)
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []
-
-    @staticmethod
-    def _filter_lines_by_ip(output: str, target_ip: str) -> str:
-        """Filter neighbor table output to lines containing exact IP match."""
-        import ipaddress
-        try:
-            target_addr = ipaddress.ip_address(target_ip.split('%')[0])
-        except ValueError:
-            return output
-
-        matching_lines = []
-        for line in output.splitlines():
-            # Extract potential IP addresses from the line
-            for word in line.split():
-                word_clean = word.split('%')[0].rstrip(',')
-                try:
-                    addr = ipaddress.ip_address(word_clean)
-                    if addr == target_addr:
-                        matching_lines.append(line)
-                        break
-                except ValueError:
-                    continue
-        return '\n'.join(matching_lines)
 
     @job_tracker
     def _get_mac_by_scapy(self, ip: str) -> List[str]:

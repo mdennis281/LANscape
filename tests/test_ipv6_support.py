@@ -23,6 +23,7 @@ from lanscape.core.system_compat import (
     get_ping_command,
     get_arp_lookup_command,
     get_candidate_interfaces,
+    filter_neighbor_table_output,
 )
 from lanscape.core.device_alive import (
     ArpCacheLookup,
@@ -284,7 +285,7 @@ class TestArpCacheLookupIpv6:
 2001:db8::10 dev eth0 lladdr 11:22:33:44:55:66 STALE
 2001:db8::100 dev eth0 lladdr 00:11:22:33:44:55 DELAY
 """
-        result = ArpCacheLookup._filter_lines_by_ip(output, '2001:db8::1')
+        result = filter_neighbor_table_output(output, '2001:db8::1')
         # Should only match the exact IP, not ::10 or ::100
         assert 'aa:bb:cc:dd:ee:ff' in result
         assert '11:22:33:44:55:66' not in result

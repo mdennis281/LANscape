@@ -62,26 +62,9 @@ class ArpCacheConfig(ConfigBase):
 
 
 class PokeConfig(ConfigBase):
-    """Configuration for TCP poke (triggers ARP/NDP cache population)."""
+    """Configuration for TCP poke (triggers ARP cache population)."""
     attempts: int = 1
     timeout: float = 2.0
-
-
-class MetadataConfig(ConfigBase):
-    """Configuration for device metadata resolution (hostname, mDNS, LLMNR, NetBIOS).
-
-    Controls timeouts and attempts for all hostname resolution methods including
-    reverse DNS, mDNS PTR queries, LLMNR, NetBIOS NBSTAT, and system-level
-    resolvers (avahi-resolve on Linux, dns-sd on macOS).
-
-    These settings apply to both IPv4 and IPv6 targets - for IPv6, the NDP-based
-    methods use the same timeout/attempt semantics as ARP-based lookups for IPv4.
-    """
-    timeout: float = 2.0
-    attempts: int = 1
-
-    def __str__(self):
-        return f'MetadataCfg(timeout={self.timeout}, attempts={self.attempts})'
 
 
 class ServiceScanStrategy(Enum):
@@ -155,7 +138,6 @@ class ScanConfig(ConfigBase):
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
-    metadata_config: MetadataConfig = Field(default_factory=MetadataConfig)
     port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
     service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
 

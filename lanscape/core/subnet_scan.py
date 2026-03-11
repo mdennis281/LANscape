@@ -299,7 +299,7 @@ class SubnetScanner():
         if not device.alive:
             return None
         self.log.debug(f'[{host}] is alive, getting metadata')
-        device.get_metadata(self.cfg.metadata_config)
+        device.get_metadata()
         self.results.devices.append(device)
         return True
 

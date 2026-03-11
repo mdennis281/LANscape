@@ -63,7 +63,7 @@ cfg = ArpCacheConfig(attempts=2, wait_before=0.3)
 | `attempts` | `int` | `1` | Number of ARP cache lookup attempts |
 | `wait_before` | `float` | `0.2` | Seconds to wait before checking the cache (allows ARP entries to populate) |
 
-> **Note:** ARP cache lookups are IPv4-only. For IPv6 targets, this step is automatically skipped. IPv6 MAC resolution uses the system’s NDP (Neighbor Discovery Protocol) neighbor cache instead.
+> **Note:** For IPv4 targets, this step consults the OS ARP cache. For IPv6 targets, it consults the system's NDP (Neighbor Discovery Protocol) neighbor cache instead.
 
 ---
 

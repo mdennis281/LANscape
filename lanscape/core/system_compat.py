@@ -51,7 +51,12 @@ def filter_neighbor_table_output(output: str, target_ip: str) -> str:
     matching_lines = []
     for line in output.splitlines():
         for word in line.split():
-            word_clean = word.split('%')[0].rstrip(',')
+            # Normalize candidate token:
+            # - strip interface scope (e.g. "%en0")
+            # - remove common surrounding brackets ((), [], {}, <>)
+            # - drop common trailing punctuation delimiters (.,;:)
+            token = word.split('%')[0].strip("()[]{}<>")
+            word_clean = token.rstrip('.,;:')
             try:
                 addr = ipaddress.ip_address(word_clean)
                 if addr == target_addr:

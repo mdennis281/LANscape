@@ -443,9 +443,9 @@ class TestDeviceMdnsIpv6:
     def test_ipv4_device_uses_v4_mdns(self, mock_v6, mock_v4):
         """IPv4 device should use the v4 mDNS path."""
         device = Device(ip='192.168.1.10', alive=True)
-        result = device._resolve_mdns()
+        result = device._resolve_mdns(2.0)
 
-        mock_v4.assert_called_once()
+        mock_v4.assert_called_once_with(2.0)
         mock_v6.assert_not_called()
         assert result == 'host-v4.local'
 
@@ -454,9 +454,9 @@ class TestDeviceMdnsIpv6:
     def test_ipv6_device_uses_v6_mdns(self, mock_v4, mock_v6):
         """IPv6 device should use the v6 mDNS path."""
         device = Device(ip='2001:db8::10', alive=True)
-        result = device._resolve_mdns()
+        result = device._resolve_mdns(2.0)
 
-        mock_v6.assert_called_once()
+        mock_v6.assert_called_once_with(2.0)
         mock_v4.assert_not_called()
         assert result == 'host-v6.local'
 
@@ -473,7 +473,7 @@ class TestDeviceMdnsV6:
         mock_sock.recvfrom.side_effect = socket.timeout('timed out')
 
         device = Device(ip='2001:0db8:0000:0000:0000:0000:0000:0001', alive=True)
-        device._resolve_mdns_v6()
+        device._resolve_mdns_v6(2.0)
 
         # Verify sendto was called with IPv6 multicast address
         args, _ = mock_sock.sendto.call_args
@@ -487,7 +487,7 @@ class TestDeviceMdnsV6:
         mock_sock.recvfrom.side_effect = socket.timeout('timed out')
 
         device = Device(ip='::1', alive=True)
-        device._resolve_mdns_v6()
+        device._resolve_mdns_v6(2.0)
 
         mock_socket_cls.assert_called_once_with(socket.AF_INET6, socket.SOCK_DGRAM)
 
@@ -499,7 +499,7 @@ class TestDeviceMdnsV6:
         mock_sock.recvfrom.side_effect = socket.timeout('timed out')
 
         device = Device(ip='fe80::1', alive=True)
-        assert device._resolve_mdns_v6() is None
+        assert device._resolve_mdns_v6(2.0) is None
         mock_sock.close.assert_called_once()
 
 
@@ -509,13 +509,13 @@ class TestDeviceNetbiosIpv6:
     def test_ipv6_returns_none(self):
         """NetBIOS is IPv4-only, so IPv6 should return None immediately."""
         device = Device(ip='2001:db8::1', alive=True)
-        assert device._resolve_netbios() is None
+        assert device._resolve_netbios(2.0) is None
 
     @patch('lanscape.core.net_tools.device.socket.socket')
     def test_ipv6_does_not_create_socket(self, mock_socket_cls):
         """IPv6 should not even attempt socket creation for NetBIOS."""
         device = Device(ip='fe80::1', alive=True)
-        device._resolve_netbios()
+        device._resolve_netbios(2.0)
         mock_socket_cls.assert_not_called()
 
 

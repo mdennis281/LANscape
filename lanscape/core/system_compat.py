@@ -373,6 +373,226 @@ def os_handles_hostname_resolution() -> bool:
     return bool(psutil.WINDOWS)
 
 
+def resolve_hostname_avahi(ip: str, timeout: float = 2.0) -> Optional[str]:
+    """Resolve hostname via avahi-resolve-address (Linux mDNS daemon).
+
+    This is the recommended approach on Linux when avahi is installed,
+    as it uses the system's mDNS responder which maintains a cache and
+    handles IPv6 properly.
+
+    Returns the hostname (without .local suffix) or None on failure.
+    """
+    if psutil.WINDOWS or psutil.MACOS:
+        return None
+
+    avahi_path = shutil.which('avahi-resolve-address')
+    if not avahi_path:
+        return None
+
+    try:
+        # Strip scope ID for avahi
+        clean_ip = ip.split('%')[0]
+        result = subprocess.run(
+            [avahi_path, '-a', clean_ip],
+            capture_output=True, text=True, timeout=timeout, check=False
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Output format: "192.168.1.1\tmyhostname.local"
+            parts = result.stdout.strip().split()
+            if len(parts) >= 2:
+                hostname = parts[-1]
+                # Remove .local suffix if present
+                if hostname.endswith('.local'):
+                    hostname = hostname[:-6]
+                return hostname
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        pass
+    return None
+
+
+def resolve_hostname_dnssd(ip: str, timeout: float = 3.0) -> Optional[str]:
+    """Resolve hostname via dns-sd (macOS mDNS system service).
+
+    Uses the macOS mDNSResponder daemon for reverse lookups. This is the
+    preferred approach on macOS as it accesses the system's full mDNS
+    cache and handles both IPv4 and IPv6.
+
+    Returns the hostname (without .local suffix) or None on failure.
+    """
+    if not psutil.MACOS:
+        return None
+
+    dnssd_path = shutil.which('dns-sd')
+    if not dnssd_path:
+        return None
+
+    try:
+        # Build the PTR query name
+        clean_ip = ip.split('%')[0]
+        if is_ipv6(clean_ip):
+            addr = ipaddress.IPv6Address(clean_ip)
+            nibbles = addr.exploded.replace(':', '')
+            reversed_name = '.'.join(reversed(nibbles)) + '.ip6.arpa'
+        else:
+            reversed_name = '.'.join(reversed(clean_ip.split('.'))) + '.in-addr.arpa'
+
+        # dns-sd -Q <name> PTR - queries for PTR record
+        result = subprocess.run(
+            [dnssd_path, '-t', str(timeout), '-Q', reversed_name, 'PTR'],
+            capture_output=True, text=True, timeout=timeout + 1, check=False
+        )
+        # Parse output for hostname
+        for line in result.stdout.splitlines():
+            # Look for PTR record in output
+            if 'PTR' in line and '.local' in line.lower():
+                # Extract hostname from PTR record value
+                match = re.search(r'PTR\s+(\S+)', line)
+                if match:
+                    hostname = match.group(1).rstrip('.')
+                    if hostname.endswith('.local'):
+                        hostname = hostname[:-6]
+                    return hostname
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        pass
+    return None
+
+
+def resolve_hostname_llmnr(ip: str, timeout: float = 1.5) -> Optional[str]:
+    """Resolve hostname via LLMNR reverse query.
+
+    Link-Local Multicast Name Resolution (RFC 4795) is commonly used by
+    Windows devices and can resolve hostnames even when mDNS/NetBIOS fail.
+    Supports both IPv4 and IPv6 targets.
+
+    Returns the hostname or None on failure.
+    """
+    try:
+        clean_ip = ip.split('%')[0]
+        addr = ipaddress.ip_address(clean_ip)
+    except ValueError:
+        return None
+
+    # Build reverse query name
+    if addr.version == 6:
+        nibbles = addr.exploded.replace(':', '')
+        qname = '.'.join(reversed(nibbles)) + '.ip6.arpa'
+    else:
+        qname = '.'.join(reversed(str(addr).split('.'))) + '.in-addr.arpa'
+
+    # Build LLMNR PTR query packet
+    name_bytes = b''
+    for label in qname.split('.'):
+        name_bytes += bytes([len(label)]) + label.encode('ascii')
+    name_bytes += b'\x00'
+
+    # Transaction ID, Flags (standard query), Questions=1, etc.
+    request = (
+        b'\x00\x01'   # Transaction ID
+        b'\x00\x00'   # Flags: standard query
+        b'\x00\x01'   # Questions: 1
+        b'\x00\x00'   # Answers: 0
+        b'\x00\x00'   # Authority: 0
+        b'\x00\x00'   # Additional: 0
+    ) + name_bytes + (
+        b'\x00\x0c'   # Type: PTR
+        b'\x00\x01'   # Class: IN
+    )
+
+    sock = None
+    try:
+        if addr.version == 6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            sock.settimeout(timeout)
+            # LLMNR IPv6 multicast address
+            sock.sendto(request, ('ff02::1:3', 5355))
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(timeout)
+            # LLMNR IPv4 multicast address
+            sock.sendto(request, ('224.0.0.252', 5355))
+
+        data, _ = sock.recvfrom(1500)
+        return _parse_llmnr_ptr_response(data)
+    except (socket.timeout, OSError):
+        return None
+    finally:
+        if sock:
+            sock.close()
+
+
+def _parse_llmnr_ptr_response(data: bytes) -> Optional[str]:
+    """Parse an LLMNR PTR response and extract the hostname."""
+    if len(data) < 12:
+        return None
+
+    # Skip header (12 bytes) and question section
+    offset = 12
+
+    # Skip question name
+    while offset < len(data) and data[offset] != 0:
+        if (data[offset] & 0xC0) == 0xC0:
+            offset += 2
+            break
+        offset += data[offset] + 1
+    else:
+        offset += 1
+    offset += 4  # Skip QTYPE and QCLASS
+
+    # Check answer count from header
+    answer_count = (data[6] << 8) | data[7]
+    if answer_count == 0:
+        return None
+
+    # Parse answer section
+    if offset >= len(data):
+        return None
+
+    # Skip answer name (may be pointer)
+    if (data[offset] & 0xC0) == 0xC0:
+        offset += 2
+    else:
+        while offset < len(data) and data[offset] != 0:
+            offset += data[offset] + 1
+        offset += 1
+
+    # Skip TYPE, CLASS, TTL
+    offset += 10
+    if offset >= len(data):
+        return None
+
+    # Read RDLENGTH
+    rdlength = (data[offset - 2] << 8) | data[offset - 1]
+    if rdlength == 0 or offset >= len(data):
+        return None
+
+    # Parse PTR RDATA (hostname)
+    hostname_parts = []
+    while offset < len(data) and data[offset] != 0:
+        if (data[offset] & 0xC0) == 0xC0:
+            # Compression pointer - follow it
+            pointer = ((data[offset] & 0x3F) << 8) | data[offset + 1]
+            temp_offset = pointer
+            while temp_offset < len(data) and data[temp_offset] != 0:
+                length = data[temp_offset]
+                temp_offset += 1
+                if temp_offset + length <= len(data):
+                    hostname_parts.append(
+                        data[temp_offset:temp_offset + length].decode('ascii', errors='ignore')
+                    )
+                temp_offset += length
+            break
+        length = data[offset]
+        offset += 1
+        if offset + length <= len(data):
+            hostname_parts.append(data[offset:offset + length].decode('ascii', errors='ignore'))
+        offset += length
+
+    if hostname_parts:
+        # Return just the first part (hostname without domain)
+        return hostname_parts[0]
+    return None
+
+
 # ─── Network interface helpers ──────────────────────────────────────
 
 def get_ip_address(interface: str) -> Optional[str]:

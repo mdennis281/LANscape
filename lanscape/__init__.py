@@ -13,6 +13,7 @@ from lanscape.core.scan_config import (
     PingConfig,
     PokeConfig,
     ArpCacheConfig,
+    MetadataConfig,
     PortScanConfig,
     ServiceScanConfig,
     ServiceScanStrategy,

@@ -12,11 +12,18 @@ from lanscape.core.service_scan import scan_service, ServiceScanResult
 from lanscape.core.mac_lookup import MacLookup, get_macs
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, timeout_enforcer
-from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig
+from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, MetadataConfig
 from lanscape.core.models import (
     DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo, ProbeResponseInfo
 )
-from lanscape.core.system_compat import os_handles_hostname_resolution, get_socket_family, is_ipv6
+from lanscape.core.system_compat import (
+    os_handles_hostname_resolution,
+    get_socket_family,
+    is_ipv6,
+    resolve_hostname_avahi,
+    resolve_hostname_dnssd,
+    resolve_hostname_llmnr,
+)
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
 
 log = logging.getLogger('NetTools')
@@ -190,10 +197,16 @@ class Device(BaseModel):
                 data['mac_addr']) if data['mac_addr'] else None
         return data
 
-    def get_metadata(self):
-        """Retrieve metadata such as hostname, MAC addresses, and alternate IPs."""
+    def get_metadata(self, metadata_config: Optional[MetadataConfig] = None):
+        """Retrieve metadata such as hostname, MAC addresses, and alternate IPs.
+
+        Args:
+            metadata_config: Optional configuration for hostname resolution timeouts.
+                             Uses default MetadataConfig if not provided.
+        """
+        cfg = metadata_config or MetadataConfig()
         if self.alive:
-            self.hostname = self._get_hostname()
+            self.hostname = self._get_hostname(cfg)
             self._get_mac_addresses()
             if not self.manufacturer:
                 self.manufacturer = self._get_manufacturer(
@@ -295,8 +308,22 @@ class Device(BaseModel):
         return self.macs
 
     @job_tracker
-    def _get_hostname(self) -> Optional[str]:
-        """Get the hostname via reverse DNS, with mDNS/NetBIOS fallback on non-Windows."""
+    def _get_hostname(self, cfg: MetadataConfig) -> Optional[str]:
+        """Get the hostname via reverse DNS, with mDNS/NetBIOS/LLMNR fallbacks.
+
+        Args:
+            cfg: MetadataConfig controlling timeout and attempts for lookups.
+
+        Resolution order:
+        1. socket.gethostbyaddr() - standard reverse DNS
+        2. avahi-resolve (Linux) or dns-sd (macOS) - system mDNS daemons
+        3. Raw mDNS PTR query - pure Python multicast
+        4. LLMNR query - for Windows devices on the network
+        5. NetBIOS NBSTAT - IPv4 only, for older Windows devices
+        """
+        timeout = cfg.timeout
+
+        # 1. Standard reverse DNS
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
             if hostname:
@@ -307,23 +334,39 @@ class Device(BaseModel):
         if os_handles_hostname_resolution():
             return None
 
-        hostname = self._resolve_mdns()
+        # 2. System mDNS daemon (avahi on Linux, dns-sd on macOS)
+        hostname = resolve_hostname_avahi(self.ip, timeout=timeout)
         if hostname:
             return hostname
 
-        hostname = self._resolve_netbios()
+        hostname = resolve_hostname_dnssd(self.ip, timeout=timeout)
+        if hostname:
+            return hostname
+
+        # 3. Raw mDNS PTR query
+        hostname = self._resolve_mdns(timeout)
+        if hostname:
+            return hostname
+
+        # 4. LLMNR (useful for Windows devices)
+        hostname = resolve_hostname_llmnr(self.ip, timeout=timeout)
+        if hostname:
+            return hostname
+
+        # 5. NetBIOS (IPv4 only)
+        hostname = self._resolve_netbios(timeout)
         if hostname:
             return hostname
 
         return None
 
-    def _resolve_mdns(self) -> Optional[str]:
+    def _resolve_mdns(self, timeout: float) -> Optional[str]:
         """Resolve hostname via mDNS multicast PTR query (pure Python, IPv4 & IPv6)."""
         if is_ipv6(self.ip):
-            return self._resolve_mdns_v6()
-        return self._resolve_mdns_v4()
+            return self._resolve_mdns_v6(timeout)
+        return self._resolve_mdns_v4(timeout)
 
-    def _resolve_mdns_v4(self) -> Optional[str]:
+    def _resolve_mdns_v4(self, timeout: float) -> Optional[str]:
         """Resolve hostname via IPv4 mDNS PTR query."""
         reversed_ip = '.'.join(reversed(self.ip.split('.')))
         qname = f"{reversed_ip}.in-addr.arpa"
@@ -348,7 +391,7 @@ class Device(BaseModel):
         sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(2.0)
+            sock.settimeout(timeout)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
             sock.sendto(request, ('224.0.0.251', 5353))
             data, _ = sock.recvfrom(1500)
@@ -359,7 +402,7 @@ class Device(BaseModel):
             if sock:
                 sock.close()
 
-    def _resolve_mdns_v6(self) -> Optional[str]:
+    def _resolve_mdns_v6(self, timeout: float) -> Optional[str]:
         """Resolve hostname via IPv6 mDNS PTR query."""
         import ipaddress as _ipaddress  # pylint: disable=import-outside-toplevel
         addr = _ipaddress.IPv6Address(self.ip)
@@ -387,7 +430,7 @@ class Device(BaseModel):
         sock = None
         try:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-            sock.settimeout(2.0)
+            sock.settimeout(timeout)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 255)
 
             # Determine scope_id for link-local multicast (ff02::fb) based on
@@ -415,7 +458,7 @@ class Device(BaseModel):
             if sock:
                 sock.close()
 
-    def _resolve_netbios(self) -> Optional[str]:
+    def _resolve_netbios(self, timeout: float) -> Optional[str]:
         """Resolve hostname via NetBIOS NBSTAT query (pure Python, IPv4 only)."""
         if is_ipv6(self.ip):
             return None
@@ -436,7 +479,7 @@ class Device(BaseModel):
         sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(2.0)
+            sock.settimeout(timeout)
             sock.sendto(request, (self.ip, 137))
             data, _ = sock.recvfrom(1500)
             return _parse_nbstat_response(data)

@@ -98,7 +98,7 @@ def _prime_ndp_cache() -> None:
         try:
             cmd = get_ndp_ping_command(target)
             subprocess.run(   # pylint: disable=subprocess-run-check
-                cmd, shell=True, timeout=6,
+                cmd, timeout=6,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
         except Exception:  # pylint: disable=broad-except

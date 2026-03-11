@@ -263,13 +263,13 @@ def get_ipv6_interface_scopes() -> List[str]:
     return scopes
 
 
-def get_ndp_ping_command(target: str) -> str:
-    """Return a shell command to ICMPv6-ping *target* (e.g. ``ff02::1%scope``)."""
+def get_ndp_ping_command(target: str) -> List[str]:
+    """Return a command list to ICMPv6-ping *target* (e.g. ``ff02::1%scope``)."""
     if psutil.WINDOWS:
-        return f"ping -6 -n 2 -w 1000 {target}"
+        return ['ping', '-6', '-n', '2', '-w', '1000', target]
     if psutil.MACOS:
-        return f"ping6 -c 2 -W 2 {target}"
-    return f"ping -6 -c 2 -W 2 {target}"
+        return ['ping6', '-c', '2', '-W', '2', target]
+    return ['ping', '-6', '-c', '2', '-W', '2', target]
 
 
 # ─── MAC address extraction ────────────────────────────────────────

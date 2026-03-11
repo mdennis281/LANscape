@@ -277,7 +277,8 @@ class TestNdpCachePriming:
         mock_psutil.WINDOWS = True
         mock_psutil.MACOS = False
         cmd = get_ndp_ping_command('ff02::1%10')
-        assert 'ping -6' in cmd
+        assert cmd[0] == 'ping'
+        assert '-6' in cmd
         assert 'ff02::1%10' in cmd
 
     @patch('lanscape.core.system_compat.psutil')
@@ -286,7 +287,8 @@ class TestNdpCachePriming:
         mock_psutil.WINDOWS = False
         mock_psutil.MACOS = False
         cmd = get_ndp_ping_command('ff02::1%eth0')
-        assert 'ping -6' in cmd
+        assert cmd[0] == 'ping'
+        assert '-6' in cmd
         assert 'ff02::1%eth0' in cmd
 
     @patch('lanscape.core.system_compat.psutil')
@@ -295,7 +297,7 @@ class TestNdpCachePriming:
         mock_psutil.WINDOWS = False
         mock_psutil.MACOS = True
         cmd = get_ndp_ping_command('ff02::1%en0')
-        assert 'ping6' in cmd
+        assert cmd[0] == 'ping6'
 
     @patch('lanscape.core.alt_ip_resolver.subprocess.run')
     @patch('lanscape.core.alt_ip_resolver.get_ipv6_interface_scopes',

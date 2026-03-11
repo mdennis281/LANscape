@@ -505,13 +505,11 @@ class ScannerResults:
         Returns:
             ScanResults: Complete scan results with metadata, devices, and config
         """
-        sorted_devices = sorted(
-            self.devices,
-            key=lambda obj: (
-                ipaddress.ip_address(obj.ip).version,
-                ipaddress.ip_address(obj.ip).packed,
-            )
-        )
+        def _sort_key(obj):
+            addr = ipaddress.ip_address(obj.ip)
+            return (addr.version, addr.packed)
+
+        sorted_devices = sorted(self.devices, key=_sort_key)
         device_results = [device.to_result() for device in sorted_devices]
 
         return ScanResults(

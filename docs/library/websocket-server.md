@@ -476,7 +476,7 @@ List all network subnets detected on the host machine. The primary subnet is sor
 ```json
 [
   { "subnet": "192.168.1.0/24", "address_cnt": 254, "interface": "eth0" },
-  { "subnet": "fd00::/64", "address_cnt": 18446744073709551614, "interface": "eth0" }
+  { "subnet": "fd00::/64", "address_cnt": 100000, "interface": "eth0" }
 ]
 ```
 
@@ -485,7 +485,7 @@ Each object includes:
 | Key | Type | Description |
 |-----|------|-------------|
 | `subnet` | `string` | Subnet in CIDR notation |
-| `address_cnt` | `int` | Number of hosts in the subnet |
+| `address_cnt` | `int` | Number of hosts in the subnet (capped at 100,000 for large IPv6 subnets) |
 | `interface` | `string` | Network interface name (e.g., `"eth0"`, `"Wi-Fi"`) |
 
 ---

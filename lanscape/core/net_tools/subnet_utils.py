@@ -74,8 +74,8 @@ def _is_scannable_ipv6(addr: str) -> bool:
     return True
 
 
-def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
-    """Convert a psutil snicaddr to a ``network/prefix`` string."""
+def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str | None:
+    """Convert a psutil snicaddr to a ``network/prefix`` string, or ``None`` if not derivable."""
     if not snicaddr.address:
         return None
 
@@ -135,9 +135,11 @@ def get_all_network_subnets() -> List[dict]:
     seen = set()  # Track (subnet, interface) pairs to dedupe
 
     for interface, snicaddrs in addrs.items():
+        iface_stats = gateways.get(interface)
+        if not iface_stats or not iface_stats.isup:
+            continue
         for snicaddr in snicaddrs:
-            if snicaddr.family in (socket.AF_INET, socket.AF_INET6) \
-                    and gateways[interface].isup:
+            if snicaddr.family in (socket.AF_INET, socket.AF_INET6):
                 subnet = network_from_snicaddr(snicaddr)
                 if subnet:
                     key = (subnet, interface)

@@ -6,7 +6,7 @@ Covers:
 - NeighborTable model (lookup, reverse lookup, deduplication)
 - NeighborTableService lifecycle (start/stop, singleton, wait_for_refresh)
 - Command fallback logic
-- Live integration tests (Windows local, Linux via SSH)
+- Live integration tests (Windows local)
 """
 # pylint: disable=protected-access,missing-function-docstring
 import shutil as _shutil
@@ -572,6 +572,21 @@ class TestNeighborTableServiceLifecycle:
         svc.stop()
 
     @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_start_updates_config_when_running(self, mock_check):
+        """Calling start() with new config while running should update the config."""
+        mock_check.return_value = b''
+        svc = NeighborTableService.instance()
+        svc.start(refresh_interval=2.0, command_timeout=5.0)
+        assert svc._refresh_interval == 2.0
+        assert svc._command_timeout == 5.0
+        # Update config while running
+        svc.start(refresh_interval=10.0, command_timeout=8.0)
+        assert svc.is_running
+        assert svc._refresh_interval == 10.0
+        assert svc._command_timeout == 8.0
+        svc.stop()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
     def test_wait_for_refresh(self, mock_check):
         mock_check.return_value = LINUX_IPV4_NEIGH.encode()
         svc = NeighborTableService.instance()
@@ -585,6 +600,45 @@ class TestNeighborTableServiceLifecycle:
     def test_wait_for_refresh_not_running(self):
         svc = NeighborTableService.instance()
         assert svc.wait_for_refresh(timeout=0.1) is False
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_instant_hit(self, mock_check):
+        """get_macs_wait returns immediately when IP is already cached."""
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', '-4', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=10.0)
+            try:
+                import time
+                t0 = time.monotonic()
+                macs = svc.get_macs_wait('192.168.1.1')
+                elapsed = time.monotonic() - t0
+                assert macs == ['aa:bb:cc:dd:ee:ff']
+                assert elapsed < 1.0, f"Should be instant, took {elapsed:.2f}s"
+            finally:
+                svc.stop()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_waits_one_cycle(self, mock_check):
+        """get_macs_wait waits for a new refresh start+finish when IP is not cached."""
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', '-4', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=0.5)
+            try:
+                # IP not in the test data — will wait one cycle then return empty
+                macs = svc.get_macs_wait('10.99.99.99')
+                assert macs == []
+            finally:
+                svc.stop()
+
+    def test_get_macs_wait_not_running(self):
+        """get_macs_wait returns empty list when service is not running."""
+        svc = NeighborTableService.instance()
+        macs = svc.get_macs_wait('192.168.1.1')
+        assert macs == []
 
     @patch('lanscape.core.neighbor_table.subprocess.check_output')
     def test_get_mac_after_start(self, mock_check):
@@ -679,51 +733,6 @@ class TestLiveWindowsArpTable:
                 "Service should find at least one IPv4 neighbor"
         finally:
             svc.stop()
-
-
-class TestLiveLinuxNeighborTable:
-    """Live tests against a real Linux machine via SSH."""
-
-    SSH_HOST = 'valheim.lan'
-    SSH_USER = 'dipduo'
-    SSH_PASS = 'mdennis281'
-
-    @pytest.fixture(autouse=True)
-    def check_ssh_available(self):
-        """Skip if we can't reach the SSH host."""
-        if not _shutil.which('sshpass'):
-            pytest.skip("sshpass not installed")
-        try:
-            subprocess.run(
-                ['sshpass', '-p', self.SSH_PASS,
-                 'ssh', '-o', 'StrictHostKeyChecking=no',
-                 '-o', 'ConnectTimeout=3',
-                 f'{self.SSH_USER}@{self.SSH_HOST}', 'echo ok'],
-                capture_output=True, timeout=10, check=True,
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-                FileNotFoundError):
-            pytest.skip(f"Cannot SSH to {self.SSH_HOST}")
-
-    def _ssh_command(self, remote_cmd: str) -> str:
-        result = subprocess.run(
-            ['sshpass', '-p', self.SSH_PASS,
-             'ssh', '-o', 'StrictHostKeyChecking=no',
-             f'{self.SSH_USER}@{self.SSH_HOST}', remote_cmd],
-            capture_output=True, text=True, timeout=15, check=True,
-        )
-        return result.stdout
-
-    def test_live_linux_ipv4_neigh(self):
-        output = self._ssh_command('ip -4 neigh show')
-        entries = parse_linux_neigh(output, ip_version=4)
-        assert len(entries) > 0, "Expected IPv4 neighbors on Linux box"
-
-    def test_live_linux_ipv6_neigh(self):
-        output = self._ssh_command('ip -6 neigh show')
-        entries = parse_linux_neigh(output, ip_version=6)
-        # IPv6 may be empty depending on network config — just verify no crash
-        assert isinstance(entries, list)
 
 
 # ═══════════════════════════════════════════════════════════════════

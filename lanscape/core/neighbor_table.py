@@ -569,7 +569,12 @@ class NeighborTableService:
         self._command_timeout: float = 5.0
         self._daemon_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
         self._refresh_event = threading.Event()
+        self._refresh_start_cond = threading.Condition()
+        self._refresh_start_count: int = 0
+        self._refresh_cond = threading.Condition()
+        self._refresh_count: int = 0
         self._running = False
 
     # ── Singleton accessor ──────────────────────────────────────────
@@ -609,7 +614,15 @@ class NeighborTableService:
         can immediately query the table.
         """
         if self._running:
-            log.debug("NeighborTableService already running")
+            if (refresh_interval != self._refresh_interval
+                    or command_timeout != self._command_timeout):
+                self._refresh_interval = refresh_interval
+                self._command_timeout = command_timeout
+                self._wake_event.set()  # interrupt current sleep
+                log.info(
+                    "NeighborTableService config updated (interval=%.1fs, timeout=%.1fs)",
+                    refresh_interval, command_timeout,
+                )
             return
 
         self._refresh_interval = refresh_interval
@@ -637,6 +650,14 @@ class NeighborTableService:
             return
         self._running = False
         self._stop_event.set()
+        self._wake_event.set()
+        # Unblock any threads waiting in get_macs_wait
+        with self._refresh_start_cond:
+            self._refresh_start_count += 1
+            self._refresh_start_cond.notify_all()
+        with self._refresh_cond:
+            self._refresh_count += 1
+            self._refresh_cond.notify_all()
         if self._daemon_thread is not None:
             self._daemon_thread.join(timeout=self._command_timeout + 2)
             self._daemon_thread = None
@@ -650,9 +671,41 @@ class NeighborTableService:
         return table.get_mac(ip)
 
     def get_macs(self, ip: str) -> List[str]:
-        """Return all MACs associated with *ip*."""
+        """Return all MACs associated with *ip* from the current cache."""
         table = self._ipv6_table if ':' in ip else self._ipv4_table
         return table.get_macs(ip)
+
+    def get_macs_wait(self, ip: str) -> List[str]:
+        """Return MACs for *ip*, waiting for one fresh refresh if not cached.
+
+        1. Checks the current cache — returns immediately if found.
+        2. Otherwise waits for a **new** refresh cycle to **start**
+           (so we don't trust one already in-flight that may have
+           begun before the OS cache was populated) and then **finish**.
+        3. Checks the cache once more and returns the result (may be empty).
+        """
+        macs = self.get_macs(ip)
+        if macs:
+            return macs
+
+        if not self._running:
+            return []
+
+        # Wait for a NEW refresh to start
+        start_baseline = self._refresh_start_count
+        with self._refresh_start_cond:
+            self._refresh_start_cond.wait_for(
+                lambda: self._refresh_start_count > start_baseline,
+            )
+
+        # Now wait for that refresh to finish
+        finish_baseline = self._refresh_count
+        with self._refresh_cond:
+            self._refresh_cond.wait_for(
+                lambda: self._refresh_count > finish_baseline,
+            )
+
+        return self.get_macs(ip)
 
     def get_ips_for_mac(self, mac: str, want_v6: bool) -> List[str]:
         """Return IPs associated with *mac* for the requested protocol."""
@@ -680,7 +733,8 @@ class NeighborTableService:
     def _refresh_loop(self) -> None:
         """Daemon thread main loop."""
         while not self._stop_event.is_set():
-            self._stop_event.wait(timeout=self._refresh_interval)
+            self._wake_event.wait(timeout=self._refresh_interval)
+            self._wake_event.clear()
             if self._stop_event.is_set():
                 break
             self._do_refresh()
@@ -689,11 +743,19 @@ class NeighborTableService:
         """Fetch both tables and atomically swap them in."""
         self._refresh_event.clear()
 
+        with self._refresh_start_cond:
+            self._refresh_start_count += 1
+            self._refresh_start_cond.notify_all()
+
         v4_entries = self._fetch_entries(want_v6=False)
         v6_entries = self._fetch_entries(want_v6=True)
 
         self._ipv4_table = build_table(v4_entries)
         self._ipv6_table = build_table(v6_entries)
+
+        with self._refresh_cond:
+            self._refresh_count += 1
+            self._refresh_cond.notify_all()
 
         self._refresh_event.set()
 

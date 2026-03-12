@@ -22,7 +22,6 @@ from lanscape.core.system_compat import (
     get_socket_family,
 )
 
-
 def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
     """
     Check if a device is alive based on the configured scan type.
@@ -148,13 +147,10 @@ class ArpCacheLookup():
         if not svc.is_running:
             return False
 
-        for _ in range(cfg.attempts):
-            svc.wait_for_refresh(timeout=cfg.wait_before + 3.0)
-            macs = svc.get_macs(device.ip)
-            if macs:
-                device.macs = macs
-                device.alive = True
-                break
+        macs = svc.get_macs_wait(device.ip)
+        if macs:
+            device.macs = macs
+            device.alive = True
         return device.alive is True
 
 

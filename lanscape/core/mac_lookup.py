@@ -45,14 +45,26 @@ class MacResolver(JobStatsMixin):
         self.caught_errors: List[DeviceError] = []
 
     def get_macs(self, ip: str) -> List[str]:
-        """Try to get the MAC address using Scapy, fallback to ARP/NDP if it fails."""
+        """Resolve MAC address via neighbor cache, or Scapy if cache is unhealthy."""
+        if self._neighbor_cache_healthy():
+            return self._get_mac_by_neighbor_cache(ip)
         if not is_ipv6(ip):
-            if mac := self._get_mac_by_scapy(ip):
-                log.debug(f"Used Scapy to resolve ip {ip} to mac {mac}")
-                return mac
-        neighbor = self._get_mac_by_neighbor_cache(ip)
-        log.debug(f"Used neighbor cache to resolve ip {ip} to mac {neighbor}")
-        return neighbor
+            if macs := self._get_mac_by_scapy(ip):
+                log.debug("Used Scapy to resolve ip %s to mac %s", ip, macs)
+                return macs
+        return []
+
+    def _neighbor_cache_healthy(self) -> bool:
+        """Return True if the NeighborTableService is running and has entries."""
+        try:
+            from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+            svc = NeighborTableService.instance()
+            if not svc.is_running:
+                return False
+            return len(svc.get_table(want_v6=False).entries) > 0 \
+                or len(svc.get_table(want_v6=True).entries) > 0
+        except Exception:  # pylint: disable=broad-except
+            return False
 
     @job_tracker
     def _get_mac_by_neighbor_cache(self, ip: str) -> List[str]:
@@ -60,9 +72,7 @@ class MacResolver(JobStatsMixin):
         try:
             from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
             svc = NeighborTableService.instance()
-            if svc.is_running:
-                return svc.get_macs(ip)
-            return []
+            return svc.get_macs(ip)
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []

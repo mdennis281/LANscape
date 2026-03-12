@@ -29,6 +29,7 @@ from lanscape.core.system_compat import (
     _build_ptr_query,
 )
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
+from lanscape.core.neighbor_table import NeighborTableService  
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -301,7 +302,8 @@ class Device(BaseModel):
     def _get_mac_addresses(self):
         """Get the possible MAC addresses of a network device given its IP address."""
         if not self.macs:
-            self.macs = get_macs(self.ip)
+            svc = NeighborTableService.instance()
+            self.macs = svc.get_macs_wait(self.ip)
         mac_selector.import_macs(self.macs)
         return self.macs
 

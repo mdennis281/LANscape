@@ -246,12 +246,13 @@ class TestPokerIpv6:
 
 
 class TestMacResolverIpv6:
-    """MacResolver should skip Scapy for IPv6 and use neighbor cache."""
+    """MacResolver uses neighbor cache when healthy, Scapy only as fallback."""
 
+    @patch.object(MacResolver, '_neighbor_cache_healthy', return_value=True)
     @patch.object(MacResolver, '_get_mac_by_neighbor_cache', return_value=['aa:bb:cc:dd:ee:ff'])
     @patch.object(MacResolver, '_get_mac_by_scapy')
-    def test_ipv6_skips_scapy(self, mock_scapy, mock_cache):
-        """IPv6 target should bypass Scapy and go straight to neighbor cache."""
+    def test_ipv6_uses_cache(self, mock_scapy, mock_cache, _mock_healthy):
+        """IPv6 target should use neighbor cache, never Scapy."""
         resolver = MacResolver()
         result = resolver.get_macs('2001:db8::1')
 
@@ -259,16 +260,42 @@ class TestMacResolverIpv6:
         mock_cache.assert_called_once_with('2001:db8::1')
         assert result == ['aa:bb:cc:dd:ee:ff']
 
+    @patch.object(MacResolver, '_neighbor_cache_healthy', return_value=True)
     @patch.object(MacResolver, '_get_mac_by_neighbor_cache', return_value=['11:22:33:44:55:66'])
-    @patch.object(MacResolver, '_get_mac_by_scapy', return_value=[])
-    def test_ipv4_tries_scapy_first(self, mock_scapy, mock_cache):
-        """IPv4 target should try Scapy first, then fall back to neighbor cache."""
+    @patch.object(MacResolver, '_get_mac_by_scapy')
+    def test_ipv4_uses_cache_when_healthy(self, mock_scapy, mock_cache, _mock_healthy):
+        """IPv4 target should use neighbor cache when service is healthy."""
         resolver = MacResolver()
         result = resolver.get_macs('192.168.1.1')
 
-        mock_scapy.assert_called_once_with('192.168.1.1')
         mock_cache.assert_called_once_with('192.168.1.1')
+        mock_scapy.assert_not_called()
         assert result == ['11:22:33:44:55:66']
+
+    @patch.object(MacResolver, '_neighbor_cache_healthy', return_value=False)
+    @patch.object(MacResolver, '_get_mac_by_neighbor_cache')
+    @patch.object(MacResolver, '_get_mac_by_scapy', return_value=['aa:bb:cc:dd:ee:ff'])
+    def test_ipv4_falls_back_to_scapy_when_unhealthy(self, mock_scapy, mock_cache,
+                                                      _mock_healthy):
+        """IPv4 target should fall back to Scapy when neighbor cache is unhealthy."""
+        resolver = MacResolver()
+        result = resolver.get_macs('192.168.1.1')
+
+        mock_cache.assert_not_called()
+        mock_scapy.assert_called_once_with('192.168.1.1')
+        assert result == ['aa:bb:cc:dd:ee:ff']
+
+    @patch.object(MacResolver, '_neighbor_cache_healthy', return_value=False)
+    @patch.object(MacResolver, '_get_mac_by_neighbor_cache')
+    @patch.object(MacResolver, '_get_mac_by_scapy')
+    def test_ipv6_returns_empty_when_unhealthy(self, mock_scapy, mock_cache, _mock_healthy):
+        """IPv6 target should return empty when cache is unhealthy (no Scapy for v6)."""
+        resolver = MacResolver()
+        result = resolver.get_macs('2001:db8::1')
+
+        mock_cache.assert_not_called()
+        mock_scapy.assert_not_called()
+        assert result == []
 
 
 # ===========================================================================

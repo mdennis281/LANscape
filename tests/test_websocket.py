@@ -441,7 +441,7 @@ class TestWebSocketServer:
         """Test server initializes correctly."""
         assert server.host == "127.0.0.1"
         assert server.port == 8766
-        assert len(server.handlers) == 3
+        assert len(server.handlers) == 4
 
     def test_get_actions(self, server):
         """Test getting all supported actions."""

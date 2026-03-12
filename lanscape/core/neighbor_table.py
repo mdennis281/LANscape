@@ -620,7 +620,7 @@ class NeighborTableService:
                 self._refresh_interval = refresh_interval
                 self._command_timeout = command_timeout
                 self._wake_event.set()  # interrupt current sleep
-                log.info(
+                log.debug(
                     "NeighborTableService config updated (interval=%.1fs, timeout=%.1fs)",
                     refresh_interval, command_timeout,
                 )
@@ -640,7 +640,7 @@ class NeighborTableService:
             daemon=True,
         )
         self._daemon_thread.start()
-        log.info(
+        log.debug(
             "NeighborTableService started (interval=%.1fs, timeout=%.1fs)",
             refresh_interval, command_timeout,
         )
@@ -662,7 +662,7 @@ class NeighborTableService:
         if self._daemon_thread is not None:
             self._daemon_thread.join(timeout=self._command_timeout + 2)
             self._daemon_thread = None
-        log.info("NeighborTableService stopped")
+        log.debug("NeighborTableService stopped")
 
     # ── Query API ───────────────────────────────────────────────────
 

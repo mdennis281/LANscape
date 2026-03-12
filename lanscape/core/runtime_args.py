@@ -15,6 +15,7 @@ class RuntimeArgs(BaseModel):
     logfile: Optional[str] = None
     loglevel: str = 'INFO'
     persistent: bool = False
+    debug: bool = False
     ws_server: bool = False
     ws_port: int = 8766
     mdns_enabled: bool = True
@@ -46,7 +47,8 @@ def parse_args() -> RuntimeArgs:
     parser.add_argument('--persistent', action='store_true',
                         help='Don\'t auto-shutdown when browser closes')
     parser.add_argument('--debug', action='store_true',
-                        help='Shorthand debug mode (equivalent to "--loglevel DEBUG")')
+                        help='Enable debug mode (sets loglevel to DEBUG and '
+                             'registers debug WebSocket handlers)')
     parser.add_argument('--ws-server', action='store_true',
                         help='Start WebSocket server only (no UI)')
     parser.add_argument('--ws-port', type=int, default=8766,

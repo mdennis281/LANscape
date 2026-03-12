@@ -13,9 +13,6 @@
 ## Checklist
 - [ ] Type hints added/updated for all new or changed functions
 - [ ] Unit tests added/updated under `tests/`
-- [ ] Linting passes (`pylint --score=yes scripts/ lanscape/ tests/`)
-- [ ] Formatting applied (`autopep8 --in-place --recursive . --max-line-length 100 -aa`)
-- [ ] All tests pass (`pytest tests/ -n auto --dist=loadscope -v`)
 - [ ] New dependencies added to `pyproject.toml` (not a requirements.txt)
 - [ ] Module exports updated in `lanscape/__init__.py` (if applicable)
 

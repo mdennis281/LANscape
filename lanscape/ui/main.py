@@ -67,7 +67,7 @@ def start_websocket_server():
     log.info(f'Starting WebSocket server on port {args.ws_port}')
 
     try:
-        run_server(host='0.0.0.0', port=args.ws_port)
+        run_server(host='0.0.0.0', port=args.ws_port, debug_mode=args.debug)
     except KeyboardInterrupt:
         log.info('WebSocket server stopped by user')
     except Exception as e:
@@ -98,6 +98,7 @@ def start_webapp_mode():
             open_browser=True,
             persistent=args.persistent,
             mdns_enabled=args.mdns_enabled,
+            debug_mode=args.debug,
         )
     except KeyboardInterrupt:
         log.info('Webapp stopped by user')

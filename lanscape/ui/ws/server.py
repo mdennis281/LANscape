@@ -44,7 +44,7 @@ class WebSocketServer:
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
         on_client_change: Optional[Callable[[int], None]] = None,
-        debug_mode: bool = False
+        debug_mode: bool = False,
     ):
         """
         Initialize the WebSocket server.
@@ -456,7 +456,8 @@ class WebSocketServer:
 
 
 def run_server(host: str = WebSocketServer.DEFAULT_HOST,
-               port: int = WebSocketServer.DEFAULT_PORT) -> None:
+               port: int = WebSocketServer.DEFAULT_PORT,
+               debug_mode: bool = False) -> None:
     """
     Run the WebSocket server.
 
@@ -465,8 +466,9 @@ def run_server(host: str = WebSocketServer.DEFAULT_HOST,
     Args:
         host: Host to bind to
         port: Port to listen on
+        debug_mode: Enable debug handler registration
     """
-    server = WebSocketServer(host, port)
+    server = WebSocketServer(host, port, debug_mode=debug_mode)
     asyncio.run(server.serve_forever())
 
 

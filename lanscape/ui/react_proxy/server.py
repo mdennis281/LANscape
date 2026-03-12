@@ -183,6 +183,7 @@ class WebappServerController:
         host: str = '127.0.0.1',
         persistent: bool = False,
         mdns_enabled: bool = True,
+        debug_mode: bool = False,
     ):
         """
         Initialize the webapp server controller.
@@ -193,12 +194,14 @@ class WebappServerController:
             host: Host to bind to
             persistent: If True, don't auto-shutdown when clients disconnect
             mdns_enabled: If False, skip mDNS advertisement and browsing
+            debug_mode: Enable debug handler registration
         """
         self.http_port = http_port
         self.ws_port = ws_port
         self.host = host
         self.persistent = persistent
         self.mdns_enabled = mdns_enabled
+        self.debug_mode = debug_mode
 
         self._http_server: Optional[ThreadingHTTPServer] = None
         self._ws_server: Optional[WebSocketServer] = None
@@ -219,10 +222,17 @@ class WebappServerController:
         asyncio.set_event_loop(self._ws_loop)
         configure_asyncio_exception_handler(self._ws_loop)
 
+        if self.debug_mode:
+            log.warning(
+                'Debug handler enabled on a non-loopback interface (0.0.0.0). '
+                'Debug actions will be accessible from the LAN.'
+            )
+
         self._ws_server = WebSocketServer(
             host='0.0.0.0',
             port=self.ws_port,
-            on_client_change=on_client_change
+            on_client_change=on_client_change,
+            debug_mode=self.debug_mode,
         )
 
         try:
@@ -403,6 +413,7 @@ def start_webapp_server(
     open_browser: bool = True,
     persistent: bool = False,
     mdns_enabled: bool = True,
+    debug_mode: bool = False,
 ) -> None:
     """
     Start the webapp server with both HTTP (static files) and WebSocket (API).
@@ -417,6 +428,7 @@ def start_webapp_server(
         open_browser: Whether to open a browser window (default: True)
         persistent: Don't auto-shutdown when clients disconnect (default: False)
         mdns_enabled: Enable mDNS service discovery (default: True)
+        debug_mode: Enable debug handler registration (default: False)
     """
     webapp_dir = REACT_BUILD_DIR
 
@@ -449,6 +461,7 @@ def start_webapp_server(
         host=host,
         persistent=persistent,
         mdns_enabled=mdns_enabled,
+        debug_mode=debug_mode,
     )
     controller.start(webapp_dir, open_browser=open_browser)
 

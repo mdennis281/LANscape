@@ -68,6 +68,18 @@ class TestParseArgsCustom:
             args = parse_args()
         assert args.loglevel == 'DEBUG'
 
+    def test_debug_defaults_false(self) -> None:
+        """debug defaults to False when --debug is not provided."""
+        with patch.object(sys, 'argv', ['lanscape']):
+            args = parse_args()
+        assert args.debug is False
+
+    def test_debug_flag_sets_debug_true(self) -> None:
+        """--debug sets args.debug to True."""
+        with patch.object(sys, 'argv', ['lanscape', '--debug']):
+            args = parse_args()
+        assert args.debug is True
+
     def test_mdns_off(self) -> None:
         """--mdns-off disables mDNS discovery."""
         with patch.object(sys, 'argv', ['lanscape', '--mdns-off']):

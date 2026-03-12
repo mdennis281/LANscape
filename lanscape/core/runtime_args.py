@@ -15,6 +15,7 @@ class RuntimeArgs(BaseModel):
     logfile: Optional[str] = None
     loglevel: str = 'INFO'
     persistent: bool = False
+    debug: bool = False
     ws_server: bool = False
     ws_port: int = 8766
     mdns_enabled: bool = True

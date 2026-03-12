@@ -222,7 +222,8 @@ class WebappServerController:
         self._ws_server = WebSocketServer(
             host='0.0.0.0',
             port=self.ws_port,
-            on_client_change=on_client_change
+            on_client_change=on_client_change,
+            debug_mode=self.debug_mode,
         )
 
         try:
@@ -403,6 +404,7 @@ def start_webapp_server(
     open_browser: bool = True,
     persistent: bool = False,
     mdns_enabled: bool = True,
+    debug_mode: bool = False,
 ) -> None:
     """
     Start the webapp server with both HTTP (static files) and WebSocket (API).
@@ -417,6 +419,7 @@ def start_webapp_server(
         open_browser: Whether to open a browser window (default: True)
         persistent: Don't auto-shutdown when clients disconnect (default: False)
         mdns_enabled: Enable mDNS service discovery (default: True)
+        debug_mode: Enable debug handler registration (default: False)
     """
     webapp_dir = REACT_BUILD_DIR
 
@@ -449,6 +452,7 @@ def start_webapp_server(
         host=host,
         persistent=persistent,
         mdns_enabled=mdns_enabled,
+        debug_mode=debug_mode,
     )
     controller.start(webapp_dir, open_browser=open_browser)
 

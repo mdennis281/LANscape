@@ -183,6 +183,7 @@ class WebappServerController:
         host: str = '127.0.0.1',
         persistent: bool = False,
         mdns_enabled: bool = True,
+        debug_mode: bool = False,
     ):
         """
         Initialize the webapp server controller.
@@ -193,12 +194,14 @@ class WebappServerController:
             host: Host to bind to
             persistent: If True, don't auto-shutdown when clients disconnect
             mdns_enabled: If False, skip mDNS advertisement and browsing
+            debug_mode: Enable debug handler registration
         """
         self.http_port = http_port
         self.ws_port = ws_port
         self.host = host
         self.persistent = persistent
         self.mdns_enabled = mdns_enabled
+        self.debug_mode = debug_mode
 
         self._http_server: Optional[ThreadingHTTPServer] = None
         self._ws_server: Optional[WebSocketServer] = None

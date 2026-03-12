@@ -222,6 +222,12 @@ class WebappServerController:
         asyncio.set_event_loop(self._ws_loop)
         configure_asyncio_exception_handler(self._ws_loop)
 
+        if self.debug_mode:
+            log.warning(
+                'Debug handler enabled on a non-loopback interface (0.0.0.0). '
+                'Debug actions will be accessible from the LAN.'
+            )
+
         self._ws_server = WebSocketServer(
             host='0.0.0.0',
             port=self.ws_port,

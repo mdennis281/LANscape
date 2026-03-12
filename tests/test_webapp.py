@@ -91,6 +91,7 @@ class TestStartWebappServer:
             host='127.0.0.1',
             persistent=False,
             mdns_enabled=True,
+            debug_mode=False,
         )
         mock_controller_cls.return_value.start.assert_called_once_with(
             temp_webapp_dir, open_browser=True
@@ -115,6 +116,7 @@ class TestStartWebappServer:
             host='0.0.0.0',
             persistent=True,
             mdns_enabled=False,
+            debug_mode=False,
         )
         mock_controller_cls.return_value.start.assert_called_once_with(
             temp_webapp_dir, open_browser=False
@@ -151,6 +153,7 @@ class TestWebappServerController:
         assert controller.host == '127.0.0.1'
         assert controller.persistent is False
         assert controller.mdns_enabled is True
+        assert controller.debug_mode is False
 
     def test_controller_init_custom(self):
         """Test controller with custom parameters."""
@@ -160,12 +163,14 @@ class TestWebappServerController:
             host='0.0.0.0',
             persistent=True,
             mdns_enabled=False,
+            debug_mode=True,
         )
         assert controller.http_port == 8080
         assert controller.ws_port == 9090
         assert controller.host == '0.0.0.0'
         assert controller.persistent is True
         assert controller.mdns_enabled is False
+        assert controller.debug_mode is True
 
 
 class TestStartStaticServer:

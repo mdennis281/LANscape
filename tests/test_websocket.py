@@ -442,11 +442,6 @@ class TestWebSocketServer:
         """Test server initializes correctly."""
         assert server.host == "127.0.0.1"
         assert server.port == 8766
-        assert len(server.handlers) == 3
-
-    def test_server_debug_mode(self):
-        """Test server registers DebugHandler when debug_mode=True."""
-        server = WebSocketServer(host="127.0.0.1", port=8766, debug_mode=True)
         assert len(server.handlers) == 4
 
     def test_get_actions(self, server):

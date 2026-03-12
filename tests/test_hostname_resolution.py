@@ -22,6 +22,14 @@ from lanscape.core.net_tools import (
     _parse_nbstat_response,
     _dns_name_decode,
 )
+from lanscape.core.system_compat import (
+    resolve_hostname_avahi,
+    resolve_hostname_dnssd,
+    resolve_hostname_llmnr,
+    resolve_hostname_getent,
+    resolve_hostname_host_cmd,
+    _parse_llmnr_ptr_response,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -525,3 +533,319 @@ class TestDnsNameDecode:
 
         name, _ = _dns_name_decode(data, 10)
         assert name == 'test.local'
+
+
+# ---------------------------------------------------------------------------
+# Tests — System mDNS helpers (avahi, dns-sd, LLMNR)
+# ---------------------------------------------------------------------------
+
+class TestResolveHostnameAvahi:
+    """Tests for resolve_hostname_avahi() on Linux systems."""
+
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', True)
+    @patch('lanscape.core.system_compat.psutil.MACOS', False)
+    def test_returns_none_on_windows(self):
+        """Should return None on Windows."""
+        assert resolve_hostname_avahi('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    @patch('lanscape.core.system_compat.psutil.MACOS', True)
+    def test_returns_none_on_macos(self):
+        """Should return None on macOS (use dns-sd instead)."""
+        assert resolve_hostname_avahi('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.shutil.which', return_value=None)
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    @patch('lanscape.core.system_compat.psutil.MACOS', False)
+    def test_returns_none_without_avahi(self, mock_which):
+        """Should return None if avahi-resolve-address is not installed."""
+        assert resolve_hostname_avahi('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which',
+           return_value='/usr/bin/avahi-resolve-address')
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    @patch('lanscape.core.system_compat.psutil.MACOS', False)
+    def test_parses_hostname_from_output(self, mock_which, mock_run):
+        """Should parse hostname from avahi-resolve output."""
+        mock_run.return_value = MagicMock(returncode=0, stdout='192.168.1.100\tmyhost.local')
+        result = resolve_hostname_avahi('192.168.1.100')
+        assert result == 'myhost'
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which',
+           return_value='/usr/bin/avahi-resolve-address')
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    @patch('lanscape.core.system_compat.psutil.MACOS', False)
+    def test_handles_ipv6_with_scope(self, mock_which, mock_run):
+        """Should strip scope ID from IPv6 addresses."""
+        mock_run.return_value = MagicMock(returncode=0, stdout='fe80::1\tdevice.local')
+        result = resolve_hostname_avahi('fe80::1%eth0')
+        mock_run.assert_called_once()
+        # Check that scope was stripped
+        call_args = mock_run.call_args[0][0]
+        assert '%' not in call_args[-1]
+        assert result == 'device'
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which',
+           return_value='/usr/bin/avahi-resolve-address')
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    @patch('lanscape.core.system_compat.psutil.MACOS', False)
+    def test_returns_none_on_failure(self, mock_which, mock_run):
+        """Should return None if avahi-resolve fails."""
+        mock_run.return_value = MagicMock(returncode=1, stdout='')
+        assert resolve_hostname_avahi('192.168.1.100') is None
+
+
+class TestResolveHostnameDnssd:
+    """Tests for resolve_hostname_dnssd() on macOS systems."""
+
+    @patch('lanscape.core.system_compat.psutil.MACOS', False)
+    def test_returns_none_on_non_macos(self):
+        """Should return None on non-macOS systems."""
+        assert resolve_hostname_dnssd('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.shutil.which', return_value=None)
+    @patch('lanscape.core.system_compat.psutil.MACOS', True)
+    def test_returns_none_without_dnssd(self, mock_which):
+        """Should return None if dns-sd is not available."""
+        assert resolve_hostname_dnssd('192.168.1.1') is None
+
+
+class TestResolveHostnameLlmnr:
+    """Tests for resolve_hostname_llmnr() - LLMNR reverse lookups."""
+
+    def test_invalid_ip_returns_none(self):
+        """Should return None for invalid IP addresses."""
+        assert resolve_hostname_llmnr('not-an-ip') is None
+
+    @patch('lanscape.core.system_compat.socket.socket')
+    def test_ipv4_sends_to_correct_address(self, mock_socket_class):
+        """IPv4 LLMNR should multicast to 224.0.0.252:5355."""
+        mock_sock = MagicMock()
+        mock_socket_class.return_value = mock_sock
+        mock_sock.recvfrom.side_effect = socket.timeout()
+
+        resolve_hostname_llmnr('192.168.1.100')
+
+        # Check socket was created with AF_INET
+        mock_socket_class.assert_called_with(socket.AF_INET, socket.SOCK_DGRAM)
+        # Check sendto was called with LLMNR multicast address
+        mock_sock.sendto.assert_called_once()
+        _, addr = mock_sock.sendto.call_args[0]
+        assert addr == ('224.0.0.252', 5355)
+
+    @patch('lanscape.core.system_compat.socket.socket')
+    def test_ipv6_sends_to_correct_address(self, mock_socket_class):
+        """IPv6 LLMNR should multicast to ff02::1:3 port 5355."""
+        mock_sock = MagicMock()
+        mock_socket_class.return_value = mock_sock
+        mock_sock.recvfrom.side_effect = socket.timeout()
+
+        resolve_hostname_llmnr('fe80::1')
+
+        # Check socket was created with AF_INET6
+        mock_socket_class.assert_called_with(socket.AF_INET6, socket.SOCK_DGRAM)
+        # Check sendto was called with LLMNR IPv6 multicast address
+        mock_sock.sendto.assert_called_once()
+        _, addr = mock_sock.sendto.call_args[0]
+        assert addr == ('ff02::1:3', 5355)
+
+    def test_returns_none_on_timeout(self):
+        """Should return None if no response is received."""
+        with patch('lanscape.core.system_compat.socket.socket') as mock_socket_class:
+            mock_sock = MagicMock()
+            mock_socket_class.return_value = mock_sock
+            mock_sock.recvfrom.side_effect = socket.timeout()
+
+            result = resolve_hostname_llmnr('192.168.1.100', timeout=0.1)
+            assert result is None
+
+
+class TestParseLlmnrPtrResponse:
+    """Tests for _parse_llmnr_ptr_response() helper."""
+
+    def test_empty_packet(self):
+        """Should return None for empty packet."""
+        assert _parse_llmnr_ptr_response(b'') is None
+
+    def test_short_packet(self):
+        """Should return None for packet shorter than header."""
+        assert _parse_llmnr_ptr_response(b'\x00' * 10) is None
+
+
+class TestResolveHostnameGetent:
+    """Tests for resolve_hostname_getent() on Linux systems."""
+
+    @patch('lanscape.core.system_compat.psutil.LINUX', False)
+    def test_returns_none_on_non_linux(self):
+        """Should return None on non-Linux systems."""
+        assert resolve_hostname_getent('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.shutil.which', return_value=None)
+    @patch('lanscape.core.system_compat.psutil.LINUX', True)
+    def test_returns_none_when_getent_not_found(self, mock_which):
+        """Should return None if getent is not found."""
+        assert resolve_hostname_getent('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/getent')
+    @patch('lanscape.core.system_compat.psutil.LINUX', True)
+    def test_successful_resolution(self, mock_which, mock_run):
+        """Should successfully resolve hostname via getent."""
+        mock_run.return_value = MagicMock(returncode=0, stdout='192.168.1.1 myhost myhost.local')
+        result = resolve_hostname_getent('192.168.1.1')
+        assert result == 'myhost'
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/getent')
+    @patch('lanscape.core.system_compat.psutil.LINUX', True)
+    def test_strips_local_suffix(self, mock_which, mock_run):
+        """Should strip common suffixes like .local, .lan, .home."""
+        mock_run.return_value = MagicMock(returncode=0, stdout='192.168.1.1 router.local')
+        result = resolve_hostname_getent('192.168.1.1')
+        assert result == 'router'
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/getent')
+    @patch('lanscape.core.system_compat.psutil.LINUX', True)
+    def test_handles_ipv6_scope(self, mock_which, mock_run):
+        """Should strip scope ID from IPv6 address before calling getent."""
+        mock_run.return_value = MagicMock(returncode=0, stdout='fe80::1 device')
+        result = resolve_hostname_getent('fe80::1%eth0')
+        call_args = mock_run.call_args[0][0]
+        assert '%' not in call_args[-1]
+        assert result == 'device'
+
+
+class TestResolveHostnameHostCmd:
+    """Tests for resolve_hostname_host_cmd() on Unix systems."""
+
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', True)
+    def test_returns_none_on_windows(self):
+        """Should return None on Windows."""
+        assert resolve_hostname_host_cmd('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.shutil.which', return_value=None)
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    def test_returns_none_when_host_not_found(self, mock_which):
+        """Should return None if host command is not found."""
+        assert resolve_hostname_host_cmd('192.168.1.1') is None
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/host')
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    def test_successful_ipv4_resolution(self, mock_which, mock_run):
+        """Should resolve hostname for IPv4 address."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='1.1.168.192.in-addr.arpa domain name pointer myhost.local.'
+        )
+        result = resolve_hostname_host_cmd('192.168.1.1')
+        assert result == 'myhost'
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/host')
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    def test_successful_ipv6_resolution(self, mock_which, mock_run):
+        """Should resolve hostname for IPv6 address."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='...ip6.arpa domain name pointer device.local.'
+        )
+        result = resolve_hostname_host_cmd('2001:db8::1')
+        assert result == 'device'
+
+    @patch('lanscape.core.system_compat.subprocess.run')
+    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/host')
+    @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
+    def test_returns_none_on_failure(self, mock_which, mock_run):
+        """Should return None if host command fails."""
+        mock_run.return_value = MagicMock(returncode=1, stdout='')
+        result = resolve_hostname_host_cmd('192.168.1.1')
+        assert result is None
+
+
+class TestHostnameResolutionFallbackChain:
+    """Integration tests for the complete hostname resolution fallback chain."""
+
+    @pytest.fixture
+    def device(self):
+        """Create a test device instance."""
+        return Device(ip="192.168.1.100", alive=True)
+
+    @patch('lanscape.core.net_tools.device.resolve_hostname_host_cmd', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_getent', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_llmnr', return_value='WINDOWS-PC')
+    @patch.object(Device, '_resolve_mdns', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_dnssd', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_avahi', return_value=None)
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
+    def test_llmnr_fallback_works(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self, mock_dns, mock_os, mock_avahi, mock_dnssd, mock_mdns, mock_llmnr,
+        mock_getent, mock_host, device
+    ):
+        """LLMNR fallback should be tried when other methods fail."""
+        mock_dns.side_effect = socket.herror('Host not found')
+
+        result = device._get_hostname()
+
+        assert result == 'WINDOWS-PC'
+        mock_llmnr.assert_called_once_with('192.168.1.100')
+
+    @patch.object(Device, '_resolve_netbios', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_host_cmd', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_getent', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_llmnr', return_value=None)
+    @patch.object(Device, '_resolve_mdns', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_dnssd', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_avahi', return_value='mydevice')
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
+    def test_avahi_tried_before_mdns(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self, mock_dns, mock_os, mock_avahi, mock_dnssd, mock_mdns, mock_llmnr,
+        mock_getent, mock_host, mock_netbios, device
+    ):
+        """Avahi should be tried before raw mDNS query."""
+        mock_dns.side_effect = socket.herror('Host not found')
+
+        result = device._get_hostname()
+
+        assert result == 'mydevice'
+        mock_avahi.assert_called_once()
+        # mDNS should not be called since avahi succeeded
+        mock_mdns.assert_not_called()
+
+    @pytest.fixture
+    def ipv6_device(self):
+        """Create a test device with IPv6 address."""
+        return Device(ip="fe80::1", alive=True)
+
+    @patch.object(Device, '_resolve_netbios', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_host_cmd', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_getent', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_llmnr', return_value='ipv6host')
+    @patch.object(Device, '_resolve_mdns', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_dnssd', return_value=None)
+    @patch('lanscape.core.net_tools.device.resolve_hostname_avahi', return_value=None)
+    @patch('lanscape.core.net_tools.device.os_handles_hostname_resolution', return_value=False)
+    @patch('lanscape.core.net_tools.device.socket.gethostbyaddr')
+    def test_ipv6_hostname_resolution(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self, mock_dns, mock_os, mock_avahi, mock_dnssd, mock_mdns, mock_llmnr,
+        mock_getent, mock_host, mock_netbios, ipv6_device
+    ):
+        """IPv6 hostname resolution should try all fallbacks."""
+        mock_dns.side_effect = socket.herror('Host not found')
+
+        result = ipv6_device._get_hostname()
+
+        assert result == 'ipv6host'
+        # All methods should be tried since earlier ones failed
+        mock_getent.assert_called_once()
+        mock_avahi.assert_called_once()
+        mock_dnssd.assert_called_once()
+        mock_host.assert_called_once()
+        mock_mdns.assert_called_once()
+        mock_llmnr.assert_called_once()

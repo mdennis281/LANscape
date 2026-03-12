@@ -23,11 +23,13 @@ The primary model for a discovered network device.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `ip` | `str` | *required* | IP address of the device |
+| `ip` | `str` | *required* | IP address of the device (IPv4 or IPv6) |
 | `alive` | `bool \| None` | `None` | Whether the device responded to alive-check |
-| `hostname` | `str \| None` | `None` | Resolved hostname (reverse DNS) |
-| `macs` | `List[str]` | `[]` | All discovered MAC addresses |
+| `hostname` | `str \| None` | `None` | Resolved hostname (reverse DNS, mDNS, or NetBIOS) |
+| `macs` | `List[str]` | `[]` | All discovered MAC addresses (via ARP for IPv4, NDP neighbor cache for IPv6) |
 | `manufacturer` | `str \| None` | `None` | MAC vendor/manufacturer name |
+| `ipv4_addresses` | `List[str]` | `[]` | All discovered IPv4 addresses for this device (includes the primary IP if it is IPv4, plus any cross-protocol alt IPs) |
+| `ipv6_addresses` | `List[str]` | `[]` | All discovered IPv6 addresses for this device (includes the primary IP if it is IPv6, plus any cross-protocol alt IPs) |
 | `ports` | `List[int]` | `[]` | Open ports found on the device |
 | `stage` | [`DeviceStage`](../config/enums.md#devicestage) | `FOUND` | Current scan stage for this device |
 | `ports_scanned` | `int` | `0` | Number of ports that have been tested |

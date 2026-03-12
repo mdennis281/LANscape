@@ -78,12 +78,12 @@ class ToolsHandler(BaseHandler):
                 'msg': f"{length} IP{'s' if length > 1 else ''}",
                 'count': length
             }
-        except SubnetTooLargeError:
+        except SubnetTooLargeError as e:
             return {
                 'valid': False,
-                'msg': 'subnet too large',
+                'msg': f'subnet too large ({e.count:,} IPs)',
                 'error': traceback.format_exc(),
-                'count': -1
+                'count': e.count
             }
         except Exception:
             return {

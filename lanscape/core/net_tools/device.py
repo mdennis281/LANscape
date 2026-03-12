@@ -1,5 +1,6 @@
 """Device model and related helpers (hostname resolution, MAC selection)."""
 
+import ipaddress
 import logging
 import socket
 import struct
@@ -9,14 +10,27 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel, PrivateAttr, ConfigDict, computed_field, model_serializer
 
 from lanscape.core.service_scan import scan_service, ServiceScanResult
-from lanscape.core.mac_lookup import MacLookup, get_macs
+from lanscape.core.mac_lookup import MacLookup
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, timeout_enforcer
 from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig
 from lanscape.core.models import (
     DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo, ProbeResponseInfo
 )
-from lanscape.core.system_compat import os_handles_hostname_resolution
+from lanscape.core.system_compat import (
+    os_handles_hostname_resolution,
+    get_socket_family,
+    is_ipv6,
+    resolve_hostname_avahi,
+    resolve_hostname_dnssd,
+    resolve_hostname_llmnr,
+    resolve_hostname_getent,
+    resolve_hostname_host_cmd,
+    _build_ptr_query,
+    _resolve_ipv6_scope_id,
+)
+from lanscape.core.alt_ip_resolver import resolve_alt_ips
+from lanscape.core.neighbor_table import NeighborTableService
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -159,6 +173,9 @@ class Device(BaseModel):
     service_info: List[ServiceInfo] = []
     caught_errors: List[DeviceError] = []
     job_stats: Optional[Dict] = None
+    alt_ips: List[str] = []
+    ipv4_addresses: List[str] = []
+    ipv6_addresses: List[str] = []
 
     _log: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger('Device'))
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -187,7 +204,7 @@ class Device(BaseModel):
         return data
 
     def get_metadata(self):
-        """Retrieve metadata such as hostname and MAC addresses."""
+        """Retrieve metadata such as hostname, MAC addresses, and alternate IPs."""
         if self.alive:
             self.hostname = self._get_hostname()
             self._get_mac_addresses()
@@ -195,6 +212,7 @@ class Device(BaseModel):
                 self.manufacturer = self._get_manufacturer(
                     self.get_mac()
                 )
+            self._resolve_alt_ips()
 
     def test_port(self, port: int, port_config: Optional[PortScanConfig] = None) -> bool:
         """Test if a specific port is open on the device."""
@@ -202,13 +220,14 @@ class Device(BaseModel):
             port_config = PortScanConfig()
 
         enforcer_timeout = port_config.timeout * (port_config.retries + 1) * 1.5
+        family = get_socket_family(self.ip)
 
         @timeout_enforcer(enforcer_timeout, False)
         def do_test():
             for attempt in range(port_config.retries + 1):
                 sock = None
                 try:
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock = socket.socket(family, socket.SOCK_STREAM)
                     sock.settimeout(port_config.timeout)
                     result = sock.connect_ex((self.ip, port))
                     if result == 0:
@@ -284,13 +303,25 @@ class Device(BaseModel):
     def _get_mac_addresses(self):
         """Get the possible MAC addresses of a network device given its IP address."""
         if not self.macs:
-            self.macs = get_macs(self.ip)
+            svc = NeighborTableService.instance()
+            self.macs = svc.get_macs_wait(self.ip)
         mac_selector.import_macs(self.macs)
         return self.macs
 
     @job_tracker
     def _get_hostname(self) -> Optional[str]:
-        """Get the hostname via reverse DNS, with mDNS/NetBIOS fallback on non-Windows."""
+        """Get the hostname via reverse DNS, with mDNS/NetBIOS/LLMNR fallbacks.
+
+        Resolution order:
+        1. socket.gethostbyaddr() - standard reverse DNS
+        2. getent hosts (Linux) - uses NSS chain (DNS, mDNS, WINS, etc.)
+        3. avahi-resolve (Linux) or dns-sd (macOS) - system mDNS daemons
+        4. host command - reverse DNS via bind-utils
+        5. Raw mDNS PTR query - pure Python multicast
+        6. LLMNR query - for Windows devices on the network
+        7. NetBIOS NBSTAT - IPv4 only, for older Windows devices
+        """
+        # 1. Standard reverse DNS
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]
             if hostname:
@@ -301,37 +332,34 @@ class Device(BaseModel):
         if os_handles_hostname_resolution():
             return None
 
-        hostname = self._resolve_mdns()
-        if hostname:
-            return hostname
-
-        hostname = self._resolve_netbios()
-        if hostname:
-            return hostname
+        # 2-7: Fallback resolvers tried in order
+        resolvers = [
+            lambda: resolve_hostname_getent(self.ip),
+            lambda: resolve_hostname_avahi(self.ip),
+            lambda: resolve_hostname_dnssd(self.ip),
+            lambda: resolve_hostname_host_cmd(self.ip),
+            self._resolve_mdns,
+            lambda: resolve_hostname_llmnr(self.ip),
+            self._resolve_netbios,
+        ]
+        for resolver in resolvers:
+            hostname = resolver()
+            if hostname:
+                return hostname
 
         return None
 
     def _resolve_mdns(self) -> Optional[str]:
-        """Resolve hostname via mDNS multicast PTR query (pure Python)."""
+        """Resolve hostname via mDNS multicast PTR query (pure Python, IPv4 & IPv6)."""
+        if is_ipv6(self.ip):
+            return self._resolve_mdns_v6()
+        return self._resolve_mdns_v4()
+
+    def _resolve_mdns_v4(self) -> Optional[str]:
+        """Resolve hostname via IPv4 mDNS PTR query."""
         reversed_ip = '.'.join(reversed(self.ip.split('.')))
         qname = f"{reversed_ip}.in-addr.arpa"
-
-        name_bytes = b''
-        for label in qname.split('.'):
-            name_bytes += bytes([len(label)]) + label.encode('ascii')
-        name_bytes += b'\x00'
-
-        request = (
-            b'\x00\x00'
-            b'\x00\x00'
-            b'\x00\x01'
-            b'\x00\x00'
-            b'\x00\x00'
-            b'\x00\x00'
-        ) + name_bytes + (
-            b'\x00\x0c'
-            b'\x80\x01'
-        )
+        request = _build_ptr_query(qname, qclass=b'\x80\x01')
 
         sock = None
         try:
@@ -347,8 +375,38 @@ class Device(BaseModel):
             if sock:
                 sock.close()
 
+    def _resolve_mdns_v6(self) -> Optional[str]:
+        """Resolve hostname via IPv6 mDNS PTR query."""
+        addr = ipaddress.IPv6Address(self.ip)
+        nibbles = addr.exploded.replace(':', '')
+        reversed_nibbles = '.'.join(reversed(nibbles))
+        qname = f"{reversed_nibbles}.ip6.arpa"
+        request = _build_ptr_query(qname, qclass=b'\x80\x01')
+
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+            sock.settimeout(2.0)
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 255)
+
+            scope_id = _resolve_ipv6_scope_id(addr)
+            if scope_id:
+                sock.sendto(request, ('ff02::fb', 5353, 0, scope_id))
+            else:
+                sock.sendto(request, ('ff02::fb', 5353))
+
+            data, _ = sock.recvfrom(1500)
+            return _parse_mdns_ptr_response(data)
+        except (socket.timeout, OSError):
+            return None
+        finally:
+            if sock:
+                sock.close()
+
     def _resolve_netbios(self) -> Optional[str]:
-        """Resolve hostname via NetBIOS NBSTAT query (pure Python)."""
+        """Resolve hostname via NetBIOS NBSTAT query (pure Python, IPv4 only)."""
+        if is_ipv6(self.ip):
+            return None
         request = (
             b'\xa5\x6c'
             b'\x00\x00'
@@ -381,6 +439,20 @@ class Device(BaseModel):
         """Get the manufacturer of a network device given its MAC address."""
         return mac_lookup.lookup_vendor(mac_addr) if mac_addr else None
 
+    @job_tracker
+    def _resolve_alt_ips(self):
+        """Discover cross-protocol IP addresses (IPv4<->IPv6) for this device."""
+        try:
+            self.alt_ips = resolve_alt_ips(self.ip, self.macs, self.hostname)
+        except Exception as exc:  # pylint: disable=broad-except
+            self._log.debug("Alt-IP resolution failed for %s: %s", self.ip, exc)
+            self.alt_ips = []
+
+        # Classify primary IP + alt IPs into protocol buckets
+        all_ips = [self.ip] + self.alt_ips
+        self.ipv4_addresses = [ip for ip in all_ips if not is_ipv6(ip)]
+        self.ipv6_addresses = [ip for ip in all_ips if is_ipv6(ip)]
+
     def to_result(self) -> DeviceResult:
         """Convert this Device to a DeviceResult for API/WebSocket responses."""
         error_infos = []
@@ -409,7 +481,9 @@ class Device(BaseModel):
             stage=device_stage,
             services=self.services,
             service_info=self.service_info,
-            errors=error_infos
+            errors=error_infos,
+            ipv4_addresses=self.ipv4_addresses,
+            ipv6_addresses=self.ipv6_addresses,
         )
 
 

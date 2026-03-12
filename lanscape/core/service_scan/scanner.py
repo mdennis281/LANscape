@@ -9,6 +9,7 @@ from lanscape.core.service_scan.models import ServiceScanResult
 from lanscape.core.service_scan.resources import PRINTER_PORTS
 from lanscape.core.service_scan.identification import _identify_service, _clean_response
 from lanscape.core.service_scan.probes import _multi_probe_generic
+from lanscape.core.system_compat import configure_asyncio_exception_handler
 
 log = logging.getLogger('ServiceScan')
 
@@ -85,6 +86,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    configure_asyncio_exception_handler(loop)
     try:
         return loop.run_until_complete(_async_scan_service(ip, port, cfg=cfg))
     except Exception as e:

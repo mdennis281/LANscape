@@ -28,6 +28,7 @@ from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController
 )
 from lanscape.core.system_compat import clear_screen
+from lanscape.core.neighbor_table import NeighborTableService
 
 
 class SubnetScanner():
@@ -64,6 +65,8 @@ class SubnetScanner():
             on_warning=self._handle_warning
         )
 
+        self._neighbor_svc = None
+
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(
             f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
@@ -75,50 +78,67 @@ class SubnetScanner():
         self._set_stage('scanning devices')
         self.running = True
 
-        # Clear job stats from any previous scan to ensure accurate progress tracking
-        self.job_stats.clear_stats()
-
-        # Create retry manager for device scanning
-        retry_config = RetryConfig(
-            max_retries=self.cfg.failure_retry_cnt,
-            multiplier_decrease=self.cfg.failure_multiplier_decrease,
-            debounce_sec=self.cfg.failure_debounce_sec,
+        # Start the background neighbor table service for thread-safe ARP/NDP lookups
+        self._neighbor_svc = NeighborTableService.instance()
+        ntc = self.cfg.neighbor_table_config
+        self._neighbor_svc.start(
+            refresh_interval=ntc.refresh_interval,
+            command_timeout=ntc.command_timeout,
         )
 
-        def on_device_error(job_id: str, error: Exception, tb_str: str):
-            """Callback for permanent device scan failures."""
-            self.results.errors.append(ScanErrorInfo(
-                basic=f"Error scanning IP {job_id}: {error}",
-                traceback=tb_str,
-            ))
+        try:
+            # Clear job stats from any previous scan to ensure accurate progress tracking
+            self.job_stats.clear_stats()
 
-        retry_manager = ThreadPoolRetryManager(
-            max_workers=self.cfg.t_cnt('isalive'),
-            retry_config=retry_config,
-            multiplier_controller=self._multiplier_controller,
-            thread_name_prefix="DeviceAlive",
-            on_job_error=on_device_error,
-        )
-
-        # Create jobs for each IP in the subnet
-        jobs = [
-            RetryJob(
-                job_id=str(ip),
-                func=self._get_host_details,
-                args=(str(ip),),
+            # Create retry manager for device scanning
+            retry_config = RetryConfig(
                 max_retries=self.cfg.failure_retry_cnt,
+                multiplier_decrease=self.cfg.failure_multiplier_decrease,
+                debounce_sec=self.cfg.failure_debounce_sec,
             )
-            for ip in self.subnet
-        ]
 
-        # Execute with retry support
-        retry_manager.execute_all(jobs)
+            def on_device_error(job_id: str, error: Exception, tb_str: str):
+                """Callback for permanent device scan failures."""
+                self.results.errors.append(ScanErrorInfo(
+                    basic=f"Error scanning IP {job_id}: {error}",
+                    traceback=tb_str,
+                ))
 
-        self._set_stage('testing ports')
-        if self.cfg.task_scan_ports:
-            self._scan_network_ports()
-        self.running = False
+            retry_manager = ThreadPoolRetryManager(
+                max_workers=self.cfg.t_cnt('isalive'),
+                retry_config=retry_config,
+                multiplier_controller=self._multiplier_controller,
+                thread_name_prefix="DeviceAlive",
+                on_job_error=on_device_error,
+            )
+
+            # Create jobs for each IP in the subnet
+            jobs = [
+                RetryJob(
+                    job_id=str(ip),
+                    func=self._get_host_details,
+                    args=(str(ip),),
+                    max_retries=self.cfg.failure_retry_cnt,
+                )
+                for ip in self.subnet
+            ]
+
+            # Execute with retry support
+            retry_manager.execute_all(jobs)
+
+            self._set_stage('testing ports')
+            if self.cfg.task_scan_ports:
+                self._scan_network_ports()
+        finally:
+            # Stop the background neighbor table service
+            if self._neighbor_svc and self._neighbor_svc.is_running:
+                self._neighbor_svc.stop()
+
+        # Set stage BEFORE running=False so the broadcast loop never sees
+        # running=False with a stale stage (e.g. 'testing ports').
         self._set_stage('complete')
+        self.results.end_time = time()
+        self.running = False
 
         devices_found = len(self.results.devices)
         open_ports = sum(len(d.ports) for d in self.results.devices)
@@ -142,8 +162,15 @@ class SubnetScanner():
         Raises:
             SubnetScanTerminationFailure: If the scan cannot be terminated within the timeout
         """
-        self.running = False
+        # Set stage BEFORE running=False so the broadcast loop always sees
+        # 'terminating' when it detects the scan is no longer running.
         self._set_stage('terminating')
+        self.running = False
+
+        # Stop neighbor table service on termination
+        if self._neighbor_svc and self._neighbor_svc.is_running:
+            self._neighbor_svc.stop()
+
         for _ in range(20):
             if not self.job_stats.running:
                 self._set_stage('terminated')
@@ -505,8 +532,11 @@ class ScannerResults:
         Returns:
             ScanResults: Complete scan results with metadata, devices, and config
         """
-        sorted_devices = sorted(
-            self.devices, key=lambda obj: ipaddress.IPv4Address(obj.ip))
+        def _sort_key(obj):
+            addr = ipaddress.ip_address(obj.ip)
+            return (addr.version, addr.packed)
+
+        sorted_devices = sorted(self.devices, key=_sort_key)
         device_results = [device.to_result() for device in sorted_devices]
 
         return ScanResults(

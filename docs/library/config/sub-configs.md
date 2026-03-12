@@ -42,7 +42,7 @@ cfg = ArpConfig(attempts=3, timeout=2.5)
 | `attempts` | `int` | `1` | Number of ARP request attempts |
 | `timeout` | `float` | `2.0` | Timeout in seconds for each ARP request |
 
-> **Note:** ARP scanning requires elevated privileges and only works within the local network segment. Use `net_tools.is_arp_supported()` to check availability.
+> **Note:** ARP scanning requires elevated privileges and only works within the local network segment. Use `net_tools.is_arp_supported()` to check availability. ARP is IPv4-only — for IPv6 targets, this discovery method is automatically skipped.
 
 ---
 
@@ -63,6 +63,8 @@ cfg = ArpCacheConfig(attempts=2, wait_before=0.3)
 | `attempts` | `int` | `1` | Number of ARP cache lookup attempts |
 | `wait_before` | `float` | `0.2` | Seconds to wait before checking the cache (allows ARP entries to populate) |
 
+> **Note:** For IPv4 targets, this step consults the OS ARP cache. For IPv6 targets, it consults the system's NDP (Neighbor Discovery Protocol) neighbor cache instead.
+
 ---
 
 ## PokeConfig
@@ -82,7 +84,28 @@ cfg = PokeConfig(attempts=4, timeout=0.25)
 | `attempts` | `int` | `1` | Number of poke attempts |
 | `timeout` | `float` | `2.0` | Timeout in seconds for each poke |
 
-> **How it works:** The poke doesn't expect a TCP response — it's just enough traffic to populate the local ARP cache, which is then checked for the device's MAC.
+> **How it works:** The poke doesn't expect a TCP response — it's just enough traffic to populate the local ARP cache (or NDP neighbor cache for IPv6), which is then checked for the device's MAC. For IPv6 targets, `AF_INET6` sockets are used automatically.
+
+---
+
+## NeighborTableConfig
+
+`lanscape.NeighborTableConfig`
+
+Controls the background neighbor table refresh service. During IPv6 scans, LANscape periodically refreshes the OS neighbor (NDP) cache in the background so that MAC address lookups stay current.
+
+```python
+from lanscape import NeighborTableConfig
+
+cfg = NeighborTableConfig(refresh_interval=3.0, command_timeout=8.0)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `refresh_interval` | `float` | `2.0` | Seconds between background neighbor table refreshes |
+| `command_timeout` | `float` | `5.0` | Timeout in seconds for each OS neighbor-table command |
+
+> **Note:** This service runs automatically during scans that include IPv6 targets. It keeps the NDP cache populated so that MAC/manufacturer lookups succeed for IPv6 devices.
 
 ---
 

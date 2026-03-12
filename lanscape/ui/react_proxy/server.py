@@ -27,6 +27,7 @@ from lanscape.ui.react_proxy.discovery import (
     build_default_route,
     get_local_address_strings,
 )
+from lanscape.core.system_compat import configure_asyncio_exception_handler
 
 REACT_BUILD_DIR = Path(__file__).resolve().parent.parent / 'react_build'
 
@@ -83,6 +84,20 @@ class SPAHandler(SimpleHTTPRequestHandler):
         self.send_header('Content-Length', str(len(html)))
         self.end_headers()
         self.wfile.write(html)
+
+    def handle_one_request(self) -> None:
+        """Handle a single HTTP request, suppressing client disconnect errors."""
+        try:
+            super().handle_one_request()
+        except ConnectionResetError:
+            # Client disconnected mid-request (e.g., browser refresh) - harmless
+            pass
+        except OSError as exc:
+            # Windows-specific: 10054=connection reset, 10053=connection aborted
+            if getattr(exc, 'winerror', None) in (10054, 10053):
+                pass
+            else:
+                raise
 
     # -----------------------------------------------------------------
     # API endpoint handlers
@@ -202,6 +217,7 @@ class WebappServerController:
         """
         self._ws_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._ws_loop)
+        configure_asyncio_exception_handler(self._ws_loop)
 
         self._ws_server = WebSocketServer(
             host='0.0.0.0',

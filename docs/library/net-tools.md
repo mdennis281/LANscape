@@ -33,7 +33,9 @@ Intelligently select the primary subnet most likely handling internet traffic. T
 4. First subnet in the list as final fallback
 
 **Deprioritized subnets** (virtual/system networks):
-- `127.0.0.0/8` — loopback
+- `127.0.0.0/8` — IPv4 loopback
+- `::1/128` — IPv6 loopback
+- `fe80::/10` — IPv6 link-local
 - `172.27.64.0/20` — WSL default
 - `172.17.0.0/16` — Docker default
 
@@ -46,31 +48,36 @@ subnet = net_tools.smart_select_primary_subnet()
 
 ### `get_all_network_subnets() -> List[dict]`
 
-Get all network subnets on the system. Useful when you want to let the user choose which subnet to scan.
+Get all network subnets on the system, including both IPv4 and IPv6 interfaces. Useful when you want to let the user choose which subnet to scan.
 
 **Returns:** `List[dict]` — each entry has:
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `"subnet"` | `str` | Subnet in CIDR notation |
-| `"address_cnt"` | `int` | Number of IPs in the subnet |
+| `"subnet"` | `str` | Subnet in CIDR notation (IPv4 or IPv6) |
+| `"address_cnt"` | `int` | Number of scannable hosts in the subnet (capped at 100,000 for large IPv6 subnets) |
+| `"interface"` | `str` | Name of the network interface (e.g., `"eth0"`, `"Wi-Fi"`) |
 
 ```python
 subnets = net_tools.get_all_network_subnets()
-# [{"subnet": "192.168.1.0/24", "address_cnt": 254}, ...]
+# [
+#   {"subnet": "192.168.1.0/24", "address_cnt": 254, "interface": "eth0"},
+#   {"subnet": "fd00::/64", "address_cnt": 100000, "interface": "eth0"},
+#   ...
+# ]
 ```
 
 ---
 
 ### `get_network_subnet(interface: str | None = None) -> str | None`
 
-Get the subnet for a specific network interface.
+Get the subnet for a specific network interface. Returns the first IPv4 or IPv6 subnet found on the interface.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `interface` | `str \| None` | `None` | Interface name. Defaults to primary interface. |
 
-**Returns:** `str | None` — subnet in CIDR notation, or `None` if unavailable.
+**Returns:** `str | None` — subnet in CIDR notation (IPv4 or IPv6), or `None` if unavailable.
 
 ---
 
@@ -109,7 +116,7 @@ from lanscape import ScanManager, ScanConfig, net_tools
 # List all subnets on the machine
 subnets = net_tools.get_all_network_subnets()
 for s in subnets:
-    print(f"  {s['subnet']}  ({s['address_cnt']} hosts)")
+    print(f"  {s['subnet']} on {s['interface']}  ({s['address_cnt']} hosts)")
 
 # Auto-pick the best one
 primary = net_tools.smart_select_primary_subnet(subnets)
@@ -130,12 +137,61 @@ for device in scan.results.to_results().devices:
 
 During a scan, LANscape resolves hostnames using a multi-strategy approach. This happens automatically — no configuration needed.
 
-| Method | Platform | Description |
-|--------|----------|-------------|
-| Reverse DNS | All | Standard `gethostbyaddr` lookup (PTR records) |
-| mDNS PTR query | Linux / macOS | Pure-Python multicast DNS query to `224.0.0.251:5353` — resolves `.local` hostnames without requiring `avahi-utils` |
-| NetBIOS NBSTAT | Linux / macOS | Pure-Python NetBIOS name query on port 137 — resolves Windows-style hostnames without requiring `samba-common` |
+| Method | Platform | IPv4 | IPv6 | Description |
+|--------|----------|------|------|-------------|
+| Reverse DNS | All | ✅ | ✅ | Standard `gethostbyaddr` lookup (PTR records) |
+| mDNS PTR query (IPv4) | Linux / macOS | ✅ | — | Multicast DNS query to `224.0.0.251:5353` using `in-addr.arpa` — resolves `.local` hostnames without `avahi-utils` |
+| mDNS PTR query (IPv6) | Linux / macOS | — | ✅ | Multicast DNS query to `ff02::fb:5353` using `ip6.arpa` — resolves `.local` hostnames for IPv6 devices |
+| NetBIOS NBSTAT | Linux / macOS | ✅ | — | NetBIOS name query on port 137 — IPv4 only, skipped for IPv6 targets |
 
 On **Windows**, the system resolver already chains through NetBIOS, LLMNR, and mDNS, so only reverse DNS is used.
 
-On **Linux and macOS**, if reverse DNS fails, LANscape tries mDNS then NetBIOS as fallbacks. Both are implemented in pure Python with no external dependencies.
+On **Linux and macOS**, if reverse DNS fails, LANscape tries mDNS then NetBIOS as fallbacks. For IPv6 targets, the mDNS query uses `ip6.arpa` PTR records sent via the IPv6 multicast address `ff02::fb`. NetBIOS is skipped since it is an IPv4-only protocol. All fallback methods are implemented in pure Python with no external dependencies.
+
+---
+
+## Cross-Protocol IP Resolution (Alt IPs)
+
+After hostname and MAC resolution, LANscape discovers **alternate IP addresses** for each device. If a device was scanned via IPv4, the resolver looks for its IPv6 addresses, and vice versa. The primary scanned IP and any discovered alt IPs are then classified into `DeviceResult.ipv4_addresses` and `DeviceResult.ipv6_addresses`.
+
+This happens automatically during scanning — no configuration needed.
+
+### Resolution Strategies
+
+| Strategy | Direction | Description |
+|----------|-----------|-------------|
+| **NDP cache priming** | IPv4 → IPv6 | Pings `ff02::1` (all-nodes multicast) on active interfaces to populate the NDP neighbor table before querying it. Runs once per process. |
+| Neighbor-cache correlation | Both | Queries the OS neighbor table (ARP for IPv4, NDP for IPv6) for entries sharing the same MAC |
+| EUI-64 link-local derivation | IPv4 → IPv6 | Derives the `fe80::` link-local address from the device's MAC using modified EUI-64 |
+| DNS `getaddrinfo` | Both | Queries A or AAAA records for the resolved hostname |
+
+All strategies are best-effort and fail silently. If a network has no IPv6 support, `ipv6_addresses` will only contain the primary IP (when scanning an IPv6 subnet) or be empty.
+
+> **Why NDP priming?** The IPv6 NDP neighbor table is only populated for devices the host has recently communicated with over IPv6. Without priming, most devices discovered via an IPv4 scan would have no IPv6 neighbor entries. The multicast ping triggers NDP responses from all IPv6-capable devices on the link, dramatically increasing coverage.
+
+### Standalone Usage
+
+The resolver can also be used independently:
+
+```python
+from lanscape import resolve_alt_ips
+
+# Find IPv6 addresses for a device scanned over IPv4
+alt = resolve_alt_ips(
+    ip='192.168.1.100',
+    macs=['aa:bb:cc:dd:ee:ff'],
+    hostname='my-device.local'
+)
+# ['fe80::a8bb:ccff:fedd:eeff', '2001:db8::100']
+```
+
+### Example: Accessing IP Addresses from Scan Results
+
+```python
+for device in scan.results.to_results().devices:
+    print(f"{device.ip} ({device.hostname})")
+    if device.ipv4_addresses:
+        print(f"  IPv4: {', '.join(device.ipv4_addresses)}")
+    if device.ipv6_addresses:
+        print(f"  IPv6: {', '.join(device.ipv6_addresses)}")
+```

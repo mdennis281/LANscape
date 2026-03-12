@@ -1,19 +1,15 @@
 """MAC address lookup and resolution service."""
 
 import logging
-import subprocess
 from typing import List, Optional
 
-from .app_scope import ResourceManager
-from .decorators import job_tracker, JobStatsMixin
-from .errors import DeviceError
-from .system_compat import (
-    get_arp_lookup_command,
-    extract_mac_from_output,
+from lanscape.core.app_scope import ResourceManager
+from lanscape.core.decorators import job_tracker, JobStatsMixin
+from lanscape.core.errors import DeviceError
+from lanscape.core.system_compat import (
     send_arp_request,
+    is_ipv6,
 )
-
-
 log = logging.getLogger('MacLookup')
 
 
@@ -49,21 +45,34 @@ class MacResolver(JobStatsMixin):
         self.caught_errors: List[DeviceError] = []
 
     def get_macs(self, ip: str) -> List[str]:
-        """Try to get the MAC address using Scapy, fallback to ARP if it fails."""
-        if mac := self._get_mac_by_scapy(ip):
-            log.debug(f"Used Scapy to resolve ip {ip} to mac {mac}")
-            return mac
-        arp = self._get_mac_by_arp(ip)
-        log.debug(f"Used ARP to resolve ip {ip} to mac {arp}")
-        return arp
+        """Resolve MAC address via neighbor cache, or Scapy if cache is unhealthy."""
+        if self._neighbor_cache_healthy():
+            return self._get_mac_by_neighbor_cache(ip)
+        if not is_ipv6(ip):
+            if macs := self._get_mac_by_scapy(ip):
+                log.debug("Used Scapy to resolve ip %s to mac %s", ip, macs)
+                return macs
+        return []
+
+    def _neighbor_cache_healthy(self) -> bool:
+        """Return True if the NeighborTableService is running and has entries."""
+        try:
+            from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+            svc = NeighborTableService.instance()
+            if not svc.is_running:
+                return False
+            return len(svc.get_table(want_v6=False).entries) > 0 \
+                or len(svc.get_table(want_v6=True).entries) > 0
+        except Exception:  # pylint: disable=broad-except
+            return False
 
     @job_tracker
-    def _get_mac_by_arp(self, ip: str) -> List[str]:
-        """Retrieve MAC addresses using the system ARP command."""
+    def _get_mac_by_neighbor_cache(self, ip: str) -> List[str]:
+        """Retrieve MAC addresses from the NeighborTableService."""
         try:
-            cmd = get_arp_lookup_command(ip)
-            output = subprocess.check_output(cmd, shell=True).decode()
-            return extract_mac_from_output(output)
+            from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+            svc = NeighborTableService.instance()
+            return svc.get_macs(ip)
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []

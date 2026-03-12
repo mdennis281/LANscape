@@ -16,10 +16,10 @@ from lanscape import ScanType
 
 | Value | String | Description |
 |-------|--------|-------------|
-| `ScanType.ICMP` | `"ICMP"` | Standard ICMP echo request (ping). Most universally supported but may be blocked by firewalls. |
-| `ScanType.ARP_LOOKUP` | `"ARP_LOOKUP"` | Active ARP request via scapy. Only works on the local network segment. Requires elevated privileges. |
-| `ScanType.POKE_THEN_ARP` | `"POKE_THEN_ARP"` | Sends a TCP packet to trigger ARP cache population, then checks the ARP cache. Good fallback when ARP scanning isn't available. |
-| `ScanType.ICMP_THEN_ARP` | `"ICMP_THEN_ARP"` | Tries ICMP first, falls back to ARP cache lookup on failure. Best balance of coverage. **Default strategy.** |
+| `ScanType.ICMP` | `"ICMP"` | Standard ICMP echo request (ping). Works for both IPv4 and IPv6 (`ping6` on Linux/macOS). Most universally supported but may be blocked by firewalls. |
+| `ScanType.ARP_LOOKUP` | `"ARP_LOOKUP"` | Active ARP request via scapy. Only works on the local network segment. Requires elevated privileges. **IPv4 only** — automatically skipped for IPv6 targets. |
+| `ScanType.POKE_THEN_ARP` | `"POKE_THEN_ARP"` | Sends a TCP packet to trigger ARP/NDP cache population, then checks the appropriate cache (ARP for IPv4, NDP neighbor cache for IPv6). Uses `AF_INET6` sockets for IPv6 targets. Good fallback when ARP/NDP scanning isn't available. |
+| `ScanType.ICMP_THEN_ARP` | `"ICMP_THEN_ARP"` | Tries ICMP first, falls back to a cache-based lookup on failure (ARP cache for IPv4, NDP neighbor cache for IPv6). Best balance of coverage. **Default strategy.** |
 
 ### Multiple Strategies
 

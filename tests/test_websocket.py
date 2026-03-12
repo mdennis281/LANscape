@@ -6,6 +6,7 @@ Tests cover:
 - WebSocket server functionality
 - End-to-end WebSocket integration
 """
+# pylint: disable=protected-access
 
 import asyncio
 import json
@@ -443,6 +444,11 @@ class TestWebSocketServer:
         assert server.port == 8766
         assert len(server.handlers) == 3
 
+    def test_server_debug_mode(self):
+        """Test server registers DebugHandler when debug_mode=True."""
+        server = WebSocketServer(host="127.0.0.1", port=8766, debug_mode=True)
+        assert len(server.handlers) == 4
+
     def test_get_actions(self, server):
         """Test getting all supported actions."""
         actions = server.get_actions()
@@ -513,6 +519,96 @@ class TestWebSocketServer:
         server.cleanup_client("client-1")
 
         assert "client-1" not in server.clients
+
+
+# Scan Completion Race Condition Tests
+###############################################################################
+
+class TestScanCompletionBroadcast:
+    """Tests for _send_scan_finished_to_subscribers stage defense."""
+
+    @pytest.fixture
+    def server(self):
+        """Create a WebSocketServer instance."""
+        return WebSocketServer(host="127.0.0.1", port=8766)
+
+    @pytest.mark.asyncio
+    async def test_finished_forces_complete_when_stage_stale(self, server):
+        """If a scan's stage is still 'testing ports' when the finished event
+        fires, the backend must override it to 'complete'."""
+        mock_ws = AsyncMock()
+        client_id = "client-1"
+        server._clients[client_id] = mock_ws
+
+        # Build a mock scan whose stage hasn't caught up yet
+        mock_scan = MagicMock()
+        mock_scan.uid = "scan-123"
+        mock_scan.running = False
+        mock_scan.results.stage = "testing ports"  # stale!
+
+        # Register subscription
+        server.scan_handler._subscriptions = {"scan-123": {client_id}}
+        # Stub _handle_get_delta to return a delta with metadata
+        server.scan_handler._handle_get_delta = MagicMock(return_value={
+            "scan_id": "scan-123",
+            "has_changes": False,
+            "metadata": {"percent_complete": 100},
+        })
+
+        await server._send_scan_finished_to_subscribers(mock_scan)
+
+        mock_ws.send.assert_called_once()
+        sent = json.loads(mock_ws.send.call_args[0][0])
+
+        assert sent["event"] == "scan.complete"
+        assert sent["data"]["metadata"]["stage"] == "complete"
+        assert sent["data"]["metadata"]["running"] is False
+
+    @pytest.mark.asyncio
+    async def test_finished_preserves_terminated_stage(self, server):
+        """A terminated scan must keep its 'terminated' stage untouched."""
+        mock_ws = AsyncMock()
+        client_id = "client-1"
+        server._clients[client_id] = mock_ws
+
+        mock_scan = MagicMock()
+        mock_scan.uid = "scan-456"
+        mock_scan.running = False
+        mock_scan.results.stage = "terminated"
+
+        server.scan_handler._subscriptions = {"scan-456": {client_id}}
+        server.scan_handler._handle_get_delta = MagicMock(return_value={
+            "scan_id": "scan-456",
+            "has_changes": False,
+            "metadata": {"percent_complete": 50},
+        })
+
+        await server._send_scan_finished_to_subscribers(mock_scan)
+
+        sent = json.loads(mock_ws.send.call_args[0][0])
+        assert sent["event"] == "scan.terminated"
+        assert sent["data"]["metadata"]["stage"] == "terminated"
+
+    @pytest.mark.asyncio
+    async def test_active_scan_transitions_to_finished(self, server):
+        """_send_updates_for_active_scans detects a newly-finished scan
+        and delegates to _send_scan_finished_to_subscribers."""
+        mock_scan = MagicMock()
+        mock_scan.uid = "scan-789"
+        mock_scan.running = False
+        mock_scan.results.stage = "complete"
+
+        server._scan_handler._scan_manager.scans = [mock_scan]
+        server._previously_running_scans = {"scan-789"}
+
+        with patch.object(
+            server, '_send_scan_finished_to_subscribers', new_callable=AsyncMock
+        ) as mock_finished:
+            await server._send_updates_for_active_scans()
+            mock_finished.assert_awaited_once_with(mock_scan)
+
+        # scan-789 should no longer be in the previously_running set
+        assert "scan-789" not in server._previously_running_scans
 
 
 # Integration Tests

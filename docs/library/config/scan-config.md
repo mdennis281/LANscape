@@ -30,6 +30,7 @@ ScanConfig(
     arp_config: ArpConfig = ArpConfig(),
     poke_config: PokeConfig = PokeConfig(),
     arp_cache_config: ArpCacheConfig = ArpCacheConfig(),
+    neighbor_table_config: NeighborTableConfig = NeighborTableConfig(),
     port_scan_config: PortScanConfig = PortScanConfig(),
     service_scan_config: ServiceScanConfig = ServiceScanConfig(),
 )
@@ -41,7 +42,7 @@ ScanConfig(
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `subnet` | `str` | *required* | Target subnet in CIDR, range, or comma-separated format (e.g., `"192.168.1.0/24"`, `"10.0.0.1-10.0.0.50"`, `"1.1.1.1,8.8.8.8"`) |
+| `subnet` | `str` | *required* | Target subnet in CIDR, range, or comma-separated format. Supports both IPv4 and IPv6 (e.g., `"192.168.1.0/24"`, `"fd00::/120"`, `"10.0.0.1-10.0.0.50"`, `"fd00::1-fd00::ff"`, `"1.1.1.1,fd00::1"`) |
 | `port_list` | `str` | *required* | Name of the port list to use (e.g., `"small"`, `"medium"`, `"large"`). Must exist in `PortManager`. |
 
 ### Threading
@@ -84,6 +85,7 @@ ScanConfig(
 | `arp_config` | [`ArpConfig`](sub-configs.md#arpconfig) | `ArpConfig()` | ARP scan settings |
 | `poke_config` | [`PokeConfig`](sub-configs.md#pokeconfig) | `PokeConfig()` | TCP poke settings |
 | `arp_cache_config` | [`ArpCacheConfig`](sub-configs.md#arpcacheconfig) | `ArpCacheConfig()` | ARP cache lookup settings |
+| `neighbor_table_config` | [`NeighborTableConfig`](sub-configs.md#neighbortableconfig) | `NeighborTableConfig()` | Background neighbor table refresh settings (IPv6) |
 | `port_scan_config` | [`PortScanConfig`](sub-configs.md#portscanconfig) | `PortScanConfig()` | Port scanning settings |
 | `service_scan_config` | [`ServiceScanConfig`](sub-configs.md#servicescanconfig) | `ServiceScanConfig()` | Service identification settings |
 
@@ -111,11 +113,11 @@ Resolve the `port_list` name into actual port numbers using `PortManager`.
 
 ---
 
-### `parse_subnet() -> List[IPv4Address]`
+### `parse_subnet() -> List[IPv4Address | IPv6Address]`
 
-Parse the `subnet` string into individual IP addresses.
+Parse the `subnet` string into individual IP addresses. Supports IPv4 and IPv6 CIDR notation, ranges, and comma-separated mixed lists.
 
-**Returns:** `List[IPv4Address]` — every IP address in the target range.
+**Returns:** `List[IPv4Address | IPv6Address]` — every IP address in the target range.
 
 ---
 
@@ -179,3 +181,24 @@ config = ScanConfig(
     ),
 )
 ```
+
+## Example: IPv6 Config
+
+```python
+from lanscape import ScanConfig, ScanType
+
+# Scan an IPv6 subnet
+config = ScanConfig(
+    subnet="fd00::/120",
+    port_list="medium",
+    lookup_type=[ScanType.ICMP_THEN_ARP],  # ARP cache step auto-skipped for IPv6
+)
+
+# Mixed IPv4 + IPv6 comma-separated targets
+config = ScanConfig(
+    subnet="192.168.1.1,192.168.1.2,fd00::1,fd00::2",
+    port_list="small",
+)
+```
+
+> **IPv6 note:** ARP-based discovery steps (`ARP_LOOKUP`, ARP cache lookups) are automatically skipped for IPv6 targets since ARP is an IPv4-only protocol. IPv6 MAC resolution uses the system’s NDP (Neighbor Discovery Protocol) cache instead.

@@ -148,7 +148,7 @@ Start a new network scan (non-blocking).
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `subnet` | `string` | yes | Target subnet (e.g. `"192.168.1.0/24"`) |
+| `subnet` | `string` | yes | Target subnet — IPv4 or IPv6 (e.g. `"192.168.1.0/24"`, `"fd00::/120"`, `"fd00::1-fd00::ff"`) |
 | `port_list` | `string` | no | Port list name (`"small"`, `"medium"`, `"large"`, or custom) |
 | `lookup_type` | `string[]` | no | Discovery methods (e.g. `["ICMP_THEN_ARP"]`) |
 | `t_multiplier` | `int` | no | Thread multiplier |
@@ -449,7 +449,7 @@ Validate a subnet string and get its host count.
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `subnet` | `string` | yes | Subnet to validate (e.g. `"192.168.1.0/24"`) |
+| `subnet` | `string` | yes | Subnet to validate — IPv4 or IPv6 (e.g. `"192.168.1.0/24"`, `"fd00::/120"`) |
 
 **Response data:**
 
@@ -475,9 +475,18 @@ List all network subnets detected on the host machine. The primary subnet is sor
 
 ```json
 [
-  { "subnet": "192.168.1.0/24", "interface": "eth0", "description": "..." }
+  { "subnet": "192.168.1.0/24", "address_cnt": 254, "interface": "eth0" },
+  { "subnet": "fd00::/64", "address_cnt": 100000, "interface": "eth0" }
 ]
 ```
+
+Each object includes:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `subnet` | `string` | Subnet in CIDR notation |
+| `address_cnt` | `int` | Number of scannable hosts in the subnet (capped at 100,000 for large IPv6 subnets) |
+| `interface` | `string` | Network interface name (e.g., `"eth0"`, `"Wi-Fi"`) |
 
 ---
 
@@ -535,6 +544,82 @@ Get application version, runtime arguments, and update status.
     "persistent": false
   }
 }
+```
+
+---
+
+### Debug Actions
+
+> **Requires `debug_mode=True`** — these actions are only available when the server is started with debug mode enabled. See [Server Configuration](#server-configuration).
+
+#### `debug.job_stats`
+
+Get current job statistics (running/finished counts and timing data).
+
+**Params:** none
+
+**Response data:**
+
+```json
+{
+  "running": { "scan_devices": 3 },
+  "finished": { "scan_devices": 12, "port_scan": 8 },
+  "timing": { "scan_devices": { "avg": 0.45, "max": 1.2 } }
+}
+```
+
+---
+
+#### `debug.job_stats_reset`
+
+Reset all accumulated job statistics.
+
+**Params:** none
+
+**Response data:**
+
+```json
+{ "success": true }
+```
+
+---
+
+#### `debug.clear_arp`
+
+Flush the system IPv4 ARP cache. Requires elevated privileges on most platforms.
+
+**Params:** none
+
+**Response data:**
+
+```json
+{ "success": true }
+```
+
+On failure:
+
+```json
+{ "success": false, "error": "All ARP flush commands failed", "details": ["..."] }
+```
+
+---
+
+#### `debug.clear_ndp`
+
+Flush the system IPv6 NDP (Neighbor Discovery Protocol) cache. Requires elevated privileges on most platforms.
+
+**Params:** none
+
+**Response data:**
+
+```json
+{ "success": true }
+```
+
+On failure:
+
+```json
+{ "success": false, "error": "All NDP flush commands failed", "details": ["..."] }
 ```
 
 ---
@@ -642,12 +727,15 @@ asyncio.run(main())
 | `host` | `127.0.0.1` | Bind address |
 | `port` | `8766` | WebSocket port |
 | `on_client_change` | `None` | Callback `(int) -> None` fired when client count changes |
+| `debug_mode` | `False` | Enable [debug actions](#debug-actions) (job stats, cache flushing) |
 
 ```python
 server = WebSocketServer(
     host="0.0.0.0",
     port=9000,
-    on_client_change=lambda count: print(f"{count} clients connected")
+    on_client_change=lambda count: print(f"{count} clients connected"),
+    debug_mode=True  # enables debug.* actions
+)
 )
 ```
 

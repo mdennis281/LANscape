@@ -3,7 +3,6 @@
 import socket
 import subprocess
 import time
-from typing import List
 
 from icmplib import ping
 from icmplib.exceptions import SocketPermissionError
@@ -15,14 +14,13 @@ from lanscape.core.scan_config import (
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
 from lanscape.core.system_compat import (
-    get_arp_cache_command,
     icmp_requires_privileged,
     get_ping_command,
     parse_ping_success,
-    extract_mac_from_output,
     send_arp_request,
+    is_ipv6,
+    get_socket_family,
 )
-
 
 def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
     """
@@ -45,11 +43,15 @@ def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
 
     if ScanType.ICMP_THEN_ARP in methods and not device.alive:
         IcmpLookup.execute(device, scan_config.ping_config)
-        ArpCacheLookup.execute(device, scan_config.arp_cache_config)
+        # Only check cache if ICMP failed - cache lookup is expensive for IPv6
+        if not device.alive:
+            ArpCacheLookup.execute(device, scan_config.arp_cache_config)
 
     if ScanType.POKE_THEN_ARP in methods and not device.alive:
         Poker.execute(device, scan_config.poke_config)
-        ArpCacheLookup.execute(device, scan_config.arp_cache_config)
+        # Only check cache if device not already found alive
+        if not device.alive:
+            ArpCacheLookup.execute(device, scan_config.arp_cache_config)
 
     return device.alive is True
 
@@ -118,67 +120,45 @@ class IcmpLookup():
 
 class ArpCacheLookup():
     """
-    Class to handle ARP cache lookups for device presence.
+    Class to handle ARP/NDP cache lookups for device presence.
+    Uses ARP cache for IPv4 and NDP neighbor cache for IPv6.
     """
 
     @classmethod
     @job_tracker
-    def execute(cls, device: Device, cfg: ArpCacheConfig) -> bool:
+    def execute(cls, device: Device, cfg: ArpCacheConfig) -> bool:  # pylint: disable=unused-argument
         """
-        Perform an ARP cache lookup for the specified device.
+        Perform an ARP/NDP cache lookup for the specified device.
+
+        Waits for the next NeighborTableService background refresh cycle
+        (so a preceding poke/ICMP has time to populate the OS cache) and
+        reads the result from the in-memory table.
 
         Args:
             device (Device): The device to look up.
+            cfg (ArpCacheConfig): The configuration for the cache lookup.
 
         Returns:
-            bool: True if the device is found in the ARP cache, False otherwise.
+            bool: True if the device is found in the cache, False otherwise.
         """
+        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+        svc = NeighborTableService.instance()
 
-        try:
-            command = cls._get_platform_arp_command() + [device.ip]
-        except RuntimeError as e:
-            device.caught_errors.append(DeviceError(e))
+        if not svc.is_running:
             return False
 
-        for _ in range(cfg.attempts):
-            time.sleep(cfg.wait_before)
-            try:
-                output = subprocess.check_output(command).decode()
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                device.caught_errors.append(DeviceError(e))
-                return False
-            macs = cls._extract_mac_address(output)
-            if macs:
-                device.macs = macs
-                device.alive = True
-                break
-
+        macs = svc.get_macs_wait(device.ip)
+        if macs:
+            device.macs = macs
+            device.alive = True
         return device.alive is True
-
-    @classmethod
-    def _get_platform_arp_command(cls) -> List[str]:
-        """
-        Get the ARP command to execute based on the platform.
-
-        On Linux, prefers 'ip neigh show' (iproute2) but falls back to
-        'arp -n' (net-tools) if ip command is not available.
-
-        Returns:
-            list[str]: The ARP command to execute.
-        """
-        return get_arp_cache_command()
-
-    @classmethod
-    def _extract_mac_address(cls, arp_resp: str) -> List[str]:
-        """Extract MAC addresses from ARP output."""
-        return extract_mac_from_output(arp_resp)
 
 
 class ArpLookup():
     """
     Class to handle ARP lookups for device presence.
     NOTE: This lookup method requires elevated privileges to access the ARP cache.
-
+    ARP is IPv4-only; IPv6 targets are skipped.
 
     [Arp Lookup Requirements](/docs/arp-issues.md)
     """
@@ -195,6 +175,9 @@ class ArpLookup():
         Returns:
             bool: True if the device is found via ARP, False otherwise.
         """
+        if is_ipv6(device.ip):
+            return device.alive is True
+
         enforcer_timeout = cfg.timeout * 2
 
         @timeout_enforcer(enforcer_timeout, raise_on_timeout=True)
@@ -239,8 +222,9 @@ class Poker():
         def do_poke():
             # Use a small set of common ports likely to be filtered but still trigger ARP
             common_ports = [80, 443, 22]
+            family = get_socket_family(device.ip)
             for i in range(cfg.attempts):
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock = socket.socket(family, socket.SOCK_STREAM)
                 sock.settimeout(cfg.timeout)
                 port = common_ports[i % len(common_ports)]
                 sock.connect_ex((device.ip, port))

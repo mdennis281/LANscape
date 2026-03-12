@@ -1,4 +1,5 @@
 {
+    "python.analysis.extraPaths": ["${workspaceFolder}"],
     "python.testing.pytestArgs": [
         "tests",
         "-v"
@@ -62,5 +63,12 @@
             "matchCommandLine": false
         }
     },
-    "chat.agent.maxRequests": 100
+    "chat.agent.maxRequests": 100,
+    "python-envs.pythonProjects": [
+        {
+            "path": ".",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
 }

@@ -23,7 +23,8 @@ from lanscape.ui.ws.protocol import (
 from lanscape.ui.ws.handlers import (
     ScanHandler,
     PortHandler,
-    ToolsHandler
+    ToolsHandler,
+    DebugHandler
 )
 
 
@@ -42,7 +43,8 @@ class WebSocketServer:
         self,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
-        on_client_change: Optional[Callable[[int], None]] = None
+        on_client_change: Optional[Callable[[int], None]] = None,
+        debug_mode: bool = False
     ):
         """
         Initialize the WebSocket server.
@@ -51,6 +53,7 @@ class WebSocketServer:
             host: Host to bind to (default: 127.0.0.1)
             port: Port to listen on (default: 8766)
             on_client_change: Optional callback when client count changes
+            debug_mode: Enable debug handler registration (default: False)
         """
         self.host = host
         self.port = port
@@ -65,8 +68,12 @@ class WebSocketServer:
         self._handlers = [
             self._scan_handler,
             self._port_handler,
-            self._tools_handler
+            self._tools_handler,
         ]
+
+        if debug_mode:
+            self._debug_handler = DebugHandler()
+            self._handlers.append(self._debug_handler)
 
         # Active connections
         self._clients: dict[str, WebSocketServerProtocol] = {}
@@ -369,6 +376,9 @@ class WebSocketServer:
             event_name = 'scan.terminated'
         else:
             event_name = 'scan.complete'
+            # Defense: if the stage hasn't fully transitioned yet, force it
+            if actual_stage not in ('complete', 'terminated'):
+                actual_stage = 'complete'
 
         for client_id in subscribed_clients:
             websocket = self._clients.get(client_id)

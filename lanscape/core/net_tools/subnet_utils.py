@@ -34,17 +34,65 @@ def get_host_ip_mask(ip_with_cidr: str) -> str:
     return f'{network.network_address}/{cidr}'
 
 
-def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str:
-    """Convert a psutil snicaddr to a ``network/prefix`` string."""
-    if not snicaddr.address or not snicaddr.netmask:
+def _get_ipv6_prefix(addr: str, netmask: str | None) -> int:
+    """
+    Determine the IPv6 prefix length.
+
+    On Linux/macOS, psutil provides the prefix in netmask.
+    On Windows, netmask is None - we use common defaults:
+    - /10 for link-local (fe80::/10 range)
+    - /64 for global addresses (most common)
+    """
+    if netmask is not None:
+        try:
+            return int(netmask)
+        except ValueError:
+            pass
+
+    # Windows fallback: determine prefix from address type
+    try:
+        addr_obj = ipaddress.IPv6Address(addr.split('%')[0])
+        if addr_obj.is_link_local:
+            return 10  # Link-local /10 range
+        if addr_obj.is_loopback:
+            return 128  # Loopback is a single host
+    except ValueError:
+        pass
+    return 64  # Assume /64 for global (most common prefix)
+
+
+def _is_scannable_ipv6(addr: str) -> bool:
+    """Return True if the IPv6 address is in a scannable range (not link-local/loopback)."""
+    try:
+        addr_obj = ipaddress.IPv6Address(addr.split('%')[0])
+        if addr_obj.is_link_local:
+            return False  # Link-local - not scannable across network
+        if addr_obj.is_loopback:
+            return False  # Loopback
+    except ValueError:
+        return False
+    return True
+
+
+def network_from_snicaddr(snicaddr: psutil._common.snicaddr) -> str | None:
+    """Convert a psutil snicaddr to a ``network/prefix`` string, or ``None`` if not derivable."""
+    if not snicaddr.address:
         return None
 
     if snicaddr.family == socket.AF_INET:
+        if not snicaddr.netmask:
+            return None
         addr = f"{snicaddr.address}/{get_cidr_from_netmask(snicaddr.netmask)}"
         return get_host_ip_mask(addr)
 
     if snicaddr.family == socket.AF_INET6:
-        addr = f"{snicaddr.address}/{snicaddr.netmask}"
+        # Filter out non-scannable IPv6 addresses
+        if not _is_scannable_ipv6(snicaddr.address):
+            return None
+        prefix = _get_ipv6_prefix(snicaddr.address, snicaddr.netmask)
+        # Strip zone ID (e.g., %eth0) if present
+        addr_clean = snicaddr.address.split('%')[0]
+        addr = f"{addr_clean}/{prefix}"
         return get_host_ip_mask(addr)
 
     return f"{snicaddr.address}"
@@ -58,7 +106,15 @@ def get_network_subnet(interface=None) -> str | None:
         addrs = psutil.net_if_addrs()
         if interface in addrs:
             for snicaddr in addrs[interface]:
-                if snicaddr.family == socket.AF_INET and snicaddr.address and snicaddr.netmask:
+                # IPv4 requires netmask; IPv6 can infer prefix via _get_ipv6_prefix()
+                if (
+                    snicaddr.family == socket.AF_INET
+                    and snicaddr.address
+                    and snicaddr.netmask
+                ) or (
+                    snicaddr.family == socket.AF_INET6
+                    and snicaddr.address
+                ):
                     subnet = network_from_snicaddr(snicaddr)
                     if subnet:
                         return subnet
@@ -69,19 +125,34 @@ def get_network_subnet(interface=None) -> str | None:
 
 
 def get_all_network_subnets() -> List[dict]:
-    """Return a list of ``{subnet, address_cnt}`` dicts for every active IPv4 interface."""
+    """Return a list of ``{subnet, address_cnt, interface}`` dicts for every active interface.
+
+    Deduplicates subnets per interface (multiple IPs on same subnet return one entry).
+    """
     addrs = psutil.net_if_addrs()
     gateways = psutil.net_if_stats()
     subnets = []
+    seen = set()  # Track (subnet, interface) pairs to dedupe
 
     for interface, snicaddrs in addrs.items():
+        iface_stats = gateways.get(interface)
+        if not iface_stats or not iface_stats.isup:
+            continue
         for snicaddr in snicaddrs:
-            if snicaddr.family == socket.AF_INET and gateways[interface].isup:
+            if snicaddr.family in (socket.AF_INET, socket.AF_INET6):
                 subnet = network_from_snicaddr(snicaddr)
                 if subnet:
+                    key = (subnet, interface)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    # Cap address_cnt to avoid JS integer overflow for large IPv6 subnets
+                    raw_count = get_address_count(subnet)
+                    capped_count = min(raw_count, MAX_IPS_ALLOWED)
                     subnets.append({
                         'subnet': subnet,
-                        'address_cnt': get_address_count(subnet)
+                        'address_cnt': capped_count,
+                        'interface': interface,
                     })
 
     return subnets
@@ -136,23 +207,19 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
 
 
 def _is_deprioritized_subnet(subnet: str) -> bool:
-    """Check if a subnet should be deprioritized (loopback, WSL, Docker)."""
+    """Check if a subnet should be deprioritized (loopback, WSL, Docker, link-local)."""
     try:
         network = ipaddress.ip_network(subnet, strict=False)
 
-        loopback = ipaddress.ip_network('127.0.0.0/8')
-        if network.overlaps(loopback):
-            return True
+        deprioritized = [
+            ipaddress.ip_network('127.0.0.0/8'),       # IPv4 loopback
+            ipaddress.ip_network('::1/128'),            # IPv6 loopback
+            ipaddress.ip_network('fe80::/10'),          # IPv6 link-local
+            ipaddress.ip_network('172.27.64.0/20'),     # WSL
+            ipaddress.ip_network('172.17.0.0/16'),      # Docker
+        ]
 
-        wsl_network = ipaddress.ip_network('172.27.64.0/20')
-        if network.overlaps(wsl_network):
-            return True
-
-        docker_network = ipaddress.ip_network('172.17.0.0/16')
-        if network.overlaps(docker_network):
-            return True
-
-        return False
+        return any(network.overlaps(net) for net in deprioritized)
     except ValueError:
         return False
 
@@ -164,11 +231,11 @@ def is_internal_block(subnet: str) -> bool:
             return all(is_internal_block(part.strip()) for part in subnet.split(','))
 
         if '/' in subnet:
-            return ipaddress.IPv4Network(subnet, strict=False).is_private
+            return ipaddress.ip_network(subnet, strict=False).is_private
 
         ip_list = parse_ip_input(subnet)
         sample_ips = ([ip_list[0], ip_list[-1]] if len(ip_list) > 1 else ip_list)
-        return all(ipaddress.IPv4Address(ip).is_private for ip in sample_ips)
+        return all(ipaddress.ip_address(str(ip)).is_private for ip in sample_ips)
 
     except (ValueError, ipaddress.AddressValueError):
         return False

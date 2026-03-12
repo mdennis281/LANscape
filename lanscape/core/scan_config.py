@@ -2,13 +2,12 @@
 
 import os
 from typing import List, Dict
-import ipaddress
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
 from lanscape.core.port_manager import PortManager
-from lanscape.core.ip_parser import parse_ip_input
+from lanscape.core.ip_parser import parse_ip_input, IPAddress
 
 
 class ConfigBase(BaseModel):
@@ -66,6 +65,12 @@ class PokeConfig(ConfigBase):
     """Configuration for TCP poke (triggers ARP cache population)."""
     attempts: int = 1
     timeout: float = 2.0
+
+
+class NeighborTableConfig(ConfigBase):
+    """Configuration for the background neighbor table refresh service."""
+    refresh_interval: float = 2.0
+    command_timeout: float = 5.0
 
 
 class ServiceScanStrategy(Enum):
@@ -139,6 +144,7 @@ class ScanConfig(ConfigBase):
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
+    neighbor_table_config: 'NeighborTableConfig' = Field(default_factory=NeighborTableConfig)
     port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
     service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
 
@@ -172,12 +178,12 @@ class ScanConfig(ConfigBase):
         """
         return PortManager().get_port_list(self.port_list).keys()
 
-    def parse_subnet(self) -> List[ipaddress.IPv4Network]:
+    def parse_subnet(self) -> List['IPAddress']:
         """
-        Parse the configured subnet string into IPv4Network objects.
+        Parse the configured subnet string into IP address objects.
 
         Returns:
-            List of IPv4Network objects representing the target networks
+            List of IPv4Address / IPv6Address objects representing the target IPs
         """
         return parse_ip_input(self.subnet)
 

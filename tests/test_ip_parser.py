@@ -139,12 +139,24 @@ class TestGetAddressCount:
     """Tests for get_address_count helper."""
 
     def test_ipv4_subnet(self):
-        """IPv4 /24 has 256 addresses."""
-        assert get_address_count("192.168.1.0/24") == 256
+        """IPv4 /24 has 254 scannable hosts (excludes network + broadcast)."""
+        assert get_address_count("192.168.1.0/24") == 254
+
+    def test_ipv4_slash31(self):
+        """/31 point-to-point link has 2 hosts."""
+        assert get_address_count("10.0.0.0/31") == 2
+
+    def test_ipv4_slash32(self):
+        """/32 single host."""
+        assert get_address_count("10.0.0.1/32") == 1
 
     def test_ipv6_subnet(self):
-        """IPv6 /120 has 256 addresses."""
-        assert get_address_count("fd00::/120") == 256
+        """IPv6 /120 has 255 scannable hosts (excludes network address)."""
+        assert get_address_count("fd00::/120") == 255
+
+    def test_ipv6_slash128(self):
+        """/128 single host."""
+        assert get_address_count("::1/128") == 1
 
     def test_invalid_returns_zero(self):
         """Invalid input returns 0."""

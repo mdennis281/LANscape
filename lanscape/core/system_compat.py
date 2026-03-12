@@ -23,9 +23,24 @@ log = logging.getLogger(__name__)
 
 # ─── IPv6 helpers ───────────────────────────────────────────────────
 
+def _resolve_ipv6_scope_id(addr: ipaddress.IPv6Address) -> int:
+    """Return the OS scope-id for reaching *addr* over IPv6, or 0."""
+    try:
+        info = socket.getaddrinfo(str(addr), 0, socket.AF_INET6, socket.SOCK_DGRAM)
+        if info and len(info[0]) >= 5 and len(info[0][4]) >= 4:
+            return info[0][4][3]
+    except OSError:
+        pass
+    return 0
+
+
 def is_ipv6(ip: str) -> bool:
-    """Return True if *ip* is an IPv6 address string."""
-    return ':' in ip
+    """Return True if *ip* is a syntactically valid IPv6 address string."""
+    ip_no_zone = ip.split('%', 1)[0]
+    try:
+        return isinstance(ipaddress.ip_address(ip_no_zone), ipaddress.IPv6Address)
+    except ValueError:
+        return False
 
 
 def get_socket_family(ip: str) -> int:
@@ -432,8 +447,11 @@ def resolve_hostname_llmnr(ip: str, timeout: float = 1.5) -> Optional[str]:
         if addr.version == 6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             sock.settimeout(timeout)
-            # LLMNR IPv6 multicast address
-            sock.sendto(request, ('ff02::1:3', 5355))
+            scope_id = _resolve_ipv6_scope_id(addr)
+            if scope_id:
+                sock.sendto(request, ('ff02::1:3', 5355, 0, scope_id))
+            else:
+                sock.sendto(request, ('ff02::1:3', 5355))
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(timeout)

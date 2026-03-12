@@ -55,7 +55,7 @@ Get all network subnets on the system, including both IPv4 and IPv6 interfaces. 
 | Key | Type | Description |
 |-----|------|-------------|
 | `"subnet"` | `str` | Subnet in CIDR notation (IPv4 or IPv6) |
-| `"address_cnt"` | `int` | Number of IPs in the subnet (capped at 100,000 for large IPv6 subnets) |
+| `"address_cnt"` | `int` | Number of scannable hosts in the subnet (capped at 100,000 for large IPv6 subnets) |
 | `"interface"` | `str` | Name of the network interface (e.g., `"eth0"`, `"Wi-Fi"`) |
 
 ```python

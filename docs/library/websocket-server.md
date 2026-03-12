@@ -485,7 +485,7 @@ Each object includes:
 | Key | Type | Description |
 |-----|------|-------------|
 | `subnet` | `string` | Subnet in CIDR notation |
-| `address_cnt` | `int` | Number of hosts in the subnet (capped at 100,000 for large IPv6 subnets) |
+| `address_cnt` | `int` | Number of scannable hosts in the subnet (capped at 100,000 for large IPv6 subnets) |
 | `interface` | `string` | Network interface name (e.g., `"eth0"`, `"Wi-Fi"`) |
 
 ---

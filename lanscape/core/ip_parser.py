@@ -44,8 +44,16 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
             net = ipaddress.ip_network(entry, strict=False)
             if net.num_addresses > MAX_IPS_ALLOWED:
                 raise SubnetTooLargeError(ip_input, net.num_addresses)
-            for ip in net.hosts():
-                ip_ranges.append(ip)
+            if isinstance(net, ipaddress.IPv6Network):
+                # IPv6 has no broadcast address — include all except network address
+                if net.num_addresses == 1:          # /128 — single host
+                    ip_ranges.append(net.network_address)
+                else:
+                    for ip_int in range(1, net.num_addresses):
+                        ip_ranges.append(net.network_address + ip_int)
+            else:
+                for ip in net.hosts():
+                    ip_ranges.append(ip)
 
         # Handle IP range (e.g., 10.0.0.15-10.0.0.25 or fd00::1-fd00::ff)
         elif '-' in entry:
@@ -62,17 +70,26 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
 
 def get_address_count(subnet: str) -> int:
     """
-    Get the number of addresses in an IP subnet (IPv4 or IPv6).
+    Get the number of scannable host addresses in an IP subnet (IPv4 or IPv6).
+
+    For IPv4, this excludes the network and broadcast addresses (except for /31 and /32).
+    For IPv6, this excludes only the network address (IPv6 has no broadcast).
 
     Args:
         subnet (str): Subnet in CIDR notation
 
     Returns:
-        int: Number of addresses in the subnet, or 0 if invalid
+        int: Number of scannable host addresses in the subnet, or 0 if invalid
     """
     try:
         net = ipaddress.ip_network(subnet, strict=False)
-        return net.num_addresses
+        if isinstance(net, ipaddress.IPv6Network):
+            # IPv6: exclude network address only (no broadcast)
+            return max(net.num_addresses - 1, 1)
+        # IPv4: /32 = 1 host, /31 = 2 hosts, else num_addresses - 2
+        if net.prefixlen >= 31:
+            return net.num_addresses
+        return net.num_addresses - 2
     except (ValueError, TypeError):
         return 0
 

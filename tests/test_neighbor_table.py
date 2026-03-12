@@ -8,7 +8,7 @@ Covers:
 - Command fallback logic
 - Live integration tests (Windows local)
 """
-# pylint: disable=protected-access,missing-function-docstring
+# pylint: disable=protected-access,missing-function-docstring,import-outside-toplevel
 import shutil as _shutil
 import subprocess
 from unittest.mock import patch

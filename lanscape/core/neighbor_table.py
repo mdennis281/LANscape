@@ -534,7 +534,8 @@ def parse_command_output(
     if cmd_name in parsers:
         return parsers[cmd_name]()
     if cmd_name == 'arp':
-        if _get_platform() == 'macos':
+        platform = _get_platform()
+        if platform in ('macos', 'linux'):
             return parse_macos_arp(output)
         return parse_windows_arp(output)
 

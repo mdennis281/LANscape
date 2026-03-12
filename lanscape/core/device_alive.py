@@ -126,7 +126,7 @@ class ArpCacheLookup():
 
     @classmethod
     @job_tracker
-    def execute(cls, device: Device, cfg: ArpCacheConfig) -> bool:
+    def execute(cls, device: Device, cfg: ArpCacheConfig) -> bool:  # pylint: disable=unused-argument
         """
         Perform an ARP/NDP cache lookup for the specified device.
 

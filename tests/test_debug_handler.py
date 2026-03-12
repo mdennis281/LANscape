@@ -1,4 +1,5 @@
 """Tests for the debug WebSocket handler — cache flush actions."""
+# pylint: disable=missing-function-docstring
 
 from unittest.mock import patch, MagicMock
 import subprocess
@@ -76,7 +77,7 @@ class TestGetFlushCommands:
         mock_psutil.LINUX = False
         mock_psutil.MACOS = False
         cmds = _get_flush_commands(want_v6=False)
-        assert cmds == []
+        assert not cmds
 
 
 # ── _run_flush ──────────────────────────────────────────────────────

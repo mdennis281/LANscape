@@ -10,7 +10,7 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel, PrivateAttr, ConfigDict, computed_field, model_serializer
 
 from lanscape.core.service_scan import scan_service, ServiceScanResult
-from lanscape.core.mac_lookup import MacLookup, get_macs
+from lanscape.core.mac_lookup import MacLookup
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, timeout_enforcer
 from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig
@@ -27,9 +27,10 @@ from lanscape.core.system_compat import (
     resolve_hostname_getent,
     resolve_hostname_host_cmd,
     _build_ptr_query,
+    _resolve_ipv6_scope_id,
 )
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
-from lanscape.core.neighbor_table import NeighborTableService  
+from lanscape.core.neighbor_table import NeighborTableService
 
 log = logging.getLogger('NetTools')
 mac_lookup = MacLookup()
@@ -388,18 +389,7 @@ class Device(BaseModel):
             sock.settimeout(2.0)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 255)
 
-            # Determine scope_id for link-local multicast (ff02::fb) based on
-            # the interface used to reach the target IPv6 address.
-            scope_id = 0
-            try:
-                info = socket.getaddrinfo(
-                    str(addr), 0, socket.AF_INET6, socket.SOCK_DGRAM
-                )
-                if info and len(info[0]) >= 5 and len(info[0][4]) >= 4:
-                    scope_id = info[0][4][3]
-            except OSError:
-                scope_id = 0
-
+            scope_id = _resolve_ipv6_scope_id(addr)
             if scope_id:
                 sock.sendto(request, ('ff02::fb', 5353, 0, scope_id))
             else:

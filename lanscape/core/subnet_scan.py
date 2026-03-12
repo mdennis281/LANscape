@@ -86,56 +86,58 @@ class SubnetScanner():
             command_timeout=ntc.command_timeout,
         )
 
-        # Clear job stats from any previous scan to ensure accurate progress tracking
-        self.job_stats.clear_stats()
+        try:
+            # Clear job stats from any previous scan to ensure accurate progress tracking
+            self.job_stats.clear_stats()
 
-        # Create retry manager for device scanning
-        retry_config = RetryConfig(
-            max_retries=self.cfg.failure_retry_cnt,
-            multiplier_decrease=self.cfg.failure_multiplier_decrease,
-            debounce_sec=self.cfg.failure_debounce_sec,
-        )
-
-        def on_device_error(job_id: str, error: Exception, tb_str: str):
-            """Callback for permanent device scan failures."""
-            self.results.errors.append(ScanErrorInfo(
-                basic=f"Error scanning IP {job_id}: {error}",
-                traceback=tb_str,
-            ))
-
-        retry_manager = ThreadPoolRetryManager(
-            max_workers=self.cfg.t_cnt('isalive'),
-            retry_config=retry_config,
-            multiplier_controller=self._multiplier_controller,
-            thread_name_prefix="DeviceAlive",
-            on_job_error=on_device_error,
-        )
-
-        # Create jobs for each IP in the subnet
-        jobs = [
-            RetryJob(
-                job_id=str(ip),
-                func=self._get_host_details,
-                args=(str(ip),),
+            # Create retry manager for device scanning
+            retry_config = RetryConfig(
                 max_retries=self.cfg.failure_retry_cnt,
+                multiplier_decrease=self.cfg.failure_multiplier_decrease,
+                debounce_sec=self.cfg.failure_debounce_sec,
             )
-            for ip in self.subnet
-        ]
 
-        # Execute with retry support
-        retry_manager.execute_all(jobs)
+            def on_device_error(job_id: str, error: Exception, tb_str: str):
+                """Callback for permanent device scan failures."""
+                self.results.errors.append(ScanErrorInfo(
+                    basic=f"Error scanning IP {job_id}: {error}",
+                    traceback=tb_str,
+                ))
 
-        self._set_stage('testing ports')
-        if self.cfg.task_scan_ports:
-            self._scan_network_ports()
+            retry_manager = ThreadPoolRetryManager(
+                max_workers=self.cfg.t_cnt('isalive'),
+                retry_config=retry_config,
+                multiplier_controller=self._multiplier_controller,
+                thread_name_prefix="DeviceAlive",
+                on_job_error=on_device_error,
+            )
 
-        # Stop the background neighbor table service
-        if hasattr(self, '_neighbor_svc') and self._neighbor_svc.is_running:
-            self._neighbor_svc.stop()
+            # Create jobs for each IP in the subnet
+            jobs = [
+                RetryJob(
+                    job_id=str(ip),
+                    func=self._get_host_details,
+                    args=(str(ip),),
+                    max_retries=self.cfg.failure_retry_cnt,
+                )
+                for ip in self.subnet
+            ]
+
+            # Execute with retry support
+            retry_manager.execute_all(jobs)
+
+            self._set_stage('testing ports')
+            if self.cfg.task_scan_ports:
+                self._scan_network_ports()
+        finally:
+            # Stop the background neighbor table service
+            if self._neighbor_svc and self._neighbor_svc.is_running:
+                self._neighbor_svc.stop()
 
         # Set stage BEFORE running=False so the broadcast loop never sees
         # running=False with a stale stage (e.g. 'testing ports').
         self._set_stage('complete')
+        self.results.end_time = time()
         self.running = False
 
         devices_found = len(self.results.devices)
@@ -166,7 +168,7 @@ class SubnetScanner():
         self.running = False
 
         # Stop neighbor table service on termination
-        if hasattr(self, '_neighbor_svc') and self._neighbor_svc.is_running:
+        if self._neighbor_svc and self._neighbor_svc.is_running:
             self._neighbor_svc.stop()
 
         for _ in range(20):

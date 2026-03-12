@@ -75,6 +75,15 @@ class SubnetScanner():
         self._set_stage('scanning devices')
         self.running = True
 
+        # Start the background neighbor table service for thread-safe ARP/NDP lookups
+        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+        self._neighbor_svc = NeighborTableService.instance()
+        ntc = self.cfg.neighbor_table_config
+        self._neighbor_svc.start(
+            refresh_interval=ntc.refresh_interval,
+            command_timeout=ntc.command_timeout,
+        )
+
         # Clear job stats from any previous scan to ensure accurate progress tracking
         self.job_stats.clear_stats()
 
@@ -118,6 +127,11 @@ class SubnetScanner():
         if self.cfg.task_scan_ports:
             self._scan_network_ports()
         self.running = False
+
+        # Stop the background neighbor table service
+        if hasattr(self, '_neighbor_svc') and self._neighbor_svc.is_running:
+            self._neighbor_svc.stop()
+
         self._set_stage('complete')
 
         devices_found = len(self.results.devices)
@@ -144,6 +158,11 @@ class SubnetScanner():
         """
         self.running = False
         self._set_stage('terminating')
+
+        # Stop neighbor table service on termination
+        if hasattr(self, '_neighbor_svc') and self._neighbor_svc.is_running:
+            self._neighbor_svc.stop()
+
         for _ in range(20):
             if not self.job_stats.running:
                 self._set_stage('terminated')

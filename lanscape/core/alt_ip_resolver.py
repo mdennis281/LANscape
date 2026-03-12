@@ -17,10 +17,8 @@ from typing import List
 
 from lanscape.core.system_compat import (
     is_ipv6,
-    extract_ips_for_mac,
     get_ipv6_interface_scopes,
     get_ndp_ping_command,
-    get_neighbor_dump_command,
 )
 
 log = logging.getLogger('AltIPResolver')
@@ -115,6 +113,7 @@ def _alt_ips_from_neighbor_cache(mac: str, scanning_v6: bool) -> List[str]:
     """Search the opposite-protocol neighbor table for *mac*.
 
     When scanning IPv4 we query the IPv6 neighbor table, and vice versa.
+    Uses the NeighborTableService for thread-safe, lock-free lookups.
     If looking for IPv6 entries, the NDP cache is primed first (once per
     process) to maximise coverage.
     """
@@ -122,13 +121,15 @@ def _alt_ips_from_neighbor_cache(mac: str, scanning_v6: bool) -> List[str]:
         want_v6 = not scanning_v6
         if want_v6:
             _prime_ndp_cache()
-        cmd = get_neighbor_dump_command(want_v6)
-        if not cmd:
-            return []
-        output = subprocess.check_output(
-            cmd, shell=True, timeout=5, stderr=subprocess.DEVNULL,
-        ).decode(errors='replace')
-        return extract_ips_for_mac(output, mac, want_v6)
+
+        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+        svc = NeighborTableService.instance()
+        if svc.is_running:
+            return svc.get_ips_for_mac(mac, want_v6)
+        return []
+    except Exception as exc:  # pylint: disable=broad-except
+        log.debug("Neighbor-cache lookup failed: %s", exc)
+        return []
     except Exception as exc:  # pylint: disable=broad-except
         log.debug("Neighbor-cache lookup failed: %s", exc)
         return []

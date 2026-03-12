@@ -67,6 +67,12 @@ class PokeConfig(ConfigBase):
     timeout: float = 2.0
 
 
+class NeighborTableConfig(ConfigBase):
+    """Configuration for the background neighbor table refresh service."""
+    refresh_interval: float = 2.0
+    command_timeout: float = 5.0
+
+
 class ServiceScanStrategy(Enum):
     """
     Enumeration of strategies for service scanning on open ports.
@@ -138,6 +144,7 @@ class ScanConfig(ConfigBase):
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
+    neighbor_table_config: 'NeighborTableConfig' = Field(default_factory=NeighborTableConfig)
     port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
     service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
 

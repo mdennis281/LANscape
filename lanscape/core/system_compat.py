@@ -14,12 +14,9 @@ import shutil
 import socket
 import struct
 import subprocess
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import psutil
-
-from lanscape.core.decorators import run_once
-
 
 log = logging.getLogger(__name__)
 
@@ -36,35 +33,7 @@ def get_socket_family(ip: str) -> int:
     return socket.AF_INET6 if is_ipv6(ip) else socket.AF_INET
 
 
-def filter_neighbor_table_output(output: str, target_ip: str) -> str:
-    """Filter neighbor table output to lines containing exact IP match.
 
-    Used for IPv6 neighbor table parsing on Windows/macOS where the command
-    returns full table and shell-level filtering may incorrectly match
-    partial addresses.
-    """
-    try:
-        target_addr = ipaddress.ip_address(target_ip.split('%')[0])
-    except ValueError:
-        return output
-
-    matching_lines = []
-    for line in output.splitlines():
-        for word in line.split():
-            # Normalize candidate token:
-            # - strip interface scope (e.g. "%en0")
-            # - remove common surrounding brackets ((), [], {}, <>)
-            # - drop common trailing punctuation delimiters (.,;:)
-            token = word.split('%')[0].strip("()[]{}<>")
-            word_clean = token.rstrip('.,;:')
-            try:
-                addr = ipaddress.ip_address(word_clean)
-                if addr == target_addr:
-                    matching_lines.append(line)
-                    break
-            except ValueError:
-                continue
-    return '\n'.join(matching_lines)
 
 
 # ─── Virtual interface filtering ────────────────────────────────────
@@ -76,153 +45,6 @@ VIRTUAL_IFACE_NAMES: tuple[str, ...] = (
     'vethernet', 'zerotier', 'tailscale', 'tun', 'tap',
     'wg', 'utun', 'virbr', 'br-', 'ham',
 )
-
-
-# ─── ARP commands ───────────────────────────────────────────────────
-
-@run_once
-def get_linux_arp_command() -> Tuple[List[str], str]:
-    """Get the ARP cache command for Linux, with fallback.
-
-    Prefers ``ip neigh show`` (iproute2) over ``arp -n`` (net-tools).
-    Result is cached via ``@run_once``.
-    """
-    if shutil.which('ip'):
-        return (['ip', 'neigh', 'show'], 'ip neigh show')
-
-    if shutil.which('arp'):
-        return (['arp', '-n'], 'arp -n')
-
-    log.warning(
-        "Neither 'ip' nor 'arp' command found - ARP lookup is unavailable. "
-        "Please install the 'iproute2' or 'net-tools' package to enable ARP cache lookups."
-    )
-    raise RuntimeError(
-        "No suitable ARP command found on this Linux system. "
-        "Install 'iproute2' (providing 'ip') or 'net-tools' (providing 'arp')."
-    )
-
-
-def get_arp_cache_command() -> List[str]:
-    """Get the platform-appropriate ARP cache command (list form, no IP arg)."""
-    if psutil.WINDOWS:
-        return ['arp', '-a']
-    if psutil.LINUX:
-        cmd_list, _ = get_linux_arp_command()
-        return cmd_list
-    if psutil.MACOS:
-        return ['arp', '-n']
-
-    raise NotImplementedError("Unsupported platform")
-
-
-def get_arp_lookup_command(ip: str) -> str:
-    """Get a shell-string command for resolving a single IP's MAC/link-layer address.
-
-    For IPv6 targets, uses the appropriate neighbor-discovery command.
-    """
-    if is_ipv6(ip):
-        return _get_ipv6_neighbor_command(ip)
-    if psutil.WINDOWS:
-        return f"arp -a {ip}"
-    if psutil.LINUX:
-        _, cmd_str = get_linux_arp_command()
-        return f"{cmd_str} {ip}"
-    return f"arp {ip}"
-
-
-def _get_ipv6_neighbor_command(ip: str) -> str:
-    """Get the platform-appropriate IPv6 neighbor cache command for a single IP.
-
-    Note: For Windows and macOS, we return the full neighbor table and rely on
-    Python-side parsing to perform an exact IP match, avoiding fragile shell-level
-    substring filters (e.g., `findstr {ip}` / `grep {ip}`) that can incorrectly
-    match partial IPv6 addresses.
-    """
-    if psutil.WINDOWS:
-        # Full table; caller must perform exact IP matching when parsing.
-        return "netsh interface ipv6 show neighbors"
-    if psutil.LINUX:
-        # `ip -6 neigh show {ip}` already performs an exact lookup for the IP.
-        return f"ip -6 neigh show {ip}"
-    if psutil.MACOS:
-        # Full table; caller must perform exact IP matching when parsing.
-        return "ndp -an"
-    return f"ip -6 neigh show {ip}"
-
-
-# ─── Neighbor-table dump (full table) ──────────────────────────────
-
-# (want_v6, platform) → shell command for dumping the full neighbor table.
-_NEIGHBOR_DUMP_CMDS: dict[tuple[bool, str], str] = {
-    (True, 'windows'): 'netsh interface ipv6 show neighbors',
-    (True, 'linux'): 'ip -6 neigh show',
-    (True, 'macos'): 'ndp -an',
-    (False, 'windows'): 'arp -a',
-    (False, 'linux'): 'ip -4 neigh show',
-    (False, 'macos'): 'arp -an',
-}
-
-
-def get_neighbor_dump_command(want_v6: bool) -> str | None:
-    """Return a shell command that dumps the full neighbor table for a protocol.
-
-    *want_v6* selects IPv6 (``True``) or IPv4 (``False``) entries.
-    Returns ``None`` on unsupported platforms.
-    """
-    if psutil.WINDOWS:
-        platform = 'windows'
-    elif psutil.LINUX:
-        platform = 'linux'
-    elif psutil.MACOS:
-        platform = 'macos'
-    else:
-        return None
-    return _NEIGHBOR_DUMP_CMDS.get((want_v6, platform))
-
-
-# ─── Neighbor-table output parsing ─────────────────────────────────
-
-_IP4_RE = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3})')
-_IP6_RE = re.compile(r'([0-9a-fA-F:]{3,}(?:::[0-9a-fA-F]{1,4}|:[0-9a-fA-F]{1,4}){1,})')
-
-
-def extract_ips_for_mac(output: str, mac: str, want_v6: bool) -> List[str]:
-    """Parse neighbor-table output and return IPs associated with *mac*.
-
-    Handles output from Linux ``ip neigh``, Windows ``arp``/``netsh``,
-    and macOS ``arp``/``ndp``.  MAC comparisons are case-insensitive and
-    normalise dash separators to colons.
-    """
-    results: list[str] = []
-    mac_lower = mac.lower().replace('-', ':')
-
-    for line in output.splitlines():
-        line_lower = line.lower().replace('-', ':')
-        if mac_lower not in line_lower:
-            continue
-
-        pattern = _IP6_RE if want_v6 else _IP4_RE
-        match = pattern.search(line)
-        if not match:
-            continue
-
-        candidate = match.group(1)
-        try:
-            addr = ipaddress.ip_address(candidate.split('%')[0])
-        except ValueError:
-            continue
-
-        if want_v6 and addr.version != 6:
-            continue
-        if not want_v6 and addr.version != 4:
-            continue
-        if addr.is_loopback:
-            continue
-
-        results.append(str(addr))
-
-    return results
 
 
 # ─── NDP / IPv6 interface helpers ───────────────────────────────────
@@ -275,27 +97,6 @@ def get_ndp_ping_command(target: str) -> List[str]:
     if psutil.MACOS:
         return ['ping6', '-c', '2', '-W', '2', target]
     return ['ping', '-6', '-c', '2', '-W', '2', target]
-
-
-# ─── MAC address extraction ────────────────────────────────────────
-
-_MAC_RE = re.compile(r'..:..:..:..:..:..')
-
-# Invalid MAC addresses that should be filtered out
-_INVALID_MACS = frozenset({
-    '00:00:00:00:00:00',  # Null/incomplete entry
-    'ff:ff:ff:ff:ff:ff',  # Broadcast address
-})
-
-
-def extract_mac_from_output(output: str) -> List[str]:
-    """Extract MAC addresses from command output (normalises ``-`` to ``:``).
-
-    Returns all valid matches found in *output*. Filters out null/broadcast MACs
-    that indicate incomplete or invalid neighbor table entries.
-    """
-    macs = _MAC_RE.findall(output.replace('-', ':'))
-    return [mac.lower() for mac in macs if mac.lower() not in _INVALID_MACS]
 
 
 # ─── ARP packet helpers (Scapy) ────────────────────────────────────

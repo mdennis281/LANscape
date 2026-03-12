@@ -1,21 +1,15 @@
 """MAC address lookup and resolution service."""
 
 import logging
-import subprocess
 from typing import List, Optional
 
-from .app_scope import ResourceManager
-from .decorators import job_tracker, JobStatsMixin
-from .errors import DeviceError
-from .system_compat import (
-    get_arp_lookup_command,
-    extract_mac_from_output,
+from lanscape.core.app_scope import ResourceManager
+from lanscape.core.decorators import job_tracker, JobStatsMixin
+from lanscape.core.errors import DeviceError
+from lanscape.core.system_compat import (
     send_arp_request,
     is_ipv6,
-    filter_neighbor_table_output,
 )
-
-
 log = logging.getLogger('MacLookup')
 
 
@@ -62,15 +56,13 @@ class MacResolver(JobStatsMixin):
 
     @job_tracker
     def _get_mac_by_neighbor_cache(self, ip: str) -> List[str]:
-        """Retrieve MAC addresses using the system ARP/NDP command."""
+        """Retrieve MAC addresses from the NeighborTableService."""
         try:
-            cmd = get_arp_lookup_command(ip)
-            output = subprocess.check_output(cmd, shell=True).decode()
-            # For IPv6 on Windows/macOS, the command returns the full table
-            # so we need to filter lines that contain an exact IP match
-            if is_ipv6(ip):
-                output = filter_neighbor_table_output(output, ip)
-            return extract_mac_from_output(output)
+            from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+            svc = NeighborTableService.instance()
+            if svc.is_running:
+                return svc.get_macs(ip)
+            return []
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []

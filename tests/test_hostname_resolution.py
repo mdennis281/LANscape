@@ -557,7 +557,8 @@ class TestResolveHostnameAvahi:
         assert resolve_hostname_avahi('192.168.1.1') is None
 
     @patch('lanscape.core.system_compat.subprocess.run')
-    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/avahi-resolve-address')
+    @patch('lanscape.core.system_compat.shutil.which',
+           return_value='/usr/bin/avahi-resolve-address')
     @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
     @patch('lanscape.core.system_compat.psutil.MACOS', False)
     def test_parses_hostname_from_output(self, mock_which, mock_run):
@@ -568,7 +569,8 @@ class TestResolveHostnameAvahi:
         assert result == 'myhost'
 
     @patch('lanscape.core.system_compat.subprocess.run')
-    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/avahi-resolve-address')
+    @patch('lanscape.core.system_compat.shutil.which',
+           return_value='/usr/bin/avahi-resolve-address')
     @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
     @patch('lanscape.core.system_compat.psutil.MACOS', False)
     def test_handles_ipv6_with_scope(self, mock_which, mock_run):
@@ -583,7 +585,8 @@ class TestResolveHostnameAvahi:
         assert result == 'device'
 
     @patch('lanscape.core.system_compat.subprocess.run')
-    @patch('lanscape.core.system_compat.shutil.which', return_value='/usr/bin/avahi-resolve-address')
+    @patch('lanscape.core.system_compat.shutil.which',
+           return_value='/usr/bin/avahi-resolve-address')
     @patch('lanscape.core.system_compat.psutil.WINDOWS', False)
     @patch('lanscape.core.system_compat.psutil.MACOS', False)
     def test_returns_none_on_failure(self, mock_which, mock_run):

@@ -8,7 +8,7 @@ Covers:
 - Deduplication and exclusion logic
 - Top-level resolve_alt_ips orchestration
 - Graceful fallback on errors
-- System-compat helpers: neighbor dump commands, NDP ping, interface scopes
+- System-compat helpers: NDP ping, interface scopes
 """
 # pylint: disable=protected-access,import-outside-toplevel,unused-argument
 
@@ -24,8 +24,6 @@ from lanscape.core.alt_ip_resolver import (
     _prime_ndp_cache,
 )
 from lanscape.core.system_compat import (
-    extract_ips_for_mac,
-    get_neighbor_dump_command,
     get_ipv6_interface_scopes,
     get_ndp_ping_command,
 )
@@ -104,114 +102,6 @@ class TestEui64LinkLocal:
 # Neighbor-cache IP extraction
 # ===========================================================================
 
-
-class TestExtractIpsForMac:
-    """Tests for extract_ips_for_mac() (system_compat)."""
-
-    def test_linux_ip_neigh_v6(self):
-        """Parse Linux 'ip -6 neigh show' output for IPv6."""
-        output = (
-            "fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE\n"
-            "2001:db8::100 dev eth0 lladdr aa:bb:cc:dd:ee:ff STALE\n"
-            "fe80::2 dev eth0 lladdr 11:22:33:44:55:66 REACHABLE\n"
-        )
-        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=True)
-        assert 'fe80::1' in result
-        assert '2001:db8::100' in result
-        assert 'fe80::2' not in result  # different MAC
-
-    def test_linux_ip_neigh_v4(self):
-        """Parse Linux 'ip -4 neigh show' output for IPv4."""
-        output = (
-            "192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE\n"
-            "10.0.0.5 dev eth0 lladdr aa:bb:cc:dd:ee:ff STALE\n"
-            "192.168.1.2 dev eth0 lladdr 11:22:33:44:55:66 DELAY\n"
-        )
-        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
-        assert '192.168.1.1' in result
-        assert '10.0.0.5' in result
-        assert '192.168.1.2' not in result
-
-    def test_windows_arp_output(self):
-        """Parse Windows 'arp -a' output with dash separators."""
-        output = (
-            "  192.168.1.1         aa-bb-cc-dd-ee-ff     dynamic\n"
-            "  192.168.1.100       11-22-33-44-55-66     dynamic\n"
-        )
-        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
-        assert '192.168.1.1' in result
-        assert '192.168.1.100' not in result
-
-    def test_no_matching_mac(self):
-        """Output with no matching MAC returns empty."""
-        output = "10.0.0.1 dev eth0 lladdr 11:22:33:44:55:66 REACHABLE\n"
-        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
-        assert not result
-
-    def test_loopback_excluded(self):
-        """Loopback addresses should be excluded."""
-        output = "127.0.0.1 dev lo lladdr aa:bb:cc:dd:ee:ff PERMANENT\n"
-        result = extract_ips_for_mac(output, 'aa:bb:cc:dd:ee:ff', want_v6=False)
-        assert not result
-
-    def test_empty_output(self):
-        """Empty output returns empty list."""
-        assert not extract_ips_for_mac('', 'aa:bb:cc:dd:ee:ff', want_v6=True)
-
-
-# ===========================================================================
-# Neighbor dump command generation
-# ===========================================================================
-
-
-class TestNeighborDumpCommand:
-    """Tests for get_neighbor_dump_command() (system_compat)."""
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_windows_v6(self, mock_psutil):
-        """Windows IPv6 dump uses netsh."""
-        mock_psutil.WINDOWS = True
-        mock_psutil.LINUX = False
-        mock_psutil.MACOS = False
-        cmd = get_neighbor_dump_command(want_v6=True)
-        assert 'netsh' in cmd
-        assert 'ipv6' in cmd
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_linux_v6(self, mock_psutil):
-        """Linux IPv6 dump uses ip -6 neigh show."""
-        mock_psutil.WINDOWS = False
-        mock_psutil.LINUX = True
-        mock_psutil.MACOS = False
-        cmd = get_neighbor_dump_command(want_v6=True)
-        assert cmd == 'ip -6 neigh show'
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_linux_v4(self, mock_psutil):
-        """Linux IPv4 dump uses ip -4 neigh show."""
-        mock_psutil.WINDOWS = False
-        mock_psutil.LINUX = True
-        mock_psutil.MACOS = False
-        cmd = get_neighbor_dump_command(want_v6=False)
-        assert cmd == 'ip -4 neigh show'
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_macos_v6(self, mock_psutil):
-        """macOS IPv6 dump uses ndp."""
-        mock_psutil.WINDOWS = False
-        mock_psutil.LINUX = False
-        mock_psutil.MACOS = True
-        cmd = get_neighbor_dump_command(want_v6=True)
-        assert 'ndp' in cmd
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_macos_v4(self, mock_psutil):
-        """macOS IPv4 dump uses arp."""
-        mock_psutil.WINDOWS = False
-        mock_psutil.LINUX = False
-        mock_psutil.MACOS = True
-        cmd = get_neighbor_dump_command(want_v6=False)
-        assert 'arp' in cmd
 
 
 # ===========================================================================
@@ -325,28 +215,6 @@ class TestNdpCachePriming:
     def test_prime_no_interfaces(self, mock_scopes):
         """No interfaces should not raise an error."""
         _prime_ndp_cache()  # Should complete without error
-
-    @patch('lanscape.core.alt_ip_resolver._prime_ndp_cache')
-    @patch('lanscape.core.alt_ip_resolver.subprocess.check_output',
-           return_value=b'fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE\n')
-    @patch('lanscape.core.alt_ip_resolver.get_neighbor_dump_command',
-           return_value='ip -6 neigh show')
-    def test_neighbor_cache_primes_for_v6(self, mock_cmd, mock_check, mock_prime):
-        """Looking for IPv6 entries should trigger NDP priming."""
-        from lanscape.core.alt_ip_resolver import _alt_ips_from_neighbor_cache
-        _alt_ips_from_neighbor_cache('aa:bb:cc:dd:ee:ff', scanning_v6=False)
-        mock_prime.assert_called_once()
-
-    @patch('lanscape.core.alt_ip_resolver._prime_ndp_cache')
-    @patch('lanscape.core.alt_ip_resolver.subprocess.check_output',
-           return_value=b'192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE\n')
-    @patch('lanscape.core.alt_ip_resolver.get_neighbor_dump_command',
-           return_value='ip -4 neigh show')
-    def test_neighbor_cache_skips_prime_for_v4(self, mock_cmd, mock_check, mock_prime):
-        """Looking for IPv4 entries should NOT trigger NDP priming."""
-        from lanscape.core.alt_ip_resolver import _alt_ips_from_neighbor_cache
-        _alt_ips_from_neighbor_cache('aa:bb:cc:dd:ee:ff', scanning_v6=True)
-        mock_prime.assert_not_called()
 
 
 # ===========================================================================

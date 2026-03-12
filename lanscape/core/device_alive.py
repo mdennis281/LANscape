@@ -3,7 +3,6 @@
 import socket
 import subprocess
 import time
-from typing import List
 
 from icmplib import ping
 from icmplib.exceptions import SocketPermissionError
@@ -15,16 +14,12 @@ from lanscape.core.scan_config import (
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
 from lanscape.core.system_compat import (
-    get_arp_cache_command,
-    get_arp_lookup_command,
     icmp_requires_privileged,
     get_ping_command,
     parse_ping_success,
-    extract_mac_from_output,
     send_arp_request,
     is_ipv6,
     get_socket_family,
-    filter_neighbor_table_output,
 )
 
 
@@ -49,11 +44,15 @@ def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
 
     if ScanType.ICMP_THEN_ARP in methods and not device.alive:
         IcmpLookup.execute(device, scan_config.ping_config)
-        ArpCacheLookup.execute(device, scan_config.arp_cache_config)
+        # Only check cache if ICMP failed - cache lookup is expensive for IPv6
+        if not device.alive:
+            ArpCacheLookup.execute(device, scan_config.arp_cache_config)
 
     if ScanType.POKE_THEN_ARP in methods and not device.alive:
         Poker.execute(device, scan_config.poke_config)
-        ArpCacheLookup.execute(device, scan_config.arp_cache_config)
+        # Only check cache if device not already found alive
+        if not device.alive:
+            ArpCacheLookup.execute(device, scan_config.arp_cache_config)
 
     return device.alive is True
 
@@ -132,64 +131,31 @@ class ArpCacheLookup():
         """
         Perform an ARP/NDP cache lookup for the specified device.
 
+        Waits for the next NeighborTableService background refresh cycle
+        (so a preceding poke/ICMP has time to populate the OS cache) and
+        reads the result from the in-memory table.
+
         Args:
             device (Device): The device to look up.
+            cfg (ArpCacheConfig): The configuration for the cache lookup.
 
         Returns:
             bool: True if the device is found in the cache, False otherwise.
         """
-        ipv6 = is_ipv6(device.ip)
+        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
+        svc = NeighborTableService.instance()
 
-        try:
-            if ipv6:
-                # IPv6: use shell-based NDP neighbor command
-                command = get_arp_lookup_command(device.ip)
-                use_shell = True
-            else:
-                # IPv4: use list-based ARP command
-                command = cls._get_platform_arp_command() + [device.ip]
-                use_shell = False
-        except RuntimeError as e:
-            device.caught_errors.append(DeviceError(e))
+        if not svc.is_running:
             return False
 
         for _ in range(cfg.attempts):
-            time.sleep(cfg.wait_before)
-            try:
-                output = subprocess.check_output(command, shell=use_shell).decode()
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                device.caught_errors.append(DeviceError(e))
-                return False
-
-            # For IPv6 on Windows/macOS, filter to exact IP match
-            if ipv6:
-                output = filter_neighbor_table_output(output, device.ip)
-
-            macs = cls._extract_mac_address(output)
+            svc.wait_for_refresh(timeout=cfg.wait_before + 3.0)
+            macs = svc.get_macs(device.ip)
             if macs:
                 device.macs = macs
                 device.alive = True
                 break
-
         return device.alive is True
-
-    @classmethod
-    def _get_platform_arp_command(cls) -> List[str]:
-        """
-        Get the ARP command to execute based on the platform.
-
-        On Linux, prefers 'ip neigh show' (iproute2) but falls back to
-        'arp -n' (net-tools) if ip command is not available.
-
-        Returns:
-            list[str]: The ARP command to execute.
-        """
-        return get_arp_cache_command()
-
-    @classmethod
-    def _extract_mac_address(cls, arp_resp: str) -> List[str]:
-        """Extract MAC addresses from ARP output."""
-        return extract_mac_from_output(arp_resp)
 
 
 class ArpLookup():

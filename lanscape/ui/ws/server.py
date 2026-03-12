@@ -23,7 +23,8 @@ from lanscape.ui.ws.protocol import (
 from lanscape.ui.ws.handlers import (
     ScanHandler,
     PortHandler,
-    ToolsHandler
+    ToolsHandler,
+    DebugHandler
 )
 
 
@@ -61,11 +62,13 @@ class WebSocketServer:
         self._scan_handler = ScanHandler()
         self._port_handler = PortHandler()
         self._tools_handler = ToolsHandler()
+        self._debug_handler = DebugHandler()
 
         self._handlers = [
             self._scan_handler,
             self._port_handler,
-            self._tools_handler
+            self._tools_handler,
+            self._debug_handler
         ]
 
         # Active connections

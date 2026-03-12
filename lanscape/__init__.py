@@ -16,10 +16,18 @@ from lanscape.core.scan_config import (
     PortScanConfig,
     ServiceScanConfig,
     ServiceScanStrategy,
-    ScanType
+    ScanType,
+    NeighborTableConfig,
 )
 
 from lanscape.core.port_manager import PortManager
+
+# Neighbor table service (centralized ARP/NDP cache)
+from lanscape.core.neighbor_table import (
+    NeighborTableService,
+    NeighborEntry,
+    NeighborTable,
+)
 
 # Network utilities and device model
 from lanscape.core import net_tools  # noqa: F401 – namespace import for `lanscape.net_tools`

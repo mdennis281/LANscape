@@ -152,9 +152,13 @@ def job_tracker(func):
         if len(qual_parts) > 1:
             cls_name = qual_parts[-2]
 
-            # Check if first_arg is an instance and has the expected class name
-            if first_arg is not None and hasattr(first_arg, '__class__'):
-                if first_arg.__class__.__name__ == cls_name:
+            if first_arg is not None:
+                # Check if first_arg is the class itself (for @classmethod)
+                if isinstance(first_arg, type) and first_arg.__name__ == cls_name:
+                    return f"{cls_name}.{func.__name__}"
+
+                # Check if first_arg is an instance and has the expected class name
+                if hasattr(first_arg, '__class__') and first_arg.__class__.__name__ == cls_name:
                     return f"{cls_name}.{func.__name__}"
 
         return func.__name__

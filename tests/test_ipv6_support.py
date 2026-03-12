@@ -3,9 +3,8 @@ Unit tests for IPv6 support across the scanning pipeline.
 
 Covers:
 - system_compat: is_ipv6, get_socket_family, send_arp_request (IPv6 skip),
-  get_ping_command (IPv6), get_arp_lookup_command (IPv6 NDP),
-  get_candidate_interfaces (AF_INET6)
-- device_alive: ArpCacheLookup/ArpLookup skip for IPv6, Poker IPv6 socket family
+  get_ping_command (IPv6), get_candidate_interfaces (AF_INET6)
+- device_alive: ArpLookup skip for IPv6, Poker IPv6 socket family
 - mac_lookup: Scapy skip for IPv6, neighbor cache fallback
 - device: test_port AF_INET6, mDNS IPv6 dispatch, NetBIOS IPv6 skip
 - subnet_scan: to_results sorts mixed IPv4/IPv6
@@ -21,12 +20,9 @@ from lanscape.core.system_compat import (
     get_socket_family,
     send_arp_request,
     get_ping_command,
-    get_arp_lookup_command,
     get_candidate_interfaces,
-    filter_neighbor_table_output,
 )
 from lanscape.core.device_alive import (
-    ArpCacheLookup,
     ArpLookup,
     Poker,
 )
@@ -38,7 +34,6 @@ from lanscape.core.net_tools.subnet_utils import (
     network_from_snicaddr,
 )
 from lanscape.core.scan_config import (
-    ArpCacheConfig,
     ArpConfig,
     PokeConfig,
     PortScanConfig,
@@ -158,45 +153,6 @@ class TestGetPingCommandIpv6:
         assert '10.0.0.1' in cmd
 
 
-class TestGetArpLookupCommandIpv6:
-    """get_arp_lookup_command dispatches to NDP for IPv6."""
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_ipv6_windows_uses_netsh(self, mock_psutil):
-        """Windows IPv6 should use netsh to query full neighbor table."""
-        mock_psutil.WINDOWS = True
-        mock_psutil.LINUX = False
-        mock_psutil.MACOS = False
-
-        cmd = get_arp_lookup_command('fe80::1')
-        assert 'netsh' in cmd
-        assert 'ipv6' in cmd
-        # Note: Windows returns full table for Python-side exact IP matching
-        assert cmd == 'netsh interface ipv6 show neighbors'
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_ipv6_linux_uses_ip_dash_6(self, mock_psutil):
-        """Linux IPv6 should use 'ip -6 neigh show'."""
-        mock_psutil.WINDOWS = False
-        mock_psutil.LINUX = True
-        mock_psutil.MACOS = False
-
-        cmd = get_arp_lookup_command('2001:db8::1')
-        assert 'ip -6 neigh show 2001:db8::1' == cmd
-
-    @patch('lanscape.core.system_compat.psutil')
-    def test_ipv6_macos_uses_ndp(self, mock_psutil):
-        """macOS IPv6 should use 'ndp -an' for full neighbor table."""
-        mock_psutil.WINDOWS = False
-        mock_psutil.LINUX = False
-        mock_psutil.MACOS = True
-
-        cmd = get_arp_lookup_command('::1')
-        assert 'ndp' in cmd
-        # Note: macOS returns full table for Python-side exact IP matching
-        assert cmd == 'ndp -an'
-
-
 class TestGetCandidateInterfacesIpv6:
     """get_candidate_interfaces should include IPv6-capable interfaces."""
 
@@ -231,65 +187,6 @@ class TestGetCandidateInterfacesIpv6:
 # ===========================================================================
 # device_alive — IPv6 behaviour
 # ===========================================================================
-
-
-class TestArpCacheLookupIpv6:
-    """ArpCacheLookup uses NDP cache for IPv6 targets."""
-
-    def test_ipv6_uses_ndp_cache(self):
-        """IPv6 device should use NDP neighbor cache lookup."""
-        device = Device(ip='2001:db8::1')
-        cfg = ArpCacheConfig()
-
-        with patch('lanscape.core.device_alive.get_arp_lookup_command',
-                   return_value='ip -6 neigh show 2001:db8::1'):
-            with patch('lanscape.core.device_alive.subprocess.check_output',
-                       return_value=b'2001:db8::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE'):
-                result = ArpCacheLookup.execute(device, cfg)
-
-        assert result is True
-        assert device.alive is True
-        assert 'aa:bb:cc:dd:ee:ff' in device.macs
-
-    def test_ipv6_no_neighbor_entry(self):
-        """IPv6 device should remain not-alive when no NDP entry found."""
-        device = Device(ip='2001:db8::1')
-        cfg = ArpCacheConfig()
-
-        with patch('lanscape.core.device_alive.get_arp_lookup_command',
-                   return_value='ip -6 neigh show 2001:db8::1'):
-            with patch('lanscape.core.device_alive.subprocess.check_output',
-                       return_value=b''):
-                result = ArpCacheLookup.execute(device, cfg)
-
-        assert result is False
-        assert device.alive is None
-
-    def test_ipv4_target_not_skipped(self):
-        """IPv4 device should proceed with ARP cache lookup (mocked)."""
-        device = Device(ip='192.168.1.1')
-        cfg = ArpCacheConfig()
-
-        with patch.object(ArpCacheLookup, '_get_platform_arp_command',
-                          return_value=['arp', '-a']):
-            with patch('lanscape.core.device_alive.subprocess.check_output',
-                       return_value=b'192.168.1.1  aa-bb-cc-dd-ee-ff  dynamic'):
-                ArpCacheLookup.execute(device, cfg)
-
-        assert device.alive is True
-
-    def test_ipv6_filter_lines_by_ip(self):
-        """Verifies exact IP matching for IPv6 neighbor table output."""
-        output = """
-2001:db8::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE
-2001:db8::10 dev eth0 lladdr 11:22:33:44:55:66 STALE
-2001:db8::100 dev eth0 lladdr 00:11:22:33:44:55 DELAY
-"""
-        result = filter_neighbor_table_output(output, '2001:db8::1')
-        # Should only match the exact IP, not ::10 or ::100
-        assert 'aa:bb:cc:dd:ee:ff' in result
-        assert '11:22:33:44:55:66' not in result
-        assert '00:11:22:33:44:55' not in result
 
 
 class TestArpLookupIpv6:
@@ -372,20 +269,6 @@ class TestMacResolverIpv6:
         mock_scapy.assert_called_once_with('192.168.1.1')
         mock_cache.assert_called_once_with('192.168.1.1')
         assert result == ['11:22:33:44:55:66']
-
-    @patch('lanscape.core.mac_lookup.subprocess.check_output')
-    @patch('lanscape.core.mac_lookup.get_arp_lookup_command',
-           return_value='ip -6 neigh show 2001:db8::1')
-    def test_ipv6_neighbor_cache_command(self, _mock_cmd, mock_check_output):
-        """IPv6 neighbor cache lookup should use IPv6 NDP command."""
-        mock_check_output.return_value = (
-            b"2001:db8::1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE"
-        )
-        resolver = MacResolver()
-        result = resolver._get_mac_by_neighbor_cache('2001:db8::1')
-
-        mock_check_output.assert_called_once()
-        assert 'aa:bb:cc:dd:ee:ff' in result
 
 
 # ===========================================================================

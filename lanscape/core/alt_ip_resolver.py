@@ -130,9 +130,6 @@ def _alt_ips_from_neighbor_cache(mac: str, scanning_v6: bool) -> List[str]:
     except Exception as exc:  # pylint: disable=broad-except
         log.debug("Neighbor-cache lookup failed: %s", exc)
         return []
-    except Exception as exc:  # pylint: disable=broad-except
-        log.debug("Neighbor-cache lookup failed: %s", exc)
-        return []
 
 
 # ─── EUI-64 link-local derivation ──────────────────────────────────

@@ -32,6 +32,8 @@ from typing import ClassVar, Dict, List, Literal, Optional
 import psutil
 from pydantic import BaseModel, Field
 
+from lanscape.core.decorators import job_tracker
+
 log = logging.getLogger(__name__)
 
 # MACs that represent incomplete/invalid neighbor table entries.
@@ -109,6 +111,7 @@ def _is_valid_mac(mac: str) -> bool:
 
 # ─── Table construction ────────────────────────────────────────────
 
+@job_tracker
 def build_table(entries: List[NeighborEntry]) -> NeighborTable:
     """Build an immutable :class:`NeighborTable` from a list of entries."""
     entry_map: dict[str, NeighborEntry] = {}
@@ -681,7 +684,7 @@ class NeighborTableService:
             if self._stop_event.is_set():
                 break
             self._do_refresh()
-
+    @job_tracker
     def _do_refresh(self) -> None:
         """Fetch both tables and atomically swap them in."""
         self._refresh_event.clear()

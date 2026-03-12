@@ -372,6 +372,9 @@ class WebSocketServer:
             event_name = 'scan.terminated'
         else:
             event_name = 'scan.complete'
+            # Defense: if the stage hasn't fully transitioned yet, force it
+            if actual_stage not in ('complete', 'terminated'):
+                actual_stage = 'complete'
 
         for client_id in subscribed_clients:
             websocket = self._clients.get(client_id)

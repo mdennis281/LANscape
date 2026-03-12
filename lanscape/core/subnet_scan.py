@@ -128,13 +128,15 @@ class SubnetScanner():
         self._set_stage('testing ports')
         if self.cfg.task_scan_ports:
             self._scan_network_ports()
-        self.running = False
 
         # Stop the background neighbor table service
         if hasattr(self, '_neighbor_svc') and self._neighbor_svc.is_running:
             self._neighbor_svc.stop()
 
+        # Set stage BEFORE running=False so the broadcast loop never sees
+        # running=False with a stale stage (e.g. 'testing ports').
         self._set_stage('complete')
+        self.running = False
 
         devices_found = len(self.results.devices)
         open_ports = sum(len(d.ports) for d in self.results.devices)
@@ -158,8 +160,10 @@ class SubnetScanner():
         Raises:
             SubnetScanTerminationFailure: If the scan cannot be terminated within the timeout
         """
-        self.running = False
+        # Set stage BEFORE running=False so the broadcast loop always sees
+        # 'terminating' when it detects the scan is no longer running.
         self._set_stage('terminating')
+        self.running = False
 
         # Stop neighbor table service on termination
         if hasattr(self, '_neighbor_svc') and self._neighbor_svc.is_running:

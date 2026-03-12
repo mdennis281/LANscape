@@ -30,6 +30,7 @@ ScanConfig(
     arp_config: ArpConfig = ArpConfig(),
     poke_config: PokeConfig = PokeConfig(),
     arp_cache_config: ArpCacheConfig = ArpCacheConfig(),
+    neighbor_table_config: NeighborTableConfig = NeighborTableConfig(),
     port_scan_config: PortScanConfig = PortScanConfig(),
     service_scan_config: ServiceScanConfig = ServiceScanConfig(),
 )
@@ -84,6 +85,7 @@ ScanConfig(
 | `arp_config` | [`ArpConfig`](sub-configs.md#arpconfig) | `ArpConfig()` | ARP scan settings |
 | `poke_config` | [`PokeConfig`](sub-configs.md#pokeconfig) | `PokeConfig()` | TCP poke settings |
 | `arp_cache_config` | [`ArpCacheConfig`](sub-configs.md#arpcacheconfig) | `ArpCacheConfig()` | ARP cache lookup settings |
+| `neighbor_table_config` | [`NeighborTableConfig`](sub-configs.md#neighbortableconfig) | `NeighborTableConfig()` | Background neighbor table refresh settings (IPv6) |
 | `port_scan_config` | [`PortScanConfig`](sub-configs.md#portscanconfig) | `PortScanConfig()` | Port scanning settings |
 | `service_scan_config` | [`ServiceScanConfig`](sub-configs.md#servicescanconfig) | `ServiceScanConfig()` | Service identification settings |
 

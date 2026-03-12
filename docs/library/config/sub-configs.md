@@ -88,6 +88,27 @@ cfg = PokeConfig(attempts=4, timeout=0.25)
 
 ---
 
+## NeighborTableConfig
+
+`lanscape.NeighborTableConfig`
+
+Controls the background neighbor table refresh service. During IPv6 scans, LANscape periodically refreshes the OS neighbor (NDP) cache in the background so that MAC address lookups stay current.
+
+```python
+from lanscape import NeighborTableConfig
+
+cfg = NeighborTableConfig(refresh_interval=3.0, command_timeout=8.0)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `refresh_interval` | `float` | `2.0` | Seconds between background neighbor table refreshes |
+| `command_timeout` | `float` | `5.0` | Timeout in seconds for each OS neighbor-table command |
+
+> **Note:** This service runs automatically during scans that include IPv6 targets. It keeps the NDP cache populated so that MAC/manufacturer lookups succeed for IPv6 devices.
+
+---
+
 ## PortScanConfig
 
 `lanscape.PortScanConfig`

@@ -1,5 +1,6 @@
 """Device model and related helpers (hostname resolution, MAC selection)."""
 
+import ipaddress
 import logging
 import socket
 import struct
@@ -25,6 +26,7 @@ from lanscape.core.system_compat import (
     resolve_hostname_llmnr,
     resolve_hostname_getent,
     resolve_hostname_host_cmd,
+    _build_ptr_query,
 )
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
 
@@ -327,39 +329,20 @@ class Device(BaseModel):
         if os_handles_hostname_resolution():
             return None
 
-        # 2. getent hosts (Linux NSS - chains mDNS, DNS, WINS, etc.)
-        hostname = resolve_hostname_getent(self.ip)
-        if hostname:
-            return hostname
-
-        # 3. System mDNS daemon (avahi on Linux, dns-sd on macOS)
-        hostname = resolve_hostname_avahi(self.ip)
-        if hostname:
-            return hostname
-
-        hostname = resolve_hostname_dnssd(self.ip)
-        if hostname:
-            return hostname
-
-        # 4. host command (reverse DNS)
-        hostname = resolve_hostname_host_cmd(self.ip)
-        if hostname:
-            return hostname
-
-        # 5. Raw mDNS PTR query
-        hostname = self._resolve_mdns()
-        if hostname:
-            return hostname
-
-        # 6. LLMNR (useful for Windows devices)
-        hostname = resolve_hostname_llmnr(self.ip)
-        if hostname:
-            return hostname
-
-        # 7. NetBIOS (IPv4 only)
-        hostname = self._resolve_netbios()
-        if hostname:
-            return hostname
+        # 2-7: Fallback resolvers tried in order
+        resolvers = [
+            lambda: resolve_hostname_getent(self.ip),
+            lambda: resolve_hostname_avahi(self.ip),
+            lambda: resolve_hostname_dnssd(self.ip),
+            lambda: resolve_hostname_host_cmd(self.ip),
+            self._resolve_mdns,
+            lambda: resolve_hostname_llmnr(self.ip),
+            self._resolve_netbios,
+        ]
+        for resolver in resolvers:
+            hostname = resolver()
+            if hostname:
+                return hostname
 
         return None
 
@@ -373,23 +356,7 @@ class Device(BaseModel):
         """Resolve hostname via IPv4 mDNS PTR query."""
         reversed_ip = '.'.join(reversed(self.ip.split('.')))
         qname = f"{reversed_ip}.in-addr.arpa"
-
-        name_bytes = b''
-        for label in qname.split('.'):
-            name_bytes += bytes([len(label)]) + label.encode('ascii')
-        name_bytes += b'\x00'
-
-        request = (
-            b'\x00\x00'
-            b'\x00\x00'
-            b'\x00\x01'
-            b'\x00\x00'
-            b'\x00\x00'
-            b'\x00\x00'
-        ) + name_bytes + (
-            b'\x00\x0c'
-            b'\x80\x01'
-        )
+        request = _build_ptr_query(qname, qclass=b'\x80\x01')
 
         sock = None
         try:
@@ -407,28 +374,11 @@ class Device(BaseModel):
 
     def _resolve_mdns_v6(self) -> Optional[str]:
         """Resolve hostname via IPv6 mDNS PTR query."""
-        import ipaddress as _ipaddress  # pylint: disable=import-outside-toplevel
-        addr = _ipaddress.IPv6Address(self.ip)
+        addr = ipaddress.IPv6Address(self.ip)
         nibbles = addr.exploded.replace(':', '')
         reversed_nibbles = '.'.join(reversed(nibbles))
         qname = f"{reversed_nibbles}.ip6.arpa"
-
-        name_bytes = b''
-        for label in qname.split('.'):
-            name_bytes += bytes([len(label)]) + label.encode('ascii')
-        name_bytes += b'\x00'
-
-        request = (
-            b'\x00\x00'
-            b'\x00\x00'
-            b'\x00\x01'
-            b'\x00\x00'
-            b'\x00\x00'
-            b'\x00\x00'
-        ) + name_bytes + (
-            b'\x00\x0c'   # PTR record
-            b'\x80\x01'   # QU flag + IN class
-        )
+        request = _build_ptr_query(qname, qclass=b'\x80\x01')
 
         sock = None
         try:

@@ -28,6 +28,7 @@ from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController
 )
 from lanscape.core.system_compat import clear_screen
+from lanscape.core.neighbor_table import NeighborTableService
 
 
 class SubnetScanner():
@@ -64,6 +65,8 @@ class SubnetScanner():
             on_warning=self._handle_warning
         )
 
+        self._neighbor_svc = None
+
         self.log.debug(f'Instantiated with uid: {self.uid}')
         self.log.debug(
             f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
@@ -76,7 +79,6 @@ class SubnetScanner():
         self.running = True
 
         # Start the background neighbor table service for thread-safe ARP/NDP lookups
-        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
         self._neighbor_svc = NeighborTableService.instance()
         ntc = self.cfg.neighbor_table_config
         self._neighbor_svc.start(

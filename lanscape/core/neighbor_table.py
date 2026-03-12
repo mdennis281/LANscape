@@ -66,21 +66,21 @@ class NeighborTable(BaseModel):
 
     def get_mac(self, ip: str) -> Optional[str]:
         """Return the MAC for *ip*, or ``None`` if not in the table."""
-        entry = self.entries.get(_normalize_ip(ip))
+        entry = self.entries.get(_normalize_ip(ip))  # pylint: disable=no-member
         return entry.mac if entry else None
 
     def get_macs(self, ip: str) -> List[str]:
         """Return all MACs associated with *ip* (usually 0 or 1)."""
-        entry = self.entries.get(_normalize_ip(ip))
+        entry = self.entries.get(_normalize_ip(ip))  # pylint: disable=no-member
         return [entry.mac] if entry else []
 
     def get_ips_for_mac(self, mac: str, want_v6: bool) -> List[str]:
         """Return IPs associated with *mac* for the requested protocol."""
         norm = _normalize_mac(mac)
-        ips = self.mac_index.get(norm, [])
+        ips = self.mac_index.get(norm, [])  # pylint: disable=no-member
         target_version = 6 if want_v6 else 4
         return [ip for ip in ips
-                if self.entries.get(ip, NeighborEntry(
+                if self.entries.get(ip, NeighborEntry(  # pylint: disable=no-member
                     ip='', mac='', ip_version=4
                 )).ip_version == target_version]
 

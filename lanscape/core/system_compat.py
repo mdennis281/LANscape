@@ -266,6 +266,81 @@ def resolve_hostname_dnssd(ip: str, timeout: float = 3.0) -> Optional[str]:
     return None
 
 
+# ─── Shared DNS / hostname helpers ──────────────────────────────────
+
+_HOSTNAME_SUFFIXES = ('.local', '.lan', '.home')
+
+
+def _strip_hostname_suffix(hostname: str) -> str:
+    """Remove common hostname suffixes (.local, .lan, .home)."""
+    for suffix in _HOSTNAME_SUFFIXES:
+        if hostname.endswith(suffix):
+            return hostname[:-len(suffix)]
+    return hostname
+
+
+def _encode_dns_name(qname: str) -> bytes:
+    """Encode a dotted domain name into DNS wire format."""
+    name_bytes = b''
+    for label in qname.split('.'):
+        name_bytes += bytes([len(label)]) + label.encode('ascii')
+    return name_bytes + b'\x00'
+
+
+def _build_ptr_query(qname: str, txn_id: bytes = b'\x00\x00',
+                     qclass: bytes = b'\x00\x01') -> bytes:
+    """Build a DNS PTR query packet for the given query name."""
+    return (
+        txn_id
+        + b'\x00\x00'   # Flags: standard query
+        + b'\x00\x01'   # Questions: 1
+        + b'\x00\x00'   # Answers: 0
+        + b'\x00\x00'   # Authority: 0
+        + b'\x00\x00'   # Additional: 0
+        + _encode_dns_name(qname)
+        + b'\x00\x0c'   # Type: PTR
+        + qclass
+    )
+
+
+def _skip_dns_name(data: bytes, offset: int) -> int:
+    """Skip a DNS name in wire format, returning the offset past the name."""
+    while offset < len(data) and data[offset] != 0:
+        if (data[offset] & 0xC0) == 0xC0:
+            return offset + 2
+        offset += data[offset] + 1
+    return offset + 1
+
+
+def _read_dns_labels(data: bytes, offset: int) -> List[str]:
+    """Read DNS name labels starting at *offset*, following compression pointers."""
+    labels: List[str] = []
+    while offset < len(data) and data[offset] != 0:
+        if (data[offset] & 0xC0) == 0xC0:
+            if offset + 1 >= len(data):
+                break
+            pointer = ((data[offset] & 0x3F) << 8) | data[offset + 1]
+            labels.extend(_read_dns_labels(data, pointer))
+            break
+        length = data[offset]
+        offset += 1
+        if offset + length <= len(data):
+            labels.append(data[offset:offset + length].decode('ascii', errors='ignore'))
+        offset += length
+    return labels
+
+
+def _extract_ptr_hostname(output: str) -> Optional[str]:
+    """Extract hostname from 'host' command PTR output."""
+    for line in output.splitlines():
+        if 'domain name pointer' not in line.lower():
+            continue
+        parts = line.strip().rstrip('.').split()
+        if parts:
+            return _strip_hostname_suffix(parts[-1])
+    return None
+
+
 def resolve_hostname_getent(ip: str, timeout: float = 2.0) -> Optional[str]:
     """Resolve hostname via getent hosts (Linux NSS resolution).
 
@@ -293,13 +368,7 @@ def resolve_hostname_getent(ip: str, timeout: float = 2.0) -> Optional[str]:
             parts = result.stdout.strip().split()
             if len(parts) >= 2:
                 # Take the first hostname (shortest, usually without domain)
-                hostname = parts[1]
-                # Remove common suffixes
-                for suffix in ('.local', '.lan', '.home'):
-                    if hostname.endswith(suffix):
-                        hostname = hostname[:-len(suffix)]
-                        break
-                return hostname
+                return _strip_hostname_suffix(parts[1])
     except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
         pass
     return None
@@ -327,20 +396,7 @@ def resolve_hostname_host_cmd(ip: str, timeout: float = 2.0) -> Optional[str]:
             capture_output=True, text=True, timeout=timeout, check=False
         )
         if result.returncode == 0 and result.stdout.strip():
-            # Output format: "1.1.168.192.in-addr.arpa domain name pointer hostname.local."
-            # or for IPv6: "...ip6.arpa domain name pointer hostname.local."
-            for line in result.stdout.splitlines():
-                if 'domain name pointer' in line.lower():
-                    # Extract the hostname from the end of the line
-                    parts = line.strip().rstrip('.').split()
-                    if parts:
-                        hostname = parts[-1]
-                        # Remove common suffixes
-                        for suffix in ('.local', '.lan', '.home'):
-                            if hostname.endswith(suffix):
-                                hostname = hostname[:-len(suffix)]
-                                break
-                        return hostname
+            return _extract_ptr_hostname(result.stdout)
     except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
         pass
     return None
@@ -369,23 +425,7 @@ def resolve_hostname_llmnr(ip: str, timeout: float = 1.5) -> Optional[str]:
         qname = '.'.join(reversed(str(addr).split('.'))) + '.in-addr.arpa'
 
     # Build LLMNR PTR query packet
-    name_bytes = b''
-    for label in qname.split('.'):
-        name_bytes += bytes([len(label)]) + label.encode('ascii')
-    name_bytes += b'\x00'
-
-    # Transaction ID, Flags (standard query), Questions=1, etc.
-    request = (
-        b'\x00\x01'   # Transaction ID
-        b'\x00\x00'   # Flags: standard query
-        b'\x00\x01'   # Questions: 1
-        b'\x00\x00'   # Answers: 0
-        b'\x00\x00'   # Authority: 0
-        b'\x00\x00'   # Additional: 0
-    ) + name_bytes + (
-        b'\x00\x0c'   # Type: PTR
-        b'\x00\x01'   # Class: IN
-    )
+    request = _build_ptr_query(qname, txn_id=b'\x00\x01')
 
     sock = None
     try:
@@ -414,72 +454,23 @@ def _parse_llmnr_ptr_response(data: bytes) -> Optional[str]:
     if len(data) < 12:
         return None
 
-    # Skip header (12 bytes) and question section
-    offset = 12
-
-    # Skip question name
-    while offset < len(data) and data[offset] != 0:
-        if (data[offset] & 0xC0) == 0xC0:
-            offset += 2
-            break
-        offset += data[offset] + 1
-    else:
-        offset += 1
-    offset += 4  # Skip QTYPE and QCLASS
-
-    # Check answer count from header
     answer_count = (data[6] << 8) | data[7]
     if answer_count == 0:
         return None
 
-    # Parse answer section
-    if offset >= len(data):
+    # Skip question name + QTYPE/QCLASS, then answer name + TYPE/CLASS/TTL/RDLENGTH
+    offset = _skip_dns_name(data, 12) + 4
+    offset = _skip_dns_name(data, offset) + 10
+
+    if offset > len(data):
         return None
 
-    # Skip answer name (may be pointer)
-    if (data[offset] & 0xC0) == 0xC0:
-        offset += 2
-    else:
-        while offset < len(data) and data[offset] != 0:
-            offset += data[offset] + 1
-        offset += 1
-
-    # Skip TYPE, CLASS, TTL
-    offset += 10
-    if offset >= len(data):
-        return None
-
-    # Read RDLENGTH
     rdlength = (data[offset - 2] << 8) | data[offset - 1]
     if rdlength == 0 or offset >= len(data):
         return None
 
-    # Parse PTR RDATA (hostname)
-    hostname_parts = []
-    while offset < len(data) and data[offset] != 0:
-        if (data[offset] & 0xC0) == 0xC0:
-            # Compression pointer - follow it
-            pointer = ((data[offset] & 0x3F) << 8) | data[offset + 1]
-            temp_offset = pointer
-            while temp_offset < len(data) and data[temp_offset] != 0:
-                length = data[temp_offset]
-                temp_offset += 1
-                if temp_offset + length <= len(data):
-                    hostname_parts.append(
-                        data[temp_offset:temp_offset + length].decode('ascii', errors='ignore')
-                    )
-                temp_offset += length
-            break
-        length = data[offset]
-        offset += 1
-        if offset + length <= len(data):
-            hostname_parts.append(data[offset:offset + length].decode('ascii', errors='ignore'))
-        offset += length
-
-    if hostname_parts:
-        # Return just the first part (hostname without domain)
-        return hostname_parts[0]
-    return None
+    labels = _read_dns_labels(data, offset)
+    return labels[0] if labels else None
 
 
 # ─── Network interface helpers ──────────────────────────────────────

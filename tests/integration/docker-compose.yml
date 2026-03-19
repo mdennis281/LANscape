@@ -1,0 +1,249 @@
+# LANscape Integration Test Environment
+#
+# Dual-stack (IPv4 + IPv6) isolated Docker network with service containers
+# for end-to-end scanning validation.
+#
+# Usage:
+#   docker compose -f tests/integration/docker-compose.yml up -d    # Start services
+#   docker compose -f tests/integration/docker-compose.yml run scanner  # Run tests
+#   docker compose -f tests/integration/docker-compose.yml down     # Cleanup
+#
+# NOTE: Docker Desktop on Windows may require "ipv6": true in daemon settings.
+
+x-common: &common
+  restart: "no"
+  networks:
+    testnet:
+
+services:
+  # ── Web Server ──────────────────────────────────────────────────────────
+  # HTTP (80), HTTPS (443), HTTP alt (8080)
+  web-server:
+    <<: *common
+    build:
+      context: ./services/nginx
+      dockerfile: Dockerfile
+    container_name: lanscape-test-web
+    hostname: web-server
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.10
+        ipv6_address: "fd00:dead:beef::10"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ── Mail Server ─────────────────────────────────────────────────────────
+  # GreenMail test.all: SMTP (3025), IMAP (3143)
+  mail-server:
+    <<: *common
+    image: greenmail/standalone:2.1.2
+    container_name: lanscape-test-mail
+    hostname: mail-server
+    environment:
+      - GREENMAIL_OPTS=-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.11
+        ipv6_address: "fd00:dead:beef::11"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '(echo > /dev/tcp/localhost/3025) 2>/dev/null && (echo > /dev/tcp/localhost/3143) 2>/dev/null'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  # ── Proxy Server ────────────────────────────────────────────────────────
+  # Squid HTTP proxy (3128)
+  proxy-server:
+    <<: *common
+    image: ubuntu/squid:latest
+    container_name: lanscape-test-proxy
+    hostname: proxy-server
+    volumes:
+      - ./services/squid/squid.conf:/etc/squid/squid.conf:ro
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.12
+        ipv6_address: "fd00:dead:beef::12"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '(echo > /dev/tcp/localhost/3128) 2>/dev/null'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ── SSH Server ──────────────────────────────────────────────────────────
+  # SSH (22)
+  ssh-server:
+    <<: *common
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: lanscape-test-ssh
+    hostname: ssh-server
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - PASSWORD_ACCESS=true
+      - USER_PASSWORD=testpass
+      - USER_NAME=testuser
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.13
+        ipv6_address: "fd00:dead:beef::13"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 2222 || nc -z localhost 22"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # ── Database Server ─────────────────────────────────────────────────────
+  # PostgreSQL (5432) + Redis (6379) as sidecars
+  postgres:
+    <<: *common
+    image: postgres:16-alpine
+    container_name: lanscape-test-postgres
+    hostname: postgres
+    environment:
+      - POSTGRES_PASSWORD=testpass
+      - POSTGRES_USER=testuser
+      - POSTGRES_DB=testdb
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.14
+        ipv6_address: "fd00:dead:beef::14"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  redis:
+    <<: *common
+    image: redis:7-alpine
+    container_name: lanscape-test-redis
+    hostname: redis
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.15
+        ipv6_address: "fd00:dead:beef::15"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+  # ── FTP Server ──────────────────────────────────────────────────────────
+  # FTP (21)
+  ftp-server:
+    <<: *common
+    image: delfer/alpine-ftp-server
+    container_name: lanscape-test-ftp
+    hostname: ftp-server
+    environment:
+      - USERS=testuser|testpass
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.16
+        ipv6_address: "fd00:dead:beef::16"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep vsftpd > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ── DNS Server ──────────────────────────────────────────────────────────
+  # DNS (53 TCP+UDP)
+  dns-server:
+    <<: *common
+    image: coredns/coredns:latest
+    container_name: lanscape-test-dns
+    hostname: dns-server
+    volumes:
+      - ./services/coredns/Corefile:/Corefile:ro
+      - ./services/coredns/testnet.zone:/testnet.zone:ro
+    command: ["-conf", "/Corefile"]
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.17
+        ipv6_address: "fd00:dead:beef::17"
+    # CoreDNS is a scratch image — no shell for healthchecks
+    healthcheck:
+      disable: true
+
+  # ── Multi-Service Host ──────────────────────────────────────────────────
+  # SSH (22) + HTTP (80) + HTTPS (443) — tests multi-port detection
+  multi-service:
+    <<: *common
+    build:
+      context: ./services/multi
+      dockerfile: Dockerfile
+    container_name: lanscape-test-multi
+    hostname: multi-service
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.20
+        ipv6_address: "fd00:dead:beef::20"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 22 && nc -z localhost 80"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # ── LANscape Scanner ────────────────────────────────────────────────────
+  # Runs integration tests against all service containers
+  scanner:
+    build:
+      context: ../../
+      dockerfile: tests/integration/Dockerfile.scanner
+    container_name: lanscape-test-scanner
+    hostname: scanner
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - ./results:/app/results
+      - ../../tests:/app/tests
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.100
+        ipv6_address: "fd00:dead:beef::100"
+    depends_on:
+      web-server:
+        condition: service_healthy
+      mail-server:
+        condition: service_healthy
+      proxy-server:
+        condition: service_healthy
+      ssh-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ftp-server:
+        condition: service_healthy
+      dns-server:
+        condition: service_started
+      multi-service:
+        condition: service_healthy
+    profiles: ["scanner"]
+
+networks:
+  testnet:
+    driver: bridge
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1
+        - subnet: "fd00:dead:beef::/64"
+          gateway: "fd00:dead:beef::1"

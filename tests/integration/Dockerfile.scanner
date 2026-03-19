@@ -1,0 +1,23 @@
+# LANscape Integration Test Scanner
+# Builds from local source to test current code (not PyPI release)
+
+FROM python:3.12-slim
+
+# Runtime deps for network scanning (same as production Dockerfile)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpcap0.8 \
+    iproute2 \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy project source
+COPY . .
+
+# Install lanscape from source + test dependencies
+RUN pip install --no-cache-dir -e ".[dev]" && \
+    pip install --no-cache-dir pyyaml tabulate
+
+# Default: run integration tests
+CMD ["python", "-m", "pytest", "tests/integration/", "-v", "--tb=short", "-x"]

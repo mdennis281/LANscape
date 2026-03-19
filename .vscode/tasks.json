@@ -205,6 +205,42 @@
             }
         },
         {
+            "label": "Integration Tests (Docker)",
+            "type": "shell",
+            "command": "${workspaceFolder}/tests/integration/run.ps1",
+            "args": [],
+            "problemMatcher": [],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "windows": {
+                "command": "${workspaceFolder}/tests/integration/run.ps1",
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "command": "${workspaceFolder}/tests/integration/run.sh",
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "command": "${workspaceFolder}/tests/integration/run.sh",
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
+        },
+        {
             "label": "Dev Mode (Hot Reload)",
             "type": "shell",
             "command": "${command:python.interpreterPath}",

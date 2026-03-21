@@ -220,8 +220,14 @@ def generate_release_description(git_log: str, version: str, api_key: str) -> st
     ## ⚠️ Breaking Changes
     - Any changes that might affect existing users (if applicable)
 
-    Be accurate, concise, and professional. You're not trying to sell what changed. Youre just relaying the facts.
+    Be accurate, concise, and factual. You're not trying to sell what changed. Youre just relaying the facts.
     If no significant changes are found, state that clearly.
+    
+    When formatting the response, be a bit edgy and informal - 
+    this is a message to users who are excited about the project, not a corporate press release.
+    I want anyone taking the time reading these release notes to have a positive experience reading this, make
+    it mildly entertaining to read.
+    
     """
 
     # Try GPT-4o first, fallback to other models if needed

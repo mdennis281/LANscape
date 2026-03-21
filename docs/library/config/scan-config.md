@@ -33,6 +33,7 @@ ScanConfig(
     neighbor_table_config: NeighborTableConfig = NeighborTableConfig(),
     port_scan_config: PortScanConfig = PortScanConfig(),
     service_scan_config: ServiceScanConfig = ServiceScanConfig(),
+    hostname_config: HostnameConfig = HostnameConfig(),
 )
 ```
 
@@ -88,6 +89,7 @@ ScanConfig(
 | `neighbor_table_config` | [`NeighborTableConfig`](sub-configs.md#neighbortableconfig) | `NeighborTableConfig()` | Background neighbor table refresh settings (IPv6) |
 | `port_scan_config` | [`PortScanConfig`](sub-configs.md#portscanconfig) | `PortScanConfig()` | Port scanning settings |
 | `service_scan_config` | [`ServiceScanConfig`](sub-configs.md#servicescanconfig) | `ServiceScanConfig()` | Service identification settings |
+| `hostname_config` | [`HostnameConfig`](sub-configs.md#hostnameconfig) | `HostnameConfig()` | Hostname resolution retry settings |
 
 ## Methods
 
@@ -142,11 +144,11 @@ config = DEFAULT_CONFIGS['balanced']
 config.subnet = "192.168.1.0/24"
 ```
 
-| Preset | `port_list` | `lookup_type` | `t_cnt_port_scan` | `t_cnt_port_test` | `t_cnt_isalive` |
-|--------|-------------|---------------|--------------------|--------------------|-----------------|
-| `balanced` | `medium` | `ICMP_THEN_ARP` | cpu_count | cpu×4 | cpu×6 |
-| `accurate` | `large` | `ICMP_THEN_ARP`, `ARP_LOOKUP` | 5 | 64 | 64 |
-| `fast` | `small` | `POKE_THEN_ARP` | 20 | 256 | 512 |
+| Preset | `port_list` | `lookup_type` | `t_cnt_port_scan` | `t_cnt_port_test` | `t_cnt_isalive` | `hostname_config` |
+|--------|-------------|---------------|--------------------|--------------------|-----------------|--------------------|
+| `balanced` | `medium` | `ICMP_THEN_ARP` | cpu_count | cpu×4 | cpu×6 | retries=1, delay=1.5s |
+| `accurate` | `large` | `ICMP_THEN_ARP`, `ARP_LOOKUP` | 5 | 64 | 64 | retries=2, delay=2.0s |
+| `fast` | `small` | `POKE_THEN_ARP` | 20 | 256 | 512 | retries=0 (disabled) |
 
 ### `get_default_configs_with_arp_fallback(arp_supported: bool) -> Dict[str, dict]`
 
@@ -162,7 +164,7 @@ Returns the default presets as dicts, substituting `ARP_LOOKUP` with `POKE_THEN_
 from lanscape import (
     ScanConfig, ScanType,
     PingConfig, PokeConfig, PortScanConfig, ServiceScanConfig,
-    ServiceScanStrategy
+    ServiceScanStrategy, HostnameConfig
 )
 
 config = ScanConfig(

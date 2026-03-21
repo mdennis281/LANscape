@@ -22,6 +22,7 @@ from lanscape.core.net_tools import (
     _parse_nbstat_response,
     _dns_name_decode,
 )
+from lanscape.core.scan_config import HostnameConfig
 from lanscape.core.system_compat import (
     resolve_hostname_avahi,
     resolve_hostname_dnssd,
@@ -121,6 +122,8 @@ def _build_nbstat_response(
 class TestGetHostname:
     """Tests for Device._get_hostname()."""
 
+    NO_RETRY = HostnameConfig(retries=0)
+
     @pytest.fixture
     def device(self):
         """Create a test Device instance."""
@@ -131,7 +134,7 @@ class TestGetHostname:
         """Reverse DNS succeeds — should return hostname immediately."""
         mock_dns.return_value = ('myrouter.local', [], ['192.168.1.100'])
 
-        result = device._get_hostname()
+        result = device._get_hostname(self.NO_RETRY)
 
         assert result == 'myrouter.local'
         mock_dns.assert_called_once_with('192.168.1.100')
@@ -142,7 +145,7 @@ class TestGetHostname:
         """On Windows, if DNS fails, should return None without trying fallbacks."""
         mock_dns.side_effect = socket.herror('Host not found')
 
-        result = device._get_hostname()
+        result = device._get_hostname(self.NO_RETRY)
 
         assert result is None
 
@@ -156,7 +159,7 @@ class TestGetHostname:
         """mDNS fallback resolves hostname when DNS fails on Linux."""
         mock_dns.side_effect = socket.herror('Host not found')
 
-        result = device._get_hostname()
+        result = device._get_hostname(self.NO_RETRY)
 
         assert result == 'livingroom-pi.local'
 
@@ -170,7 +173,7 @@ class TestGetHostname:
         """NetBIOS fallback resolves hostname when DNS and mDNS fail."""
         mock_dns.side_effect = socket.herror('Host not found')
 
-        result = device._get_hostname()
+        result = device._get_hostname(self.NO_RETRY)
 
         assert result == 'DESKTOP-ABC'
 
@@ -184,7 +187,7 @@ class TestGetHostname:
         """All resolution methods fail — should return None."""
         mock_dns.side_effect = socket.herror('Host not found')
 
-        result = device._get_hostname()
+        result = device._get_hostname(self.NO_RETRY)
 
         assert result is None
 
@@ -198,9 +201,66 @@ class TestGetHostname:
         """macOS should also attempt mDNS/NetBIOS fallbacks."""
         mock_dns.side_effect = socket.herror('Host not found')
 
-        result = device._get_hostname()
+        result = device._get_hostname(self.NO_RETRY)
 
         assert result == 'macbook.local'
+
+
+# ---------------------------------------------------------------------------
+# Tests — Hostname retry behaviour
+# ---------------------------------------------------------------------------
+
+class TestHostnameRetry:
+    """Tests for the retry wrapper around _try_resolve_hostname()."""
+
+    @pytest.fixture
+    def device(self):
+        """Create a test Device instance."""
+        return Device(ip="192.168.1.100", alive=True)
+
+    @patch('lanscape.core.net_tools.device.sleep')
+    @patch.object(Device, '_try_resolve_hostname', side_effect=[None, 'retry-host.local'])
+    def test_retry_succeeds_on_second_attempt(self, mock_resolve, mock_sleep, device):
+        """Retry finds hostname on second attempt after initial failure."""
+        cfg = HostnameConfig(retries=1, retry_delay=2.0)
+        result = device._get_hostname(cfg)
+
+        assert result == 'retry-host.local'
+        assert mock_resolve.call_count == 2
+        mock_sleep.assert_called_once_with(2.0)
+
+    @patch('lanscape.core.net_tools.device.sleep')
+    @patch.object(Device, '_try_resolve_hostname', return_value=None)
+    def test_retries_exhausted_returns_none(self, mock_resolve, mock_sleep, device):
+        """All retry attempts fail — returns None."""
+        cfg = HostnameConfig(retries=2, retry_delay=1.0)
+        result = device._get_hostname(cfg)
+
+        assert result is None
+        assert mock_resolve.call_count == 3  # 1 initial + 2 retries
+        assert mock_sleep.call_count == 2
+
+    @patch('lanscape.core.net_tools.device.sleep')
+    @patch.object(Device, '_try_resolve_hostname', return_value=None)
+    def test_zero_retries_single_attempt(self, mock_resolve, mock_sleep, device):
+        """retries=0 means exactly one attempt, no sleep."""
+        cfg = HostnameConfig(retries=0)
+        result = device._get_hostname(cfg)
+
+        assert result is None
+        mock_resolve.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch('lanscape.core.net_tools.device.sleep')
+    @patch.object(Device, '_try_resolve_hostname', return_value='first-try.local')
+    def test_no_retry_when_first_attempt_succeeds(self, mock_resolve, mock_sleep, device):
+        """If the first attempt succeeds, no retries or sleeps happen."""
+        cfg = HostnameConfig(retries=3, retry_delay=5.0)
+        result = device._get_hostname(cfg)
+
+        assert result == 'first-try.local'
+        mock_resolve.assert_called_once()
+        mock_sleep.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

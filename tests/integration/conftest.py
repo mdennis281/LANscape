@@ -5,7 +5,6 @@ Provides session-scoped scan results and expected device data
 loaded from expected_results.yml.
 """
 
-import os
 import logging
 from pathlib import Path
 from typing import Optional

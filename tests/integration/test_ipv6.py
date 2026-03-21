@@ -11,6 +11,7 @@ import pytest
 
 from lanscape.core.models import ScanResults
 from tests.integration.conftest import find_device
+from tests.integration.test_service_id import _service_matches
 
 
 pytestmark = [
@@ -119,11 +120,8 @@ class TestIPv6ServiceIdentification:
         expected_devices: dict
     ):
         """Services are correctly identified when scanning IPv6 addresses."""
-        # Import the helper from the service ID tests
-        from tests.integration.test_service_id import _service_matches
-
         devices_with_services = 0
-        for name, info in expected_devices.items():
+        for _name, info in expected_devices.items():
             ipv6 = info.get("ipv6")
             if not ipv6:
                 continue

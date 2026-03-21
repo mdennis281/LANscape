@@ -17,26 +17,8 @@ from tests.integration.conftest import find_device
 pytestmark = pytest.mark.integration
 
 
-def _build_report(
-    ipv4_results: ScanResults,
-    ipv6_results: ScanResults,
-    expected_devices: dict,
-) -> str:
-    """Generate a human-readable scan comparison report."""
-    lines = [
-        "=" * 80,
-        "LANscape Integration Test Report",
-        "=" * 80,
-        "",
-    ]
-
-    # ── IPv4 Summary ──
-    lines.append("── IPv4 Scan Summary ──")
-    lines.append(f"  Devices found: {len(ipv4_results.devices)}")
-    lines.append(f"  Expected:      {len(expected_devices)}")
-    lines.append("")
-
-    # Device detail table
+def _ipv4_table(ipv4_results: ScanResults, expected_devices: dict) -> str:
+    """Build the IPv4 device comparison table."""
     rows = []
     for name, info in expected_devices.items():
         ip = info["ipv4"]
@@ -66,15 +48,12 @@ def _build_report(
 
     headers = ["Name", "IPv4", "Status", "Expected Ports", "Actual Ports",
                "Ports OK", "Services", "MACs"]
-    lines.append(tabulate(rows, headers=headers, tablefmt="grid"))
-    lines.append("")
+    return tabulate(rows, headers=headers, tablefmt="grid")
 
-    # ── IPv6 Summary ──
-    lines.append("── IPv6 Scan Summary ──")
-    lines.append(f"  Devices found: {len(ipv6_results.devices)}")
-    lines.append("")
 
-    ipv6_rows = []
+def _ipv6_table(ipv6_results: ScanResults, expected_devices: dict) -> str:
+    """Build the IPv6 device comparison table."""
+    rows = []
     for name, info in expected_devices.items():
         ipv6 = info.get("ipv6")
         if not ipv6:
@@ -88,11 +67,35 @@ def _build_report(
             actual_ports = []
             status = "MISSING"
 
-        ipv6_rows.append([name, ipv6, status, str(expected_ports), str(actual_ports)])
+        rows.append([name, ipv6, status, str(expected_ports), str(actual_ports)])
 
-    ipv6_headers = ["Name", "IPv6", "Status", "Expected Ports", "Actual Ports"]
-    lines.append(tabulate(ipv6_rows, headers=ipv6_headers, tablefmt="grid"))
-    lines.append("")
+    headers = ["Name", "IPv6", "Status", "Expected Ports", "Actual Ports"]
+    return tabulate(rows, headers=headers, tablefmt="grid")
+
+
+def _build_report(
+    ipv4_results: ScanResults,
+    ipv6_results: ScanResults,
+    expected_devices: dict,
+) -> str:
+    """Generate a human-readable scan comparison report."""
+    lines = [
+        "=" * 80,
+        "LANscape Integration Test Report",
+        "=" * 80,
+        "",
+        "── IPv4 Scan Summary ──",
+        f"  Devices found: {len(ipv4_results.devices)}",
+        f"  Expected:      {len(expected_devices)}",
+        "",
+        _ipv4_table(ipv4_results, expected_devices),
+        "",
+        "── IPv6 Scan Summary ──",
+        f"  Devices found: {len(ipv6_results.devices)}",
+        "",
+        _ipv6_table(ipv6_results, expected_devices),
+        "",
+    ]
 
     # ── Unexpected Devices ──
     expected_ips = {info["ipv4"] for info in expected_devices.values()}

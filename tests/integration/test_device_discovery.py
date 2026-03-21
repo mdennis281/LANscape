@@ -81,7 +81,7 @@ class TestIPv4Discovery:
     ):
         """Discovered devices have MAC addresses from ARP cache."""
         devices_with_macs = 0
-        for name, info in expected_devices.items():
+        for _name, info in expected_devices.items():
             ip = info["ipv4"]
             device = find_device(ipv4_scan_results, ip)
             if device is not None and device.macs:

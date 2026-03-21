@@ -15,6 +15,7 @@ import struct
 import socket
 
 import pytest
+from pydantic import ValidationError
 
 from lanscape.core.net_tools import (
     Device,
@@ -261,6 +262,16 @@ class TestHostnameRetry:
         assert result == 'first-try.local'
         mock_resolve.assert_called_once()
         mock_sleep.assert_not_called()
+
+    def test_negative_retries_rejected(self):
+        """Negative retries should be rejected by Pydantic validation."""
+        with pytest.raises(ValidationError):
+            HostnameConfig(retries=-1)
+
+    def test_negative_retry_delay_rejected(self):
+        """Negative retry_delay should be rejected by Pydantic validation."""
+        with pytest.raises(ValidationError):
+            HostnameConfig(retry_delay=-0.5)
 
 
 # ---------------------------------------------------------------------------

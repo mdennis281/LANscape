@@ -28,7 +28,7 @@ try {
     # Build
     Write-Host "-- Building service containers --"
     $buildArgs = @("-f", $ComposeFile, "build")
-    if ($Build) { $buildArgs += "--build" }
+    if ($Build) { $buildArgs += @("--no-cache", "--pull") }
     docker compose @buildArgs
     if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
@@ -42,9 +42,19 @@ try {
     $services = docker compose -f $ComposeFile ps --services | Where-Object { $_ -ne "scanner" }
     foreach ($svc in $services) {
         Write-Host -NoNewline "  Waiting for ${svc}..."
+        $containerId = docker compose -f $ComposeFile ps -q $svc
+        if (-not $containerId) {
+            Write-Host " not found"
+            Write-Warning "Container for service '$svc' not found; skipping health check"
+            continue
+        }
         $timeout = 60
         while ($timeout -gt 0) {
-            $status = docker inspect --format='{{.State.Health.Status}}' "lanscape-test-$svc" 2>$null
+            $status = docker inspect --format='{{.State.Health.Status}}' $containerId 2>$null
+            if (-not $status -or $status -eq '') {
+                Write-Host " ready (no healthcheck)"
+                break
+            }
             if ($status -eq "healthy") {
                 Write-Host " ready"
                 break

@@ -16,7 +16,7 @@ BUILD_FLAG=""
 for arg in "$@"; do
     case "$arg" in
         --keep)  KEEP=true ;;
-        --build) BUILD_FLAG="--build" ;;
+        --build) BUILD_FLAG="--no-cache --pull" ;;
         *) echo "Unknown arg: $arg"; exit 1 ;;
     esac
 done
@@ -48,7 +48,7 @@ for svc in $SERVICES; do
     timeout=60
     while [ $timeout -gt 0 ]; do
         health=$(docker compose -f "$COMPOSE_FILE" ps --format json "$svc" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('Health',''))" 2>/dev/null || echo "")
-        if [ "$health" = "healthy" ]; then
+        if [ -z "$health" ] || [ "$health" = "healthy" ]; then
             echo " ready"
             break
         fi
@@ -63,8 +63,10 @@ done
 
 echo ""
 echo "── Running integration tests ──"
+set +e
 docker compose -f "$COMPOSE_FILE" run --rm scanner
 EXIT_CODE=$?
+set -e
 
 echo ""
 echo "── Test Results ──"

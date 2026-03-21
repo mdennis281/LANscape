@@ -9,7 +9,7 @@
 # NOTE: IPv6 support depends on the runner's Docker daemon configuration.
 #       Set SKIP_IPV6_TESTS=true if the runner doesn't support Docker IPv6.
 
-name: "Quality: Integration Tests"
+name: "Quality - Integration Tests"
 
 on:
   workflow_dispatch:

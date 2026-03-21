@@ -20,4 +20,4 @@ RUN pip install --no-cache-dir -e ".[dev]" && \
     pip install --no-cache-dir pyyaml tabulate
 
 # Default: run integration tests
-CMD ["python", "-m", "pytest", "tests/integration/", "-v", "--tb=short", "-x"]
+CMD ["python", "-m", "pytest", "tests/integration/", "-v", "--tb=short", "-x", "-o", "addopts="]

@@ -60,7 +60,7 @@ services:
   # Squid HTTP proxy (3128)
   proxy-server:
     <<: *common
-    image: ubuntu/squid:latest
+    image: ubuntu/squid:5.9-24.04_edge
     container_name: lanscape-test-proxy
     hostname: proxy-server
     volumes:
@@ -80,7 +80,7 @@ services:
   # SSH (22)
   ssh-server:
     <<: *common
-    image: lscr.io/linuxserver/openssh-server:latest
+    image: lscr.io/linuxserver/openssh-server:9.8_p1-r1-ls147
     container_name: lanscape-test-ssh
     hostname: ssh-server
     environment:
@@ -162,7 +162,7 @@ services:
   # DNS (53 TCP+UDP)
   dns-server:
     <<: *common
-    image: coredns/coredns:latest
+    image: coredns/coredns:1.12.0
     container_name: lanscape-test-dns
     hostname: dns-server
     volumes:

@@ -69,8 +69,8 @@ class PokeConfig(ConfigBase):
 
 class HostnameConfig(ConfigBase):
     """Configuration for hostname resolution retries."""
-    retries: int = 1
-    retry_delay: float = 1.5
+    retries: int = Field(default=1, ge=0)
+    retry_delay: float = Field(default=1.5, ge=0)
 
     def __str__(self):
         return f'HostnameCfg(retries={self.retries}, retry_delay={self.retry_delay})'

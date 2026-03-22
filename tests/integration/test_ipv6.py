@@ -121,7 +121,8 @@ class TestIPv6ServiceIdentification:
     ):
         """Services are correctly identified when scanning IPv6 addresses."""
         devices_with_services = 0
-        for _name, info in expected_devices.items():
+        failures = []
+        for name, info in expected_devices.items():
             ipv6 = info.get("ipv6")
             if not ipv6:
                 continue
@@ -142,9 +143,16 @@ class TestIPv6ServiceIdentification:
                 if port not in ipv6_ports:
                     continue
                 if port in device.ports:
-                    _service_matches(device.services, port, labels)
+                    if not _service_matches(device.services, port, labels):
+                        failures.append(
+                            f"  {name} ({ipv6}): port {port} expected "
+                            f"{labels}, got {list(device.services.keys())}"
+                        )
 
         # At least some devices should have services identified via IPv6
         assert devices_with_services > 0, (
             "No services identified on any device via IPv6"
+        )
+        assert not failures, (
+            "IPv6 service identification failures:\n" + "\n".join(failures)
         )

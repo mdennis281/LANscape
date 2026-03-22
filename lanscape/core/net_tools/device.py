@@ -315,9 +315,11 @@ class Device(BaseModel):
     ) -> Optional[str]:
         """Get the hostname via reverse DNS, with mDNS/NetBIOS/LLMNR fallbacks.
 
-        When ``hostname_config`` is provided the entire resolution chain is
-        retried up to ``hostname_config.retries`` additional times with a
-        delay of ``hostname_config.retry_delay`` seconds between attempts.
+        The entire resolution chain is retried up to
+        ``hostname_config.retries`` additional times (default ``1``) with a
+        delay of ``hostname_config.retry_delay`` seconds (default ``1.5``)
+        between attempts.  When ``hostname_config`` is ``None`` a default
+        ``HostnameConfig()`` is used so retries still occur.
 
         Resolution order (per attempt):
         1. socket.gethostbyaddr() - standard reverse DNS

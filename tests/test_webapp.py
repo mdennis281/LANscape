@@ -320,3 +320,72 @@ class TestDiscoverEndpoint:
             server.shutdown()
             server.server_close()
             SPAHandler.discovery = None
+
+
+class TestVersionEndpoint:
+    """Tests for the /api/version endpoint."""
+
+    @staticmethod
+    def _make_server(temp_webapp_dir):
+        """Start a test server and return (base_url, server)."""
+        server = start_static_server(temp_webapp_dir, 0)
+        base_url = f'http://127.0.0.1:{server.server_address[1]}'
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return base_url, server
+
+    @pytest.fixture(autouse=True)
+    def _reset_version_cache(self):
+        """Clear the cached version between tests."""
+        with patch.object(SPAHandler, '_cached_version', None):
+            yield
+
+    def test_version_returns_json_with_file(self, temp_webapp_dir):
+        """Test that /api/version returns version.json contents."""
+        version_data = {'version': '2026.03.19.12345', 'buildTime': '2026-03-19T00:00:00Z'}
+        (temp_webapp_dir / 'version.json').write_text(json.dumps(version_data))
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/version') as resp:
+                data = json.loads(resp.read())
+            assert data['ui_version'] == '2026.03.19.12345'
+            assert data['build_time'] == '2026-03-19T00:00:00Z'
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_version_fallback_when_missing(self, temp_webapp_dir):
+        """Test that /api/version returns fallback when version.json is absent."""
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/version') as resp:
+                data = json.loads(resp.read())
+            assert data['ui_version'] == '0.0.0'
+            assert data['build_time'] == ''
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_version_fallback_on_corrupt_json(self, temp_webapp_dir):
+        """Test that /api/version returns fallback when version.json is invalid."""
+        (temp_webapp_dir / 'version.json').write_text('NOT VALID JSON{{{')
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/version') as resp:
+                data = json.loads(resp.read())
+            assert data['ui_version'] == '0.0.0'
+            assert data['build_time'] == ''
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_version_has_cors_headers(self, temp_webapp_dir):
+        """Test that /api/version includes CORS headers."""
+        base_url, server = self._make_server(temp_webapp_dir)
+        try:
+            with urllib.request.urlopen(f'{base_url}/api/version') as resp:
+                headers = dict(resp.headers)
+            assert headers.get('Access-Control-Allow-Origin') == '*'
+        finally:
+            server.shutdown()
+            server.server_close()

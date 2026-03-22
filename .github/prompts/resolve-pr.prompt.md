@@ -4,31 +4,34 @@ agent: agent
 
 # Resolve PR Issues
 
-You are a PR resolution agent. Your task is to resolve **unresolved review comments** and **failing GitHub Actions checks** on the active pull request. Use MCP tools for all operations — never use `gh` CLI unless explicitly noted as an exception.
+You are a PR resolution agent. Your task is to resolve **unresolved review comments** and **failing GitHub Actions checks** on the active pull request.
 
-## Step 0: Identify the Active PR
+All PR data is gathered via local scripts that use the `gh` CLI — no MCP tools are needed.
 
-Use the `github-pull-request_activePullRequest` tool to get the PR number, URL, branch, owner, and repo.
+## Step 0: Generate PR Analysis
 
-Store the `owner`, `repo`, and `pullNumber` — they are used in every subsequent step.
+Run the **PR Analysis** VS Code task, or execute directly:
 
-## Step 1: Triage — Detect What Needs Attention
+```bash
+python scripts/tasks/pr_analysis.py
+```
 
-### 1a. Check for Unresolved Review Threads
+This creates a `pr-analysis/` directory at the project root containing:
+- `summary.md` — overview of comments and CI checks
+- `comments/<thread_id>.json` — detail files for each unresolved review thread
+- `checks/<check_name>.json` — detail files with logs for each failed CI check
 
-Use the MCP tool `pull_request_read` with:
-- `method`: `get_review_comments`
-- `owner`, `repo`, `pullNumber` from Step 0
+## Step 1: Triage — Read the Summary
 
-Scan the results for threads where `isResolved` is `false` and `isOutdated` is `false`. These are the **actionable review comments**.
+Read `pr-analysis/summary.md` to understand the PR state. ALWAYS RUN A NEW ANALYSIS ON INVOCATION OF THIS WORKFLOW TO GET THE LATEST PR STATUS.
 
-### 1b. Check for Failing CI Checks
+### 1a. Identify Unresolved Comments
 
-Use the MCP tool `pull_request_read` with:
-- `method`: `get_check_runs`
-- `owner`, `repo`, `pullNumber` from Step 0
+The summary lists all review threads with their IDs and resolution status. Focus on threads marked **Unresolved** that are **not outdated**.
 
-Identify any check runs with `conclusion` of `failure`, `timed_out`, or `action_required`. These are the **failing checks**.
+### 1b. Identify Failing CI Checks
+
+The summary shows all CI check runs with their status and conclusion. Focus on checks with conclusion `failure`, `timed_out`, or `action_required`.
 
 ### 1c. Decide the Workflow
 
@@ -45,7 +48,11 @@ Identify any check runs with `conclusion` of `failure`, `timed_out`, or `action_
 
 For each unresolved, non-outdated review thread:
 
-### 2a. Evaluate the Comment
+### 2a. Read the Comment Detail
+
+Read the corresponding JSON file in `pr-analysis/comments/` for the full thread context — including the file path, line number, comment body, and all replies.
+
+### 2b. Evaluate the Comment
 
 1. Read the file at the thread's `path` and `line` in the local workspace
 2. Analyze the suggestion:
@@ -53,61 +60,38 @@ For each unresolved, non-outdated review thread:
    - Does it improve code quality, safety, or maintainability?
    - Would it break existing functionality?
 
-### 2b. Implement or Dismiss
+### 2c. Implement or Dismiss
 
 **If valid:** Implement the fix, run relevant tests, then proceed to resolve.
 **If not valid:** The suggestion is incorrect, outdated, or harmful — proceed to resolve without changes.
 
 Use your judgment. If a fix is reasonable and improves the code, implement it.
 
-### 2c. Resolve the Thread
+### 2d. Resolve the Thread
 
-The GitHub MCP server does not expose a thread-resolve mutation. This is the **one exception** where `gh` CLI is required.
+Run the **Resolve PR Comment** VS Code task, or execute directly:
 
-First, get the thread node IDs via GraphQL (the MCP `get_review_comments` response does not include them):
-
-```powershell
-gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: PR_NUMBER) { reviewThreads(first: 50) { nodes { id isResolved isOutdated comments(first: 1) { nodes { body path line } } } } } } }'
+```bash
+python scripts/tasks/resolve_comment.py --pr <PR_NUMBER> --comment-id "<THREAD_ID>"
 ```
 
-Then resolve each unresolved thread:
+The script will output the thread state as JSON after resolution. The `THREAD_ID` values are listed in `pr-analysis/summary.md` and the JSON detail files.
 
-```powershell
-gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "THREAD_ID" }) { thread { isResolved } } }'
-```
+### 2e. Verify Resolution
 
-Replace `OWNER`, `REPO`, `PR_NUMBER`, and `THREAD_ID` with values from previous steps.
-
-### 2d. Verify Resolution
-
-Re-run Step 1a and confirm all threads are now resolved.
+After resolving all threads, re-run the PR Analysis script (Step 0) and confirm all threads are now resolved in the updated `summary.md`.
 
 ---
 
 ## Step 3: Actions Troubleshooting
 
-### 3a. Identify Failing Jobs
+### 3a. Read the Failed Check Details
 
-Use the MCP tool `actions_list` with:
-- `method`: `list_workflow_runs`
-- `owner`, `repo`
-- Filter to the PR's head branch or use the run ID from failing check runs in Step 1b
+For each failed check, read the corresponding JSON file in `pr-analysis/checks/`. Each file contains:
+- Check metadata (name, status, conclusion, workflow, URL)
+- Failure logs (truncated to last 200 lines; full context in the file)
 
-Then use `actions_list` with:
-- `method`: `list_workflow_jobs`
-- `resource_id`: the workflow run ID
-- to get the list of jobs and their statuses
-
-### 3b. Get Failure Logs
-
-Use the MCP tool `get_job_logs` with:
-- `owner`, `repo`
-- `run_id`: the failing workflow run ID
-- `failed_only`: `true`
-- `return_content`: `true`
-- `tail_lines`: `100` (increase if needed for full context)
-
-### 3c. Diagnose the Failure
+### 3b. Diagnose the Failure
 
 Common failure categories and resolution strategies:
 
@@ -120,45 +104,44 @@ Common failure categories and resolution strategies:
 | **Dependency failure** | `pip install`, version conflicts | Update dependency pins in `pyproject.toml` |
 | **Timeout** | `timed_out` conclusion | Check for infinite loops, network issues, or increase timeout |
 
-### 3d. Implement the Fix
+### 3c. Implement the Fix
 
 1. Apply the fix to the relevant source files
 2. Run local validation:
    - For lint failures: Run the `Run Linter (Pylint)` VS Code task
-   - For test failures: `python.exe -m pytest tests/<relevant_test>.py -v`  
+   - For test failures: `python.exe -m pytest tests/<relevant_test>.py -v`
    - For build failures: `python -m build && twine check dist/*`
-3. Commit the fix using `mcp_gitkraken_git_add_or_commit` and push using `mcp_gitkraken_git_push`
+3. Commit and push the fix
 
-### 3e. Re-check (Optional)
+### 3d. Re-check
 
-After pushing the fix, the CI will re-run automatically. If the user wants immediate verification, use `actions_run_trigger` with method `rerun_failed_jobs` to re-trigger only the failed jobs.
+After pushing the fix, the CI will re-run automatically. Re-run the PR Analysis script to verify the updated check statuses once the new runs complete.
 
 ---
 
-## Quick Reference: MCP Tools Used
+## Quick Reference: Scripts & Tasks
 
-| Purpose | MCP Tool | Method/Params |
-|---------|----------|---------------|
-| Active PR context | `github-pull-request_activePullRequest` | _(no params)_ |
-| PR review threads | `pull_request_read` | `method: get_review_comments` |
-| PR check runs | `pull_request_read` | `method: get_check_runs` |
-| PR details | `pull_request_read` | `method: get` |
-| PR diff | `pull_request_read` | `method: get_diff` |
-| PR changed files | `pull_request_read` | `method: get_files` |
-| Update PR description | `update_pull_request` | `owner, repo, pullNumber, body` |
-| List workflow runs | `actions_list` | `method: list_workflow_runs` |
-| List workflow jobs | `actions_list` | `method: list_workflow_jobs` |
-| Get job logs | `get_job_logs` | `failed_only: true, return_content: true` |
-| Rerun failed jobs | `actions_run_trigger` | `method: rerun_failed_jobs` |
-| Git commit | `mcp_gitkraken_git_add_or_commit` | `directory, files, message` |
-| Git push | `mcp_gitkraken_git_push` | `directory` |
-| Resolve thread | `gh api graphql` | **Exception** — not available via MCP |
-| Get thread node IDs | `gh api graphql` | **Exception** — not available via MCP |
+| Purpose | Script / Task | Arguments |
+|---------|--------------|-----------|
+| Generate PR analysis | `python scripts/tasks/pr_analysis.py` | _(none — uses current branch)_ |
+| Resolve a comment thread | `python scripts/tasks/resolve_comment.py` | `--pr <NUMBER> --comment-id <THREAD_ID>` |
+| VS Code: PR Analysis | Task: **PR Analysis** | _(none)_ |
+| VS Code: Resolve PR Comment | Task: **Resolve PR Comment** | Prompted for PR number and thread ID |
+
+## Output Files
+
+| File | Contents |
+|------|----------|
+| `pr-analysis/summary.md` | PR overview, comment table (resolved/unresolved with IDs), CI check table |
+| `pr-analysis/comments/<id>.json` | Full thread detail: path, line, all comments with authors and bodies |
+| `pr-analysis/checks/<name>.json` | Check metadata + failure logs |
 
 ## Notes
 
-- **Always use MCP tools** — never use `gh` CLI unless explicitly marked as an exception in the table above.
-- The only `gh` CLI exceptions are `resolveReviewThread` / `unresolveReviewThread` GraphQL mutations and fetching thread node IDs — these are not in any MCP toolset.
+- Both scripts require the `gh` CLI to be installed and authenticated (`gh auth login`).
+- The analysis script auto-detects the current branch and finds the associated open PR into `main`.
+- If no open PR exists for the current branch, the script exits with an error.
+- The `pr-analysis/` directory is gitignored and fully recreated on each run.
+- Thread IDs are GraphQL node IDs (e.g. `PRRT_kwDO...`) — these are the values needed by the resolve script.
 - After implementing fixes, always run tests before resolving threads or committing.
-- Use `mcp_gitkraken_git_add_or_commit` for commits. Messages should reference the PR context: `"Address PR #<number> feedback"` or `"Fix CI: <description>"`
 - Skip `isOutdated: true` review threads unless the comment is clearly still relevant to current code.

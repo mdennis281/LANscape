@@ -18,6 +18,7 @@ from lanscape.core.scan_config import (
     ServiceScanStrategy,
     ScanType,
     NeighborTableConfig,
+    HostnameConfig,
 )
 
 from lanscape.core.port_manager import PortManager

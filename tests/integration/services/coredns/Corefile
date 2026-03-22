@@ -1,0 +1,6 @@
+.:53 {
+    file /testnet.zone testnet.local
+    health :8181
+    log
+    errors
+}

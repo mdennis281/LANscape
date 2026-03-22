@@ -1,0 +1,43 @@
+$ORIGIN testnet.local.
+@       IN SOA  ns.testnet.local. admin.testnet.local. (
+            2024010101  ; Serial
+            3600        ; Refresh
+            600         ; Retry
+            86400       ; Expire
+            60          ; Minimum TTL
+        )
+
+        IN NS   ns.testnet.local.
+
+ns          IN A        172.30.0.17
+ns          IN AAAA     fd00:dead:beef::17
+
+web-server      IN A    172.30.0.10
+web-server      IN AAAA fd00:dead:beef::10
+
+mail-server     IN A    172.30.0.11
+mail-server     IN AAAA fd00:dead:beef::11
+
+proxy-server    IN A    172.30.0.12
+proxy-server    IN AAAA fd00:dead:beef::12
+
+ssh-server      IN A    172.30.0.13
+ssh-server      IN AAAA fd00:dead:beef::13
+
+postgres        IN A    172.30.0.14
+postgres        IN AAAA fd00:dead:beef::14
+
+redis           IN A    172.30.0.15
+redis           IN AAAA fd00:dead:beef::15
+
+ftp-server      IN A    172.30.0.16
+ftp-server      IN AAAA fd00:dead:beef::16
+
+dns-server      IN A    172.30.0.17
+dns-server      IN AAAA fd00:dead:beef::17
+
+multi-service   IN A    172.30.0.20
+multi-service   IN AAAA fd00:dead:beef::20
+
+scanner         IN A    172.30.0.100
+scanner         IN AAAA fd00:dead:beef::100

@@ -48,7 +48,7 @@
             "problemMatcher": [],
             "group": "build",
             "windows": {
-                "command": "${workspaceFolder}/scripts/tag_release.ps1",
+                "command": "${workspaceFolder}/scripts/tasks/tag_release.ps1",
                 "options": {
                     "shell": {
                         "executable": "powershell"
@@ -56,7 +56,7 @@
                 }
             },
             "linux": {
-                "command": "${workspaceFolder}/scripts/tag_release.sh",
+                "command": "${workspaceFolder}/scripts/tasks/tag_release.sh",
                 "options": {
                     "shell": {
                         "executable": "/bin/bash"
@@ -64,7 +64,7 @@
                 }
             },
             "osx": {
-                "command": "${workspaceFolder}/scripts/tag_release.sh",
+                "command": "${workspaceFolder}/scripts/tasks/tag_release.sh",
                 "options": {
                     "shell": {
                         "executable": "/bin/bash"
@@ -205,11 +205,47 @@
             }
         },
         {
+            "label": "Integration Tests (Docker)",
+            "type": "shell",
+            "command": "${workspaceFolder}/tests/integration/run.ps1",
+            "args": [],
+            "problemMatcher": [],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "windows": {
+                "command": "${workspaceFolder}/tests/integration/run.ps1",
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "command": "${workspaceFolder}/tests/integration/run.sh",
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "command": "${workspaceFolder}/tests/integration/run.sh",
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
+        },
+        {
             "label": "Dev Mode (Hot Reload)",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
-                "${workspaceFolder}/scripts/devmode.py"
+                "${workspaceFolder}/scripts/tasks/devmode.py"
             ],
             "problemMatcher": [],
             "group": "build",
@@ -239,8 +275,93 @@
                     }
                 }
             }
+        },
+        {
+            "label": "PR Analysis",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "${workspaceFolder}/scripts/tasks/pr_analysis.py"
+            ],
+            "problemMatcher": [],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
+        },
+        {
+            "label": "Resolve PR Comment",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "${workspaceFolder}/scripts/tasks/resolve_comment.py",
+                "--pr",
+                "${input:prNumber}",
+                "--comment-id",
+                "${input:commentId}"
+            ],
+            "problemMatcher": [],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "powershell"
+                    }
+                }
+            },
+            "linux": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            },
+            "osx": {
+                "options": {
+                    "shell": {
+                        "executable": "/bin/bash"
+                    }
+                }
+            }
         }
     ],
 
-    "inputs": []
+    "inputs": [
+        {
+            "id": "prNumber",
+            "type": "promptString",
+            "description": "PR number"
+        },
+        {
+            "id": "commentId",
+            "type": "promptString",
+            "description": "GraphQL thread node ID (e.g. PRRT_kwDO...)"
+        }
+    ]
 }

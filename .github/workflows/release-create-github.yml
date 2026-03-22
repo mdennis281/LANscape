@@ -147,10 +147,10 @@ jobs:
           
           if [ "${{ steps.previous_tag.outputs.is_first_release }}" = "true" ] || [ -z "$PREVIOUS_TAG" ]; then
             echo "Generating first release description..."
-            python scripts/generate_release_notes.py "$VERSION" > release_description.txt
+            python scripts/ci/generate_release_notes.py "$VERSION" > release_description.txt
           else
             echo "Generating diff-based release description..."
-            python scripts/generate_release_notes.py "$VERSION" "$PREVIOUS_TAG" > release_description.txt
+            python scripts/ci/generate_release_notes.py "$VERSION" "$PREVIOUS_TAG" > release_description.txt
           fi
           
           echo "Generated release description:"

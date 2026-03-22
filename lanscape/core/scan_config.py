@@ -67,6 +67,15 @@ class PokeConfig(ConfigBase):
     timeout: float = 2.0
 
 
+class HostnameConfig(ConfigBase):
+    """Configuration for hostname resolution retries."""
+    retries: int = Field(default=1, ge=0)
+    retry_delay: float = Field(default=1.5, ge=0)
+
+    def __str__(self):
+        return f'HostnameCfg(retries={self.retries}, retry_delay={self.retry_delay})'
+
+
 class NeighborTableConfig(ConfigBase):
     """Configuration for the background neighbor table refresh service."""
     refresh_interval: float = 2.0
@@ -144,6 +153,7 @@ class ScanConfig(ConfigBase):
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
     neighbor_table_config: 'NeighborTableConfig' = Field(default_factory=NeighborTableConfig)
     port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
     service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
@@ -228,6 +238,10 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
             timeout=8.0,
             lookup_type=ServiceScanStrategy.AGGRESSIVE,
             max_concurrent_probes=5
+        ),
+        hostname_config=HostnameConfig(
+            retries=2,
+            retry_delay=2.0
         )
     ),
     'fast': ScanConfig(
@@ -253,6 +267,9 @@ DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
             timeout=2.0,
             lookup_type=ServiceScanStrategy.LAZY,
             max_concurrent_probes=15
+        ),
+        hostname_config=HostnameConfig(
+            retries=0
         )
     )
 }

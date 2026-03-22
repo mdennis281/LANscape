@@ -160,3 +160,24 @@ cfg = ServiceScanConfig(
 | `LAZY` | A few common probes to quickly identify common services |
 | `BASIC` | Common probes plus probes correlated to the specific port number |
 | `AGGRESSIVE` | All known probes in parallel for maximum identification coverage |
+
+---
+
+## HostnameConfig
+
+`lanscape.HostnameConfig`
+
+Controls retry behavior for hostname resolution. Hostname lookups use a multi-step fallback chain (reverse DNS, mDNS, LLMNR, NetBIOS, etc.) which can be spotty. This config lets you retry the full chain if the first attempt fails.
+
+```python
+from lanscape import HostnameConfig
+
+cfg = HostnameConfig(retries=2, retry_delay=2.0)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `retries` | `int` | `1` | Number of additional retry attempts after the first resolution fails (0 = single attempt, no retries) |
+| `retry_delay` | `float` | `1.5` | Delay in seconds between retry attempts |
+
+> **How it works:** On each attempt, the full resolution chain is tried (reverse DNS → platform-specific fallbacks → mDNS → LLMNR → NetBIOS). If a hostname is found on any attempt, it's returned immediately without further retries. Setting `retries=0` disables retries entirely for faster scans at the cost of potentially missing spotty hostnames.

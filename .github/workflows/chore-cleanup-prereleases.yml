@@ -43,4 +43,4 @@ jobs:
         run: |
           MAX_AGE="${{ inputs.max_age_days || '90' }}"
           echo "Cleaning up pre-releases older than ${MAX_AGE} days..."
-          python scripts/cleanup_prereleases.py --max-age-days "$MAX_AGE"
+          python scripts/ci/cleanup_prereleases.py --max-age-days "$MAX_AGE"

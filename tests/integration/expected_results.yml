@@ -1,0 +1,92 @@
+# Ground truth for LANscape integration tests.
+# Maps each service container to its expected IPs, open ports, and service labels.
+#
+# Service names must match LANscape's service_matchers.jsonc identifiers.
+# Use "any" for services where the exact label may vary.
+
+network:
+  ipv4_subnet: "172.30.0.0/24"
+  ipv6_subnet: "fd00:dead:beef::/64"
+
+# Minimum thresholds for scan-wide assertions
+assertions:
+  min_devices_discovered: 8
+  min_ipv6_devices_discovered: 5
+
+devices:
+  web-server:
+    ipv4: "172.30.0.10"
+    ipv6: "fd00:dead:beef::10"
+    ports: [80, 443, 8080]
+    services:
+      # nginx responds with HTTP headers on 80/8080, TLS on 443
+      80: ["HTTP"]
+      443: ["HTTPS"]
+      8080: ["HTTP"]
+
+  mail-server:
+    ipv4: "172.30.0.11"
+    ipv6: "fd00:dead:beef::11"
+    # GreenMail test.all uses offset ports: SMTP=3025, IMAP=3143
+    ports: [3025, 3143]
+    # GreenMail binds to 0.0.0.0 only — not reachable via IPv6
+    ipv6_ports: []
+    services:
+      3025: ["SMTP"]
+      3143: ["IMAP"]
+
+  proxy-server:
+    ipv4: "172.30.0.12"
+    ipv6: "fd00:dead:beef::12"
+    ports: [3128]
+    services:
+      3128: ["Squid", "HTTP"]
+
+  ssh-server:
+    ipv4: "172.30.0.13"
+    ipv6: "fd00:dead:beef::13"
+    # linuxserver/openssh-server uses port 2222 by default
+    ports: [2222]
+    services:
+      2222: ["SSH"]
+
+  postgres:
+    ipv4: "172.30.0.14"
+    ipv6: "fd00:dead:beef::14"
+    ports: [5432]
+    services:
+      5432: ["PostgreSQL"]
+
+  redis:
+    ipv4: "172.30.0.15"
+    ipv6: "fd00:dead:beef::15"
+    ports: [6379]
+    services:
+      # Scanner may match POP3 due to +OK response pattern
+      6379: ["Redis", "POP3"]
+
+  ftp-server:
+    ipv4: "172.30.0.16"
+    ipv6: "fd00:dead:beef::16"
+    ports: [21]
+    # vsftpd binds to IPv4 only by default
+    ipv6_ports: []
+    services:
+      # vsftpd banner "220 ..." may match SMTP pattern
+      21: ["FTP", "SMTP"]
+
+  dns-server:
+    ipv4: "172.30.0.17"
+    ipv6: "fd00:dead:beef::17"
+    ports: [53]
+    services:
+      53: ["DNS"]
+
+  multi-service:
+    ipv4: "172.30.0.20"
+    ipv6: "fd00:dead:beef::20"
+    ports: [22, 80, 443]
+    services:
+      22: ["SSH"]
+      80: ["HTTP"]
+      443: ["HTTPS"]

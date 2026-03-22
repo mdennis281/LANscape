@@ -158,6 +158,9 @@ lanscape-jobs/*.json
 # pyenv tests
 .venv*
 
+# PR analysis output
+pr-analysis/
+
 
 # tauri stuff
 node_modules

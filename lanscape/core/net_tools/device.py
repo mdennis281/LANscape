@@ -13,7 +13,7 @@ from lanscape.core.service_scan import scan_service, ServiceScanResult
 from lanscape.core.mac_lookup import MacLookup
 from lanscape.core.errors import DeviceError
 from lanscape.core.decorators import job_tracker, timeout_enforcer
-from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig
+from lanscape.core.scan_config import ServiceScanConfig, PortScanConfig, HostnameConfig
 from lanscape.core.models import (
     DeviceResult, DeviceErrorInfo, DeviceStage, ServiceInfo, ProbeResponseInfo
 )
@@ -203,10 +203,10 @@ class Device(BaseModel):
                 data['mac_addr']) if data['mac_addr'] else None
         return data
 
-    def get_metadata(self):
+    def get_metadata(self, hostname_config: Optional[HostnameConfig] = None):
         """Retrieve metadata such as hostname, MAC addresses, and alternate IPs."""
         if self.alive:
-            self.hostname = self._get_hostname()
+            self.hostname = self._get_hostname(hostname_config)
             self._get_mac_addresses()
             if not self.manufacturer:
                 self.manufacturer = self._get_manufacturer(
@@ -309,10 +309,19 @@ class Device(BaseModel):
         return self.macs
 
     @job_tracker
-    def _get_hostname(self) -> Optional[str]:
+    def _get_hostname(
+        self,
+        hostname_config: Optional[HostnameConfig] = None,
+    ) -> Optional[str]:
         """Get the hostname via reverse DNS, with mDNS/NetBIOS/LLMNR fallbacks.
 
-        Resolution order:
+        The entire resolution chain is retried up to
+        ``hostname_config.retries`` additional times (default ``1``) with a
+        delay of ``hostname_config.retry_delay`` seconds (default ``1.5``)
+        between attempts.  When ``hostname_config`` is ``None`` a default
+        ``HostnameConfig()`` is used so retries still occur.
+
+        Resolution order (per attempt):
         1. socket.gethostbyaddr() - standard reverse DNS
         2. getent hosts (Linux) - uses NSS chain (DNS, mDNS, WINS, etc.)
         3. avahi-resolve (Linux) or dns-sd (macOS) - system mDNS daemons
@@ -321,6 +330,26 @@ class Device(BaseModel):
         6. LLMNR query - for Windows devices on the network
         7. NetBIOS NBSTAT - IPv4 only, for older Windows devices
         """
+        cfg = hostname_config or HostnameConfig()
+        max_attempts = 1 + cfg.retries
+
+        for attempt in range(max_attempts):
+            result = self._try_resolve_hostname()
+            if result is not None:
+                return result
+
+            if attempt < max_attempts - 1:
+                self._log.debug(
+                    '[%s] hostname resolution attempt %d/%d failed, '
+                    'retrying in %.1fs',
+                    self.ip, attempt + 1, max_attempts, cfg.retry_delay,
+                )
+                sleep(cfg.retry_delay)
+
+        return None
+
+    def _try_resolve_hostname(self) -> Optional[str]:
+        """Single attempt at the full hostname resolution chain."""
         # 1. Standard reverse DNS
         try:
             hostname = socket.gethostbyaddr(self.ip)[0]

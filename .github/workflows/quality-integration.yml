@@ -1,0 +1,101 @@
+# LANscape Integration Tests (Docker Network)
+#
+# Spins up an isolated dual-stack Docker network with service containers,
+# then runs LANscape inside a scanner container to validate device discovery,
+# port detection, and service identification.
+#
+# Trigger: manual dispatch or weekly schedule
+#
+# NOTE: IPv6 support depends on the runner's Docker daemon configuration.
+#       Set SKIP_IPV6_TESTS=true if the runner doesn't support Docker IPv6.
+
+name: "Quality - Integration Tests"
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_ipv6:
+        description: "Skip IPv6 tests"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+  schedule:
+    # Weekly on Sunday at 03:00 UTC
+    - cron: "0 3 * * 0"
+
+concurrency:
+  group: integration-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start services
+        working-directory: tests/integration
+        run: |
+          docker compose build
+          docker compose up -d
+          echo "Waiting for services to be healthy..."
+          sleep 15
+
+      - name: Verify services are healthy
+        working-directory: tests/integration
+        run: |
+          docker compose ps
+          # Check that all non-scanner services are healthy
+          unhealthy=$(docker compose ps --format json | python3 -c "
+          import sys, json
+          raw = sys.stdin.read().strip()
+          try:
+              services = json.loads(raw)
+          except json.JSONDecodeError:
+              services = [json.loads(line) for line in raw.split('\\n') if line.strip()]
+          if not isinstance(services, list):
+              services = [services]
+          for service in services:
+              name = service.get('Name', '')
+              health = service.get('Health', 'unknown')
+              if 'scanner' not in name and health != 'healthy':
+                  print(f'{name}: {health}')
+          " 2>/dev/null || true)
+          if [ -n "$unhealthy" ]; then
+              echo "WARNING: Some services are not healthy:"
+              echo "$unhealthy"
+          fi
+
+      - name: Run integration tests
+        working-directory: tests/integration
+        env:
+          SKIP_IPV6_TESTS: ${{ github.event.inputs.skip_ipv6 || 'false' }}
+        run: |
+          docker compose run --rm \
+            -e SKIP_IPV6_TESTS=$SKIP_IPV6_TESTS \
+            scanner
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-report
+          path: tests/integration/results/report.txt
+          if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        working-directory: tests/integration
+        run: docker compose down -v --remove-orphans

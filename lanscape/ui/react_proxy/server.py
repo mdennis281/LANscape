@@ -6,6 +6,7 @@ and starts the WebSocket server for API communication.
 """
 
 import asyncio
+import json
 import logging
 import os
 import threading
@@ -18,6 +19,7 @@ from functools import partial
 from typing import Optional, Callable
 from subprocess import Popen
 
+from pydantic import BaseModel
 from pwa_launcher import open_pwa, ChromiumNotFoundError
 
 from lanscape.ui.ws.server import WebSocketServer
@@ -34,6 +36,29 @@ REACT_BUILD_DIR = Path(__file__).resolve().parent.parent / 'react_build'
 log = logging.getLogger('WebappServer')
 
 
+class VersionResponse(BaseModel):
+    """Response payload for the /api/version endpoint."""
+    ui_version: str
+    build_time: str
+
+
+def _read_build_version(build_dir: Path) -> VersionResponse:
+    """Read version.json from the React build directory.
+
+    Returns a fallback response when the file is missing or malformed
+    (e.g. local dev builds or pre-version.json installs).
+    """
+    version_file = build_dir / 'version.json'
+    try:
+        data = json.loads(version_file.read_text(encoding='utf-8'))
+        return VersionResponse(
+            ui_version=data.get('version', '0.0.0'),
+            build_time=data.get('buildTime', ''),
+        )
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return VersionResponse(ui_version='0.0.0', build_time='')
+
+
 class SPAHandler(SimpleHTTPRequestHandler):
     """
     HTTP handler for Single Page Application.
@@ -46,6 +71,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
     discovery: Optional['DiscoveryService'] = None
     mdns_enabled: bool = True
     default_route: str = 'http://localhost:5001'
+    _cached_version: Optional[VersionResponse] = None
 
     def __init__(self, *args, directory: str = None, **kwargs):
         self.spa_directory = directory
@@ -56,6 +82,8 @@ class SPAHandler(SimpleHTTPRequestHandler):
         # --- API routes --------------------------------------------------
         if self.path == '/api/discover':
             return self._handle_discover()
+        if self.path == '/api/version':
+            return self._handle_version()
 
         # --- Static / SPA -----------------------------------------------
         # Get the requested file path
@@ -116,6 +144,20 @@ class SPAHandler(SimpleHTTPRequestHandler):
         )
 
         payload = response.model_dump_json().encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _handle_version(self) -> None:
+        """Return the UI build version from version.json in the served build."""
+        if SPAHandler._cached_version is None:
+            SPAHandler._cached_version = _read_build_version(
+                Path(self.spa_directory)
+            )
+
+        payload = SPAHandler._cached_version.model_dump_json().encode('utf-8')
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', str(len(payload)))

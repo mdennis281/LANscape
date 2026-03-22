@@ -45,11 +45,22 @@ echo "── Waiting for services to be healthy ──"
 SERVICES=$(docker compose -f "$COMPOSE_FILE" ps --services | grep -v scanner)
 for svc in $SERVICES; do
     echo -n "  Waiting for $svc..."
+    container_id=$(docker compose -f "$COMPOSE_FILE" ps -q "$svc" 2>/dev/null || true)
+    if [ -z "$container_id" ]; then
+        echo " ERROR"
+        echo "[ERROR] Failed to resolve container ID for service '$svc'."
+        continue
+    fi
     timeout=60
     while [ $timeout -gt 0 ]; do
-        health=$(docker compose -f "$COMPOSE_FILE" ps --format json "$svc" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('Health',''))" 2>/dev/null || echo "")
-        if [ -z "$health" ] || [ "$health" = "healthy" ]; then
+        health=$(docker inspect -f '{{.State.Health.Status}}' "$container_id" 2>/dev/null || echo "unknown")
+        if [ "$health" = "healthy" ] || [ "$health" = "<no value>" ]; then
             echo " ready"
+            break
+        fi
+        if [ "$health" = "unhealthy" ]; then
+            echo " UNHEALTHY"
+            echo "Warning: $svc reported an 'unhealthy' status."
             break
         fi
         sleep 1

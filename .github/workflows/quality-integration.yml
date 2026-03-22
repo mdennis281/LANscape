@@ -60,11 +60,16 @@ jobs:
           # Check that all non-scanner services are healthy
           unhealthy=$(docker compose ps --format json | python3 -c "
           import sys, json
-          lines = sys.stdin.read().strip().split('\n')
-          for line in lines:
-              data = json.loads(line)
-              name = data.get('Name', '')
-              health = data.get('Health', 'unknown')
+          raw = sys.stdin.read().strip()
+          try:
+              services = json.loads(raw)
+          except json.JSONDecodeError:
+              services = [json.loads(line) for line in raw.split('\\n') if line.strip()]
+          if not isinstance(services, list):
+              services = [services]
+          for service in services:
+              name = service.get('Name', '')
+              health = service.get('Health', 'unknown')
               if 'scanner' not in name and health != 'healthy':
                   print(f'{name}: {health}')
           " 2>/dev/null || true)

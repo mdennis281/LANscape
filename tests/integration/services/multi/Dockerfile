@@ -3,16 +3,19 @@
 
 FROM alpine:3.20
 
+ARG SSH_USER=testuser
+ARG SSH_PASSWORD=testpass
+
 RUN apk add --no-cache \
     openssh-server \
     nginx \
     openssl \
     supervisor
 
-# Generate SSH host keys
+# Generate SSH host keys and configure non-root SSH user for testing
 RUN ssh-keygen -A && \
-    echo "root:testpass" | chpasswd && \
-    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    adduser -D "$SSH_USER" && \
+    echo "$SSH_USER:$SSH_PASSWORD" | chpasswd && \
     sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # Generate self-signed cert for HTTPS

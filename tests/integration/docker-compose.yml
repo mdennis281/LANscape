@@ -77,7 +77,7 @@ services:
       start_period: 10s
 
   # ── SSH Server ──────────────────────────────────────────────────────────
-  # SSH (22)
+  # SSH (2222)
   ssh-server:
     <<: *common
     image: lscr.io/linuxserver/openssh-server:9.8_p1-r1-ls147

@@ -23,7 +23,7 @@ This creates a `pr-analysis/` directory at the project root containing:
 
 ## Step 1: Triage — Read the Summary
 
-Read `pr-analysis/summary.md` to understand the PR state.
+Read `pr-analysis/summary.md` to understand the PR state. ALWAYS RUN A NEW ANALYSIS ON INVOCATION OF THIS WORKFLOW TO GET THE LATEST PR STATUS.
 
 ### 1a. Identify Unresolved Comments
 

@@ -259,24 +259,7 @@ def fetch_check_runs(pr_number: int) -> list[CheckRun]:
     return checks
 
 
-def fetch_failed_run_ids(owner: str, repo: str, branch: str) -> dict[str, int]:
-    """Map workflow run names to run IDs for failed runs on this branch."""
-    result = run_command([
-        "gh", "api",
-        f"/repos/{owner}/{repo}/actions/runs",
-        "--jq", ".workflow_runs[] | {id: .id, name: .name, conclusion: .conclusion, "
-                "head_branch: .head_branch}",
-        "-q", f".workflow_runs | map(select(.head_branch == \"{branch}\")) "
-              f"| group_by(.name) | map(sort_by(.id) | reverse | .[0]) | .[]"
-    ], check=False)
-
-    if result.returncode != 0:
-        # Fallback: use gh run list
-        return _fetch_failed_run_ids_fallback(branch)
-    return {}
-
-
-def _fetch_failed_run_ids_fallback(branch: str) -> dict[str, int]:
+def _fetch_failed_run_ids(branch: str) -> dict[str, int]:
     """Fallback method to get failed run IDs using gh run list."""
     result = run_command([
         "gh", "run", "list",
@@ -490,7 +473,7 @@ def _collect_pr_data(
     failed_logs: dict[str, str] = {}
     if failed_checks:
         logger.info("Fetching failed run logs...")
-        run_ids = _fetch_failed_run_ids_fallback(branch)
+        run_ids = _fetch_failed_run_ids(branch)
         for check in failed_checks:
             run_id = run_ids.get(check.workflow_name) or run_ids.get(check.name)
             if run_id:

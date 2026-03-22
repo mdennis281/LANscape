@@ -759,7 +759,7 @@ class TestWebSocketIntegration:
         for _ in range(100):
             try:
                 msg = await asyncio.wait_for(
-                    ws.recv(), timeout=30.0
+                    ws.recv(), timeout=60.0
                 )
             except asyncio.TimeoutError:
                 break

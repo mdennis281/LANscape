@@ -137,14 +137,12 @@ class TestIPv6ServiceIdentification:
 
             devices_with_services += 1
             expected_services = info.get("services", {})
-            matched_any = False
             for port_str, labels in expected_services.items():
                 port = int(port_str)
                 if port not in ipv6_ports:
                     continue
                 if port in device.ports:
-                    if _service_matches(device.services, port, labels):
-                        matched_any = True
+                    _service_matches(device.services, port, labels)
 
         # At least some devices should have services identified via IPv6
         assert devices_with_services > 0, (

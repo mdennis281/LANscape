@@ -17,7 +17,7 @@ COPY . .
 
 # Install lanscape from source + test dependencies
 RUN pip install --no-cache-dir -e ".[dev]" && \
-    pip install --no-cache-dir pyyaml tabulate
+    pip install --no-cache-dir pyyaml
 
 # Default: run integration tests
 CMD ["python", "-m", "pytest", "tests/integration/", "-v", "--tb=short", "-x", "-o", "addopts="]

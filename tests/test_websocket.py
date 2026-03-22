@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 import websockets
 
-from tests.test_globals import TEST_SUBNET
 from lanscape.core.scan_config import ScanType
 from lanscape.ui.ws.handlers.scan import ScanHandler
 from lanscape.ui.ws.handlers.port import PortHandler
@@ -710,21 +709,19 @@ class TestWebSocketIntegration:
     @staticmethod
     async def _start_and_subscribe(ws, client_id: str) -> str:
         """Start a scan, subscribe, and return scan_id."""
-        test_subnet = str(TEST_SUBNET).split(",", maxsplit=1)[0].strip()
-
         start_req = {
             "type": "request",
             "id": "scan-1",
             "action": "scan.start",
             "params": {
-                "subnet": test_subnet,
+                "subnet": "1.1.1.1/32",
                 "port_list": "small",
                 "lookup_type": [
                     ScanType.ICMP.value,
                     ScanType.POKE_THEN_ARP.value,
                 ],
                 "t_cnt_isalive": 2,
-                "ping_config": {"timeout": 1.0, "attempts": 2},
+                "ping_config": {"timeout": 1.0, "attempts": 1},
             },
         }
         await ws.send(json.dumps(start_req))

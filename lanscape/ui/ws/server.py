@@ -80,6 +80,8 @@ class WebSocketServer:
 
         # Track scans that were running (to detect completion)
         self._previously_running_scans: set[str] = set()
+        # Track scans whose final event has already been sent
+        self._completed_scans: set[str] = set()
 
         # Server instance
         self._server = None
@@ -362,6 +364,16 @@ class WebSocketServer:
             elif scan.uid in self._previously_running_scans:
                 # Scan just finished - send final update with appropriate event
                 await self._send_scan_finished_to_subscribers(scan)
+                self._completed_scans.add(scan.uid)
+            elif (scan.uid not in self._completed_scans
+                  and stage in ('complete', 'terminated')
+                  and self._scan_handler.get_subscriptions(scan.uid)):
+                # Scan completed before the broadcast loop ever saw it running;
+                # send an update first so subscribers see at least one delta,
+                # then the finished event.
+                await self._send_scan_update_to_subscribers(scan)
+                await self._send_scan_finished_to_subscribers(scan)
+                self._completed_scans.add(scan.uid)
 
         # Update tracking set
         self._previously_running_scans = currently_running

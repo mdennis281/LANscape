@@ -9,7 +9,7 @@ from lanscape import (
     DeviceResult, ServiceInfo, ProbeResponseInfo,
     DeviceErrorInfo, ScanErrorInfo, ScanWarningInfo,
     ScanMetadata, ScanResults, ScanSummary,
-    DeviceStage, ScanStage
+    DeviceStage, ScanStage, StageType, StageProgress
 )
 ```
 
@@ -135,6 +135,32 @@ Scan progress and status metadata — the "header" for a scan.
 | `run_time` | `int` | `0` | Runtime in seconds |
 | `errors` | `List[ScanErrorInfo]` | `[]` | Scan-level errors |
 | `warnings` | `List[ScanWarningInfo]` | `[]` | Scan-level warnings |
+| `stages` | `List[StageProgress]` | `[]` | Progress snapshot for each pipeline stage (see [StageProgress](#stageprogress)) |
+| `current_stage_index` | `int \| None` | `None` | Index of the currently executing stage (0-based). `None` when no stage is running. |
+
+The `stages` and `current_stage_index` fields are populated when scans run through the [pipeline architecture](../scanner/scan-pipeline.md). They are always present — legacy `ScanConfig` scans auto-convert to a pipeline internally.
+
+---
+
+### StageProgress
+
+Progress snapshot for a single pipeline stage. Available in `ScanMetadata.stages`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `stage_name` | `str` | *required* | Human-readable stage name (e.g. `"ICMP Discovery"`) |
+| `stage_type` | [`StageType`](../config/enums.md#stagetype) | *required* | Stage type identifier |
+| `total` | `int` | `0` | Total work items in this stage |
+| `completed` | `int` | `0` | Completed work items |
+| `finished` | `bool` | `False` | Whether the stage has finished executing |
+
+```python
+meta = scan.results.get_metadata()
+for i, stage in enumerate(meta.stages):
+    marker = "▶" if i == meta.current_stage_index else ("✓" if stage.finished else "·")
+    pct = (stage.completed / stage.total * 100) if stage.total else 0
+    print(f"  {marker} {stage.stage_name}: {pct:.0f}%")
+```
 
 ---
 

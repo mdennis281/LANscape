@@ -38,7 +38,7 @@ sm.terminate_scans()
 
 ## Methods
 
-### `new_scan(config: ScanConfig) -> SubnetScanner`
+### `new_scan(config: ScanConfig | PipelineConfig) -> SubnetScanner`
 
 Create and start a new scan in a background thread.
 
@@ -46,11 +46,12 @@ Create and start a new scan in a background thread.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `config` | [`ScanConfig`](../config/scan-config.md) | Full scan configuration |
+| `config` | [`ScanConfig`](../config/scan-config.md) \| [`PipelineConfig`](../config/pipeline-config.md) | Scan configuration — legacy or pipeline format |
 
 **Returns:** [`SubnetScanner`](subnet-scanner.md) — the newly created and running scan instance.
 
 **Behavior:**
+- Accepts both `ScanConfig` (auto-converts via `.to_pipeline_config()`) and `PipelineConfig`.
 - If the config targets an external subnet with ARP-based scan types, a warning is logged.
 - The scan runs in a dedicated `threading.Thread`.
 - The scanner is appended to `self.scans` immediately.

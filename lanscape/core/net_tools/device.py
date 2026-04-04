@@ -169,6 +169,7 @@ class Device(BaseModel):
     ports: List[int] = []
     stage: str = 'found'
     ports_scanned: int = 0
+    ports_to_scan: int = 0
     services: Dict[str, List[int]] = {}
     service_info: List[ServiceInfo] = []
     caught_errors: List[DeviceError] = []
@@ -493,6 +494,7 @@ class Device(BaseModel):
             ))
 
         stage_map = {
+            'resolving': DeviceStage.RESOLVING,
             'found': DeviceStage.FOUND,
             'scanning': DeviceStage.SCANNING,
             'complete': DeviceStage.COMPLETE
@@ -507,6 +509,7 @@ class Device(BaseModel):
             manufacturer=self.manufacturer or self._get_manufacturer(self.get_mac()),
             ports=self.ports,
             ports_scanned=self.ports_scanned,
+            ports_to_scan=self.ports_to_scan,
             stage=device_stage,
             services=self.services,
             service_info=self.service_info,

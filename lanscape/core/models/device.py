@@ -64,7 +64,8 @@ class DeviceResult(BaseModel):
     manufacturer: Optional[str] = Field(default=None, description="MAC vendor/manufacturer")
     ports: List[int] = Field(default_factory=list, description="Open ports found")
     stage: DeviceStage = Field(default=DeviceStage.FOUND, description="Current scan stage")
-    ports_scanned: int = Field(default=0, description="Number of ports tested")
+    ports_scanned: int = Field(default=0, description="Number of ports tested so far this stage")
+    ports_to_scan: int = Field(default=0, description="Total ports to test this stage")
     services: Dict[str, List[int]] = Field(
         default_factory=dict,
         description="Service name to list of ports mapping"

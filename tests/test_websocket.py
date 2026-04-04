@@ -265,6 +265,7 @@ class TestToolsHandler:
         assert "tools.subnet_test" in actions
         assert "tools.subnet_list" in actions
         assert "tools.config_defaults" in actions
+        assert "tools.stage_defaults" in actions
         assert "tools.arp_supported" in actions
         assert "tools.app_info" in actions
 
@@ -352,6 +353,29 @@ class TestToolsHandler:
             assert "balanced" in result
             assert "accurate" in result
             assert "fast" in result
+
+    def test_handle_stage_defaults(self, tools_handler):
+        """Test getting stage config defaults."""
+        result = tools_handler.invoke("stage_defaults")
+
+        assert "icmp_discovery" in result
+        assert "arp_discovery" in result
+        assert "poke_arp_discovery" in result
+        assert "icmp_arp_discovery" in result
+        assert "ipv6_ndp_discovery" in result
+        assert "ipv6_mdns_discovery" in result
+        assert "port_scan" in result
+
+        # Verify the values are real config dicts with expected fields
+        icmp = result["icmp_discovery"]
+        assert "ping_config" in icmp
+        assert "hostname_config" in icmp
+        assert "t_cnt" in icmp
+
+        port = result["port_scan"]
+        assert "port_list" in port
+        assert "port_scan_config" in port
+        assert "service_scan_config" in port
 
     def test_handle_arp_supported(self, tools_handler):
         """Test checking ARP support."""

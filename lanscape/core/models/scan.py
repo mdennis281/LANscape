@@ -6,8 +6,18 @@ from typing import List, Optional, Any, Dict
 
 from pydantic import BaseModel, Field
 
-from lanscape.core.models.enums import ScanStage
+from lanscape.core.models.enums import ScanStage, StageType
 from lanscape.core.models.device import DeviceResult
+
+
+class StageProgress(BaseModel):
+    """Progress snapshot for a single scan stage."""
+    stage_name: str = Field(description="Human-readable stage name")
+    stage_type: StageType = Field(description="Stage type identifier")
+    total: int = Field(default=0, ge=0, description="Total work items")
+    completed: int = Field(default=0, ge=0, description="Completed work items")
+    finished: bool = Field(default=False, description="Whether stage has finished")
+    runtime: float = Field(default=0.0, ge=0, description="Elapsed seconds for this stage")
 
 
 class ScanErrorInfo(BaseModel):
@@ -66,6 +76,14 @@ class ScanMetadata(BaseModel):
 
     # Warnings at scan level (e.g., multiplier reductions)
     warnings: List[ScanWarningInfo] = Field(default_factory=list, description="Scan-level warnings")
+
+    # Per-stage progress (pipeline execution)
+    stages: List[StageProgress] = Field(
+        default_factory=list, description="Progress for each pipeline stage"
+    )
+    current_stage_index: Optional[int] = Field(
+        default=None, description="Index of the currently executing stage"
+    )
 
 
 class ScanResults(BaseModel):

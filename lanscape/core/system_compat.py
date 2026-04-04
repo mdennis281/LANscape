@@ -705,3 +705,69 @@ def configure_asyncio_exception_handler(loop) -> None:
             loop.default_exception_handler(context)
 
     loop.set_exception_handler(_windows_exception_handler)
+
+
+# ─── Per-device ARP/NDP cache query ────────────────────────────────
+
+# Regex for extracting a MAC from a single-target ARP/NDP result
+_SINGLE_ARP_MAC_RE = re.compile(
+    r'([0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2}'
+    r'[:\-][0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2})'
+)
+
+
+def query_single_arp_entry(ip: str, timeout: float = 3.0) -> Optional[str]:
+    """Query the OS ARP/NDP cache for a single IP and return its MAC.
+
+    This is the pre-3.5.0 style per-device subprocess approach:
+    - Windows:  ``arp -a <ip>``
+    - Linux:    ``ip neigh show <ip>``
+    - macOS:    ``arp -n <ip>``
+
+    For IPv6 targets Linux uses ``ip -6 neigh show <ip>``.
+
+    Returns the MAC address string (lowercase, colon-separated) or
+    ``None`` if the entry is not found / incomplete.
+    """
+    clean_ip = ip.split('%')[0]
+    v6 = is_ipv6(clean_ip)
+
+    try:
+        if psutil.WINDOWS:
+            if v6:
+                cmd = ['netsh', 'interface', 'ipv6', 'show', 'neighbors']
+            else:
+                cmd = ['arp', '-a', clean_ip]
+        elif psutil.LINUX:
+            flag = '-6' if v6 else '-4'
+            cmd = ['ip', flag, 'neigh', 'show', clean_ip]
+        else:
+            # macOS / BSD
+            if v6:
+                cmd = ['ndp', '-an']
+            else:
+                cmd = ['arp', '-n', clean_ip]
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=timeout, check=False
+        )
+        output = result.stdout
+
+        # For commands that dump the full table, filter for our target IP
+        if v6 and (psutil.WINDOWS or psutil.MACOS):
+            target_lines = [
+                ln for ln in output.splitlines()
+                if clean_ip in ln
+            ]
+            output = '\n'.join(target_lines)
+
+        match = _SINGLE_ARP_MAC_RE.search(output)
+        if match:
+            mac = match.group(1).lower().replace('-', ':')
+            # Reject null / broadcast MACs
+            if mac not in ('00:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff'):
+                return mac
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        pass
+    return None

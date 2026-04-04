@@ -1,13 +1,14 @@
 """Configuration module for network scanning operations."""
 
 import os
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
 from lanscape.core.port_manager import PortManager
 from lanscape.core.ip_parser import parse_ip_input, IPAddress
+from lanscape.core.models.enums import StageType
 
 
 class ConfigBase(BaseModel):
@@ -186,7 +187,7 @@ class ScanConfig(ConfigBase):
         Returns:
             List of port numbers to scan
         """
-        return PortManager().get_port_list(self.port_list).keys()
+        return [int(p) for p in PortManager().get_port_list(self.port_list).keys()]
 
     def parse_subnet(self) -> List['IPAddress']:
         """
@@ -202,6 +203,200 @@ class ScanConfig(ConfigBase):
         b = f'ports={self.port_list}'
         c = f'scan_type={[st.value for st in self.lookup_type]}'
         return f'ScanConfig({a}, {b}, {c})'
+
+    def to_pipeline_config(self) -> 'PipelineConfig':
+        """Convert this legacy ScanConfig into a PipelineConfig.
+
+        Maps each ``lookup_type`` entry to a discovery stage, then optionally
+        appends a port-scan stage.
+        """
+        stages: List[StageConfig] = []
+
+        scan_type_map = {
+            ScanType.ICMP: StageType.ICMP_DISCOVERY,
+            ScanType.ARP_LOOKUP: StageType.ARP_DISCOVERY,
+            ScanType.POKE_THEN_ARP: StageType.POKE_ARP_DISCOVERY,
+            ScanType.ICMP_THEN_ARP: StageType.ICMP_ARP_DISCOVERY,
+        }
+
+        for lt in self.lookup_type:
+            stage_type = scan_type_map.get(lt)
+            if stage_type is None:
+                continue
+
+            if stage_type == StageType.ICMP_DISCOVERY:
+                cfg = ICMPDiscoveryStageConfig(
+                    ping_config=self.ping_config,
+                    hostname_config=self.hostname_config,
+                    t_cnt=self.t_cnt_isalive,
+                )
+            elif stage_type == StageType.ARP_DISCOVERY:
+                cfg = ARPDiscoveryStageConfig(
+                    arp_config=self.arp_config,
+                    hostname_config=self.hostname_config,
+                    t_cnt=self.t_cnt_isalive,
+                )
+            elif stage_type == StageType.POKE_ARP_DISCOVERY:
+                cfg = PokeARPDiscoveryStageConfig(
+                    poke_config=self.poke_config,
+                    arp_cache_config=self.arp_cache_config,
+                    hostname_config=self.hostname_config,
+                    t_cnt=self.t_cnt_isalive,
+                )
+            elif stage_type == StageType.ICMP_ARP_DISCOVERY:
+                cfg = ICMPARPDiscoveryStageConfig(
+                    ping_config=self.ping_config,
+                    arp_cache_config=self.arp_cache_config,
+                    hostname_config=self.hostname_config,
+                    t_cnt=self.t_cnt_isalive,
+                )
+            else:
+                continue
+
+            stages.append(StageConfig(
+                stage_type=stage_type,
+                config=cfg.to_dict(),
+            ))
+
+        if self.task_scan_ports:
+            port_cfg = PortScanStageConfig(
+                port_list=self.port_list,
+                port_scan_config=self.port_scan_config,
+                service_scan_config=self.service_scan_config,
+                scan_services=self.task_scan_port_services,
+                t_cnt_device=self.t_cnt_port_scan,
+                t_cnt_port=self.t_cnt_port_test,
+            )
+            stages.append(StageConfig(
+                stage_type=StageType.PORT_SCAN,
+                config=port_cfg.to_dict(),
+            ))
+
+        return PipelineConfig(
+            subnet=self.subnet,
+            stages=stages,
+            resilience=ResilienceConfig(
+                t_multiplier=self.t_multiplier,
+                failure_retry_cnt=self.failure_retry_cnt,
+                failure_multiplier_decrease=self.failure_multiplier_decrease,
+                failure_debounce_sec=self.failure_debounce_sec,
+            ),
+            hostname_config=self.hostname_config,
+        )
+
+
+# ─── Per-stage configuration models ────────────────────────────────
+
+
+class ICMPDiscoveryStageConfig(ConfigBase):
+    """Config for the ICMP discovery stage."""
+    ping_config: PingConfig = Field(default_factory=PingConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
+    t_cnt: int = (os.cpu_count() or 4) * 6
+
+
+class ARPDiscoveryStageConfig(ConfigBase):
+    """Config for the ARP broadcast discovery stage."""
+    arp_config: ArpConfig = Field(default_factory=ArpConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
+    t_cnt: int = (os.cpu_count() or 4) * 6
+
+
+class PokeARPDiscoveryStageConfig(ConfigBase):
+    """Config for the Poke→ARP cache discovery stage."""
+    poke_config: PokeConfig = Field(default_factory=PokeConfig)
+    arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
+    t_cnt: int = (os.cpu_count() or 4) * 6
+
+
+class ICMPARPDiscoveryStageConfig(ConfigBase):
+    """Config for the ICMP→ARP cache discovery stage."""
+    ping_config: PingConfig = Field(default_factory=PingConfig)
+    arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
+    t_cnt: int = (os.cpu_count() or 4) * 6
+
+
+class IPv6NDPDiscoveryStageConfig(ConfigBase):
+    """Config for the IPv6 NDP neighbor discovery stage."""
+    neighbor_table_config: NeighborTableConfig = Field(default_factory=NeighborTableConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
+    t_cnt: int = (os.cpu_count() or 4) * 4
+    interface: Optional[str] = None
+
+
+class IPv6MDNSDiscoveryStageConfig(ConfigBase):
+    """Config for the IPv6 mDNS discovery stage."""
+    timeout: float = 5.0
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
+    interface: Optional[str] = None
+
+
+class PortScanStageConfig(ConfigBase):
+    """Config for the port scanning stage."""
+    port_list: str = "medium"
+    port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
+    service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
+    scan_services: bool = True
+    t_cnt_device: int = os.cpu_count() or 4
+    t_cnt_port: int = (os.cpu_count() or 4) * 4
+
+
+# ─── Stage config registry ─────────────────────────────────────────
+
+STAGE_CONFIG_REGISTRY: Dict[StageType, type] = {
+    StageType.ICMP_DISCOVERY: ICMPDiscoveryStageConfig,
+    StageType.ARP_DISCOVERY: ARPDiscoveryStageConfig,
+    StageType.POKE_ARP_DISCOVERY: PokeARPDiscoveryStageConfig,
+    StageType.ICMP_ARP_DISCOVERY: ICMPARPDiscoveryStageConfig,
+    StageType.IPV6_NDP_DISCOVERY: IPv6NDPDiscoveryStageConfig,
+    StageType.IPV6_MDNS_DISCOVERY: IPv6MDNSDiscoveryStageConfig,
+    StageType.PORT_SCAN: PortScanStageConfig,
+}
+
+
+def parse_stage_config(stage_type: StageType, data: dict) -> ConfigBase:
+    """Deserialize a stage config dict to the correct model class."""
+    cls = STAGE_CONFIG_REGISTRY.get(stage_type)
+    if cls is None:
+        raise ValueError(f"Unknown stage type: {stage_type}")
+    return cls.model_validate(data)
+
+
+# ─── Pipeline configuration ────────────────────────────────────────
+
+
+class ResilienceConfig(ConfigBase):
+    """Thread-pool resilience and retry settings shared across stages."""
+    t_multiplier: float = 1.0
+    failure_retry_cnt: int = 2
+    failure_multiplier_decrease: float = 0.25
+    failure_debounce_sec: float = 5.0
+
+
+class StageConfig(ConfigBase):
+    """A single stage entry in a pipeline configuration."""
+    stage_type: StageType
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+    def get_typed_config(self) -> ConfigBase:
+        """Return the config dict parsed into its stage-specific model."""
+        return parse_stage_config(self.stage_type, self.config)
+
+
+class PipelineConfig(ConfigBase):
+    """Top-level config for a multi-stage scan pipeline.
+
+    Power users can construct this directly to build custom stage
+    sequences (e.g. ``[ICMP_DISCOVERY, PORT_SCAN, ARP_DISCOVERY, PORT_SCAN]``).
+    Simple users keep using :class:`ScanConfig`, which auto-converts via
+    :meth:`ScanConfig.to_pipeline_config`.
+    """
+    subnet: str
+    stages: List[StageConfig] = Field(default_factory=list)
+    resilience: ResilienceConfig = Field(default_factory=ResilienceConfig)
+    hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
 
 
 DEFAULT_CONFIGS: Dict[str, ScanConfig] = {
@@ -303,3 +498,19 @@ def get_default_configs_with_arp_fallback(arp_supported: bool) -> Dict[str, dict
         configs[key] = config_dict
 
     return configs
+
+
+def get_stage_config_defaults() -> Dict[str, dict]:
+    """
+    Get the default configuration for each stage type.
+
+    Instantiates each stage config class with its Pydantic defaults
+    and returns the serialized dict keyed by stage type value.
+
+    Returns:
+        Dict of stage_type string -> default config dict
+    """
+    return {
+        stage_type.value: cls().to_dict()
+        for stage_type, cls in STAGE_CONFIG_REGISTRY.items()
+    }

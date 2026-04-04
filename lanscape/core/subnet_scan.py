@@ -6,28 +6,27 @@ import logging
 import ipaddress
 import threading
 from time import time, sleep
-from typing import List
-from concurrent.futures import ThreadPoolExecutor
+from typing import List, Union
 
 # Third-party imports
 from tabulate import tabulate
 
 # Local imports
-from lanscape.core.scan_config import ScanConfig
-from lanscape.core.decorators import job_tracker, terminator, JobStats
+from lanscape.core.scan_config import ScanConfig, PipelineConfig
+from lanscape.core.decorators import JobStats
 from lanscape.core.net_tools import (
     Device, is_internal_block, scan_config_uses_arp
 )
 from lanscape.core.errors import SubnetScanTerminationFailure
-from lanscape.core.device_alive import is_device_alive
 from lanscape.core.models import (
     ScanMetadata, ScanResults, ScanStage, ScanSummary, ScanListItem,
     ScanErrorInfo, ScanWarningInfo
 )
-from lanscape.core.threadpool_retry import (
-    ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController
-)
+from lanscape.core.models.enums import StageType
 from lanscape.core.system_compat import clear_screen
+from lanscape.core.scan_pipeline import ScanPipeline
+from lanscape.core.scan_context import ScanContext
+from lanscape.core.stage_builder import build_stages
 from lanscape.core.neighbor_table import NeighborTableService
 
 
@@ -37,102 +36,65 @@ class SubnetScanner():
 
     Manages the scanning process including device discovery and port scanning.
     Tracks scan progress and provides mechanisms for controlled termination.
+
+    Accepts either a :class:`ScanConfig` (legacy) or a :class:`PipelineConfig`.
+    Legacy configs are automatically converted via
+    :meth:`ScanConfig.to_pipeline_config`.
     """
 
     def __init__(
         self,
-        config: ScanConfig
+        config: Union[ScanConfig, PipelineConfig],
     ):
-        # Config and network properties
-        self.cfg = config
-        self.subnet = config.parse_subnet()
-        self.ports: List[int] = config.get_ports()
-        self.subnet_str = config.subnet
+        # Normalise to PipelineConfig
+        if isinstance(config, ScanConfig):
+            self.cfg = config
+            self.pipeline_cfg = config.to_pipeline_config()
+        else:
+            self.cfg = config  # keep reference for backward-compat fields
+            self.pipeline_cfg = config
+
+        self.subnet_str = self.pipeline_cfg.subnet
         self.job_stats = JobStats()
 
         # Status properties
         self.running = False
         self.uid = str(uuid.uuid4())
-        self.results = ScannerResults(self)
         self.log: logging.Logger = logging.getLogger('SubnetScanner')
 
-        # Multiplier controller for resilient thread management
-        self._multiplier_controller = MultiplierController(
-            initial_multiplier=config.t_multiplier,
-            decrease_percent=config.failure_multiplier_decrease,
-            debounce_sec=config.failure_debounce_sec,
-            min_multiplier=0.1,
-            on_warning=self._handle_warning
+        # Build pipeline stages
+        stage_instances = build_stages(self.pipeline_cfg)
+        self.pipeline = ScanPipeline(
+            stage_instances,
+            on_stage_change=self._on_stage_change,
         )
+        self.context = ScanContext(self.subnet_str)
 
-        self._neighbor_svc = None
+        # Results bridge — adapts pipeline data to the existing ScannerResults API
+        self.results = ScannerResults(self)
 
         self.log.debug(f'Instantiated with uid: {self.uid}')
-        self.log.debug(
-            f'Port Count: {len(self.ports)} | Device Count: {len(self.subnet)}')
 
     def start(self):
         """
-        Scan the subnet for devices and open ports.
+        Scan the subnet for devices and open ports using the stage pipeline.
         """
         self._set_stage('scanning devices')
         self.running = True
 
-        # Start the background neighbor table service for thread-safe ARP/NDP lookups
-        self._neighbor_svc = NeighborTableService.instance()
-        ntc = self.cfg.neighbor_table_config
-        self._neighbor_svc.start(
-            refresh_interval=ntc.refresh_interval,
-            command_timeout=ntc.command_timeout,
-        )
+        # Start the neighbor table service so discovery stages can
+        # resolve MAC addresses via the OS ARP / NDP cache.
+        neighbor_svc = NeighborTableService.instance()
+        neighbor_svc.start()
 
         try:
-            # Clear job stats from any previous scan to ensure accurate progress tracking
             self.job_stats.clear_stats()
-
-            # Create retry manager for device scanning
-            retry_config = RetryConfig(
-                max_retries=self.cfg.failure_retry_cnt,
-                multiplier_decrease=self.cfg.failure_multiplier_decrease,
-                debounce_sec=self.cfg.failure_debounce_sec,
-            )
-
-            def on_device_error(job_id: str, error: Exception, tb_str: str):
-                """Callback for permanent device scan failures."""
-                self.results.errors.append(ScanErrorInfo(
-                    basic=f"Error scanning IP {job_id}: {error}",
-                    traceback=tb_str,
-                ))
-
-            retry_manager = ThreadPoolRetryManager(
-                max_workers=self.cfg.t_cnt('isalive'),
-                retry_config=retry_config,
-                multiplier_controller=self._multiplier_controller,
-                thread_name_prefix="DeviceAlive",
-                on_job_error=on_device_error,
-            )
-
-            # Create jobs for each IP in the subnet
-            jobs = [
-                RetryJob(
-                    job_id=str(ip),
-                    func=self._get_host_details,
-                    args=(str(ip),),
-                    max_retries=self.cfg.failure_retry_cnt,
-                )
-                for ip in self.subnet
-            ]
-
-            # Execute with retry support
-            retry_manager.execute_all(jobs)
-
-            self._set_stage('testing ports')
-            if self.cfg.task_scan_ports:
-                self._scan_network_ports()
+            self.pipeline.execute(self.context)
+        except Exception:
+            self.log.exception("Pipeline execution failed")
+            raise
         finally:
-            # Stop the background neighbor table service
-            if self._neighbor_svc and self._neighbor_svc.is_running:
-                self._neighbor_svc.stop()
+            neighbor_svc.stop()
 
         # Set stage BEFORE running=False so the broadcast loop never sees
         # running=False with a stale stage (e.g. 'testing ports').
@@ -140,8 +102,8 @@ class SubnetScanner():
         self.results.end_time = time()
         self.running = False
 
-        devices_found = len(self.results.devices)
-        open_ports = sum(len(d.ports) for d in self.results.devices)
+        devices_found = len(self.context.devices)
+        open_ports = sum(len(d.ports) for d in self.context.devices)
         self.log.info(
             f'Scan complete for {self.subnet_str}: '
             f'{devices_found} device(s) found, {open_ports} open port(s)'
@@ -167,9 +129,8 @@ class SubnetScanner():
         self._set_stage('terminating')
         self.running = False
 
-        # Stop neighbor table service on termination
-        if self._neighbor_svc and self._neighbor_svc.is_running:
-            self._neighbor_svc.stop()
+        # Terminate the pipeline (stops current + skips remaining stages)
+        self.pipeline.terminate()
 
         for _ in range(20):
             if not self.job_stats.running:
@@ -177,6 +138,51 @@ class SubnetScanner():
                 return True
             sleep(.5)
         raise SubnetScanTerminationFailure(self.job_stats.running)
+
+    def append_stages(self, stage_configs: List[dict]) -> None:
+        """Append new stages to an active or completed scan.
+
+        Builds concrete stage instances from config dicts and appends
+        them to the pipeline.  If the scan has already finished, it is
+        restarted in a new thread so the new stages execute.
+        """
+        from lanscape.core.scan_config import StageConfig  # pylint: disable=import-outside-toplevel
+
+        stage_entries = [StageConfig.from_dict(sc) for sc in stage_configs]
+        temp_cfg = PipelineConfig(
+            subnet=self.subnet_str,
+            stages=stage_entries,
+            resilience=self.pipeline_cfg.resilience,
+            hostname_config=self.pipeline_cfg.hostname_config,
+        )
+        new_instances = build_stages(temp_cfg)
+        self.pipeline.append_stages(new_instances)
+
+        if not self.running:
+            self._restart_pipeline()
+
+    def _restart_pipeline(self) -> None:
+        """Restart pipeline execution in a background thread for appended stages."""
+        self.running = True
+        self._set_stage('scanning devices')
+
+        def _run() -> None:
+            neighbor_svc = NeighborTableService.instance()
+            neighbor_svc.start()
+            try:
+                self.pipeline.execute(self.context)
+            except Exception:
+                self.log.exception("Pipeline execution failed (restart)")
+                raise
+            finally:
+                neighbor_svc.stop()
+
+            self._set_stage('complete')
+            self.results.end_time = time()
+            self.running = False
+
+        t = threading.Thread(target=_run)
+        t.start()
 
     def _estimate_alive_devices(self) -> float:
         """
@@ -261,7 +267,7 @@ class SubnetScanner():
         ports_scanned = self.job_stats.finished.get('SubnetScanner._test_port', 0)
         avg_port_test_sec = self._estimate_port_test_time()
 
-        total_ports = est_alive_devices * len(self.ports)
+        total_ports = est_alive_devices * len(self.cfg.get_ports())
         remaining_ports = max(0, total_ports - ports_scanned)
 
         remaining_sec = remaining_ports * avg_port_test_sec
@@ -272,9 +278,7 @@ class SubnetScanner():
 
     def calc_percent_complete(self) -> int:
         """
-        Calculate the percentage completion of the scan.
-
-        Uses scan statistics and job timing information to estimate progress.
+        Calculate the percentage completion of the scan based on pipeline stage progress.
 
         Returns:
             int: Completion percentage (0-100)
@@ -282,17 +286,21 @@ class SubnetScanner():
         if not self.running:
             return 100
 
-        est_alive_devices = self._estimate_alive_devices()
-        host_total, host_remaining = self._calc_host_discovery_time()
-        port_total, port_remaining = self._calc_port_scan_time(est_alive_devices)
-
-        est_total_time = host_total + port_total
-        est_remaining_time = host_remaining + port_remaining
-
-        if est_total_time <= 0:
+        stages = self.pipeline.stages
+        if not stages:
             return 0
 
-        return min(99, int(abs((1 - (est_remaining_time / est_total_time)) * 100)))
+        # Weight each stage equally, progress within each stage is proportional
+        total_stages = len(stages)
+        completed_weight = 0.0
+
+        for stage in stages:
+            if stage.finished:
+                completed_weight += 1.0
+            elif stage.running and stage.total > 0:
+                completed_weight += stage.completed / stage.total
+
+        return min(99, int((completed_weight / total_stages) * 100))
 
     def debug_active_scan(self, sleep_sec=1):
         """
@@ -307,102 +315,11 @@ class SubnetScanner():
             buffer = f'{self.uid} - {self.subnet_str}\n'
             buffer += f'Config: {self.cfg}\n'
             buffer += f'Elapsed: {int(t_elapsed)} sec - Remain: {t_remain} sec\n'
-            buffer += f'Scanned: {self.results.devices_scanned}/{self.results.devices_total}'
-            buffer += f' - {percent}%\n'
+            buffer += f'Progress: {percent}%\n'
             buffer += str(self.job_stats)
             clear_screen()
             print(buffer)
             sleep(sleep_sec)
-
-    @terminator
-    @job_tracker
-    def _get_host_details(self, host: str):
-        """
-        Get the MAC address and open ports of the given host.
-        """
-        device = Device(ip=host)
-        device.alive = self._ping(device)
-        self.results.scanned()
-        if not device.alive:
-            return None
-        self.log.debug(f'[{host}] is alive, getting metadata')
-        device.get_metadata(hostname_config=self.cfg.hostname_config)
-        self.results.devices.append(device)
-        return True
-
-    @terminator
-    def _scan_network_ports(self):
-        """Scan ports on all discovered devices using retry manager."""
-        retry_config = RetryConfig(
-            max_retries=self.cfg.failure_retry_cnt,
-            multiplier_decrease=self.cfg.failure_multiplier_decrease,
-            debounce_sec=self.cfg.failure_debounce_sec,
-        )
-
-        def on_port_scan_error(job_id: str, error: Exception, tb_str: str):
-            """Callback for permanent port scan failures."""
-            self.results.errors.append(ScanErrorInfo(
-                basic=f"Error scanning ports on {job_id}: {error}",
-                traceback=tb_str,
-            ))
-
-        retry_manager = ThreadPoolRetryManager(
-            max_workers=self.cfg.t_cnt('port_scan'),
-            retry_config=retry_config,
-            multiplier_controller=self._multiplier_controller,
-            thread_name_prefix="DevicePortScan",
-            on_job_error=on_port_scan_error,
-        )
-
-        # Create jobs for each device
-        jobs = [
-            RetryJob(
-                job_id=device.ip,
-                func=self._scan_ports,
-                args=(device,),
-                max_retries=self.cfg.failure_retry_cnt,
-            )
-            for device in self.results.devices
-        ]
-
-        # Execute with retry support
-        retry_manager.execute_all(jobs)
-
-    @terminator
-    @job_tracker
-    def _scan_ports(self, device: Device):
-        self.log.debug(f'[{device.ip}] Initiating port scan')
-        device.stage = 'scanning'
-        with ThreadPoolExecutor(
-                max_workers=self.cfg.t_cnt('port_test'),
-                thread_name_prefix=f"{device.ip}-PortScan") as executor:
-            futures = {executor.submit(self._test_port, device, int(
-                port)): port for port in self.ports}
-            for future in futures:
-                future.result()
-        self.log.debug(f'[{device.ip}] Completed port scan')
-        device.stage = 'complete'
-
-    @terminator
-    @job_tracker
-    def _test_port(self, host: Device, port: int):
-        """
-        Test if a port is open on a given host.
-        If port open, determine service.
-        Device class handles tracking open ports.
-        """
-        is_alive = host.test_port(port, self.cfg.port_scan_config)
-        if is_alive and self.cfg.task_scan_port_services:
-            host.scan_service(port, self.cfg.service_scan_config)
-        return is_alive
-
-    @terminator
-    @job_tracker
-    def _ping(self, host: Device):
-        """
-        Ping the given host and return True if it's reachable, False otherwise.
-        """
-        return is_device_alive(host, self.cfg)
 
     def _set_stage(self, stage):
         self.log.debug(f'[{self.uid}] Moving to Stage: {stage}')
@@ -410,46 +327,30 @@ class SubnetScanner():
         if not self.running:
             self.results.end_time = time()
 
-    def _handle_warning(self, warning_type: str, warning_data: dict):
-        """
-        Handle a warning from the multiplier controller or other sources.
-
-        Args:
-            warning_type: Type of warning (e.g., 'multiplier_reduced')
-            warning_data: Dict with warning details
-        """
-        self.results.warnings.append(ScanWarningInfo(
-            type=warning_type,
-            stage=self.results.stage,
-            **warning_data
-        ))
-        self.log.warning(f'Scan warning [{warning_type}]: {warning_data.get("message", "")}')
+    def _on_stage_change(self, stage) -> None:
+        """Called by the pipeline when a new stage begins executing."""
+        if stage.stage_type == StageType.PORT_SCAN:
+            self._set_stage('testing ports')
+        elif self.results.stage != 'scanning devices':
+            # Revert to discovery stage if we're back to a discovery stage
+            self._set_stage('scanning devices')
 
 
 class ScannerResults:
     """
     Stores and manages the results of a subnet scan.
 
-    Tracks devices found, scan statistics, and provides export functionality
-    for scan results. Also handles runtime calculation and progress tracking.
+    Bridges the pipeline's :class:`ScanContext` to the existing result APIs.
+    Tracks scan statistics and provides export functionality.
     """
 
     def __init__(self, scan: SubnetScanner):
         # Parent reference and identifiers
         self.scan = scan
-        self.port_list: str = scan.cfg.port_list
         self.subnet: str = scan.subnet_str
         self.uid = scan.uid
 
-        # Scan statistics
-        self.devices_total: int = len(list(scan.subnet))
-        self.devices_scanned: int = 0
-        self.port_list_length: int = len(scan.ports)
-        self.devices: List[Device] = []
-
         # Status tracking
-        self.errors: List[ScanErrorInfo] = []
-        self.warnings: List[ScanWarningInfo] = []
         self.running: bool = False
         self.start_time: float = time()
         self.end_time: int = None
@@ -460,16 +361,67 @@ class ScannerResults:
         self.log = logging.getLogger('ScannerResults')
         self.log.debug(f'Instantiated Logger For Scan: {self.scan.uid}')
 
+    # ── Properties that delegate to the pipeline context ────────────
+
     @property
-    def devices_alive(self):
-        """number of alive devices found in the scan"""
+    def devices(self) -> List[Device]:
+        """Devices discovered across all stages."""
+        return self.scan.context.devices
+
+    @property
+    def devices_alive(self) -> int:
+        """Number of alive devices found in the scan."""
         return len(self.devices)
 
-    def scanned(self):
-        """
-        Increment the count of scanned devices.
-        """
-        self.devices_scanned += 1
+    @property
+    def errors(self) -> List[ScanErrorInfo]:
+        """Scan-level errors from all stages."""
+        return self.scan.context.errors
+
+    @errors.setter
+    def errors(self, value: List[ScanErrorInfo]) -> None:
+        self.scan.context.errors = value
+
+    @property
+    def warnings(self) -> List[ScanWarningInfo]:
+        """Scan-level warnings from all stages."""
+        return self.scan.context.warnings
+
+    @warnings.setter
+    def warnings(self, value: List[ScanWarningInfo]) -> None:
+        self.scan.context.warnings = value
+
+    @property
+    def port_list(self) -> str:
+        """Port list name from config."""
+        if isinstance(self.scan.cfg, ScanConfig):
+            return self.scan.cfg.port_list
+        return "custom"
+
+    @property
+    def devices_total(self) -> int:
+        """Total IPs to scan (sum of discovery stage totals)."""
+        total = 0
+        for stage in self.scan.pipeline.stages:
+            if stage.stage_type.name.endswith('_DISCOVERY'):
+                total = max(total, stage.total)
+        return total or 0
+
+    @property
+    def devices_scanned(self) -> int:
+        """Number of IPs checked so far (sum of discovery stage completed)."""
+        scanned = 0
+        for stage in self.scan.pipeline.stages:
+            if stage.stage_type.name.endswith('_DISCOVERY'):
+                scanned = max(scanned, stage.completed)
+        return scanned
+
+    @property
+    def port_list_length(self) -> int:
+        """Number of ports being tested."""
+        if isinstance(self.scan.cfg, ScanConfig):
+            return len(self.scan.cfg.get_ports())
+        return 0
 
     def get_runtime(self):
         """
@@ -478,7 +430,7 @@ class ScannerResults:
         Returns:
             float: Runtime in seconds
         """
-        if self.scan.running:
+        if self.scan.running or self.end_time is None:
             return time() - self.start_time
         return self.end_time - self.start_time
 
@@ -501,9 +453,16 @@ class ScannerResults:
         Returns:
             ScanMetadata: Current scan metadata for status updates
         """
-        ports_scanned = self.scan.job_stats.finished.get(
-            'SubnetScanner._test_port', 0)
-        ports_total = self.devices_alive * self.port_list_length
+        stage_progress = self.scan.pipeline.get_stage_progress()
+        current_idx = self.scan.pipeline.current_stage_index
+
+        # Approximate ports scanned from PortScan stages
+        ports_scanned = 0
+        ports_total = 0
+        for sp in stage_progress:
+            if sp.stage_type == StageType.PORT_SCAN:
+                ports_scanned += sp.completed
+                ports_total += sp.total
 
         return ScanMetadata(
             scan_id=self.uid,
@@ -522,7 +481,9 @@ class ScannerResults:
             end_time=self.end_time,
             run_time=int(round(self.get_runtime(), 0)),
             errors=self.errors,
-            warnings=self.warnings
+            warnings=self.warnings,
+            stages=stage_progress,
+            current_stage_index=current_idx,
         )
 
     def to_results(self) -> ScanResults:
@@ -622,22 +583,23 @@ class ScanManager:
             self.scans: List[SubnetScanner] = []
             self.log = logging.getLogger('ScanManager')
 
-    def new_scan(self, config: ScanConfig) -> SubnetScanner:
+    def new_scan(self, config: Union[ScanConfig, PipelineConfig]) -> SubnetScanner:
         """
         Create and start a new scan with the given configuration.
 
         Args:
-            config: The scan configuration
+            config: The scan configuration (ScanConfig or PipelineConfig)
 
         Returns:
             SubnetScanner: The newly created scan instance
         """
-        if not is_internal_block(config.subnet) and scan_config_uses_arp(config):
-            self.log.warning(
-                f"ARP scanning detected for external subnet '{config.subnet}'. "
-                "ARP requests typically only work within the local network segment. "
-                "Consider using ICMP scanning for external IP ranges."
-            )
+        if isinstance(config, ScanConfig):
+            if not is_internal_block(config.subnet) and scan_config_uses_arp(config):
+                self.log.warning(
+                    f"ARP scanning detected for external subnet '{config.subnet}'. "
+                    "ARP requests typically only work within the local network segment. "
+                    "Consider using ICMP scanning for external IP ranges."
+                )
 
         scan = SubnetScanner(config)
         self._start(scan)

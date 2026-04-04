@@ -4,6 +4,28 @@ Enumeration types used across the LANscape configuration and model layers.
 
 ---
 
+## StageType
+
+`lanscape.StageType`
+
+Identifies each composable scan stage in the [pipeline architecture](../scanner/scan-pipeline.md). Used by [`StageConfig`](pipeline-config.md#stageconfig) and [`StageProgress`](../models/overview.md#stageprogress).
+
+```python
+from lanscape import StageType
+```
+
+| Value | String | Description |
+|-------|--------|-------------|
+| `StageType.ICMP_DISCOVERY` | `"icmp_discovery"` | ICMP echo request discovery |
+| `StageType.ARP_DISCOVERY` | `"arp_discovery"` | Scapy ARP broadcast (IPv4 only) |
+| `StageType.POKE_ARP_DISCOVERY` | `"poke_arp_discovery"` | TCP poke → ARP/NDP cache lookup |
+| `StageType.ICMP_ARP_DISCOVERY` | `"icmp_arp_discovery"` | ICMP ping → ARP/NDP cache fallback |
+| `StageType.IPV6_NDP_DISCOVERY` | `"ipv6_ndp_discovery"` | Multicast NDP neighbor discovery |
+| `StageType.IPV6_MDNS_DISCOVERY` | `"ipv6_mdns_discovery"` | mDNS service browsing |
+| `StageType.PORT_SCAN` | `"port_scan"` | TCP port scan with service identification |
+
+---
+
 ## ScanType
 
 `lanscape.ScanType`

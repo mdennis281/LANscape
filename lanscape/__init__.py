@@ -32,6 +32,7 @@ from lanscape.core.scan_config import (
 )
 
 from lanscape.core.stage_presets import StagePreset, get_stage_presets
+from lanscape.core.stage_estimates import estimate_stage_time, get_all_estimates
 
 from lanscape.core.port_manager import PortManager
 

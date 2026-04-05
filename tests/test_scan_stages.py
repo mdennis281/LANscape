@@ -21,6 +21,7 @@ from lanscape.core.scan_config import (
     STAGE_CONFIG_REGISTRY,
 )
 from lanscape.core.stage_presets import StagePreset, get_stage_presets
+from lanscape.core.stage_estimates import estimate_stage_time, get_all_estimates
 from lanscape.core.stage_builder import build_stages
 from lanscape.core.stages.discovery import (
     ICMPDiscoveryStage, ARPDiscoveryStage,
@@ -505,6 +506,79 @@ class TestStagePresets:
         """Accurate port scan preset uses the 'large' port list."""
         presets = get_stage_presets()
         assert presets['port_scan']['accurate']['port_list'] == 'large'
+
+
+# ---------------------------------------------------------------------------
+# Stage Time Estimates
+# ---------------------------------------------------------------------------
+
+class TestStageEstimates:
+    """Tests for the per-stage time estimation system."""
+
+    def test_icmp_estimate_default(self):
+        """ICMP estimate = attempts * (timeout + retry_delay)."""
+        seconds = estimate_stage_time(StageType.ICMP_DISCOVERY, {})
+        # default: 2 * (1.0 + 0.25) = 2.5
+        assert seconds == 2.5
+
+    def test_arp_estimate_default(self):
+        """ARP estimate = attempts * timeout."""
+        seconds = estimate_stage_time(StageType.ARP_DISCOVERY, {})
+        # default: 1 * 2.0 = 2.0
+        assert seconds == 2.0
+
+    def test_poke_arp_estimate_default(self):
+        """PokeARP estimate = attempts * timeout + wait_before."""
+        seconds = estimate_stage_time(StageType.POKE_ARP_DISCOVERY, {})
+        # default: 1 * 2.0 + 0.2 = 2.2
+        assert seconds == 2.2
+
+    def test_icmp_arp_estimate_default(self):
+        """ICMPARP uses same formula as ICMP."""
+        seconds = estimate_stage_time(StageType.ICMP_ARP_DISCOVERY, {})
+        assert seconds == 2.5
+
+    def test_ipv6_ndp_estimate_default(self):
+        """NDP estimate = 10 + refresh_interval."""
+        seconds = estimate_stage_time(StageType.IPV6_NDP_DISCOVERY, {})
+        # 10 + 2.0 = 12.0
+        assert seconds == 12.0
+
+    def test_ipv6_mdns_estimate_default(self):
+        """mDNS estimate = timeout."""
+        seconds = estimate_stage_time(StageType.IPV6_MDNS_DISCOVERY, {})
+        assert seconds == 5.0
+
+    def test_port_scan_estimate_default(self):
+        """Port scan estimate is positive and reasonable."""
+        seconds = estimate_stage_time(StageType.PORT_SCAN, {})
+        assert seconds > 0
+
+    def test_custom_config_changes_estimate(self):
+        """Providing custom config values changes the estimate."""
+        default = estimate_stage_time(StageType.ICMP_DISCOVERY, {})
+        custom = estimate_stage_time(StageType.ICMP_DISCOVERY, {
+            'ping_config': {'timeout': 3.0, 'attempts': 5, 'retry_delay': 1.0},
+        })
+        # 5 * (3.0 + 1.0) = 20.0
+        assert custom == 20.0
+        assert custom > default
+
+    def test_get_all_estimates(self):
+        """get_all_estimates returns estimates for all requested stages."""
+        stages = {
+            'icmp_discovery': {},
+            'port_scan': {},
+        }
+        result = get_all_estimates(stages)
+        assert set(result.keys()) == {'icmp_discovery', 'port_scan'}
+        assert all(v > 0 for v in result.values())
+
+    @pytest.mark.parametrize("stage_type", list(StageType))
+    def test_all_stages_return_positive(self, stage_type):
+        """Every stage type produces a positive estimate with defaults."""
+        seconds = estimate_stage_time(stage_type, {})
+        assert seconds > 0, f"{stage_type.value} returned {seconds}"
 
 
 # ---------------------------------------------------------------------------

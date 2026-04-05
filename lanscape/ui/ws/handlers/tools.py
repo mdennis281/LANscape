@@ -19,6 +19,7 @@ from lanscape.core.scan_config import (
     get_default_configs_with_arp_fallback, get_stage_config_defaults
 )
 from lanscape.core.stage_presets import get_stage_presets
+from lanscape.core.stage_estimates import estimate_stage_time
 from lanscape.core.version_manager import (
     get_installed_version, is_update_available, get_latest_version
 )
@@ -36,6 +37,7 @@ class ToolsHandler(BaseHandler):
     - tools.config_defaults: Get default scan configurations
     - tools.stage_defaults: Get default per-stage configurations
     - tools.stage_presets: Get fast/balanced/accurate presets per stage
+    - tools.stage_estimate: Estimate time for one unit of work
     - tools.arp_supported: Check if ARP is supported on this system
     - tools.app_info: Get app version, runtime args, and update status
     """
@@ -50,6 +52,7 @@ class ToolsHandler(BaseHandler):
         self.register('config_defaults', self._handle_config_defaults)
         self.register('stage_defaults', self._handle_stage_defaults)
         self.register('stage_presets', self._handle_stage_presets)
+        self.register('stage_estimate', self._handle_stage_estimate)
         self.register('arp_supported', self._handle_arp_supported)
         self.register('app_info', self._handle_app_info)
 
@@ -163,6 +166,31 @@ class ToolsHandler(BaseHandler):
             Dict of stage_type -> {preset_name -> config dict}
         """
         return get_stage_presets()
+
+    def _handle_stage_estimate(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Estimate worst-case time for one unit of work in a stage.
+
+        Params:
+            stage_type: The stage type string
+            config: The stage config dict
+
+        Returns:
+            Dict with 'seconds' float
+        """
+        from lanscape.core.models.enums import StageType as ST  # pylint: disable=import-outside-toplevel
+        stage_type_str = self._get_param(params, 'stage_type')
+        config = params.get('config', {})
+        try:
+            st = ST(stage_type_str)
+            seconds = estimate_stage_time(st, config)
+            return {'seconds': seconds}
+        except Exception:
+            return {'error': traceback.format_exc()}
 
     def _handle_arp_supported(
         self,

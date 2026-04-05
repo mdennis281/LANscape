@@ -393,6 +393,23 @@ class TestToolsHandler:
         # Fast port scan uses 'small' port list
         assert result["port_scan"]["fast"]["port_list"] == "small"
 
+    def test_handle_stage_estimate(self, tools_handler):
+        """Test getting a time estimate for a stage."""
+        result = tools_handler.invoke("stage_estimate", {
+            "stage_type": "icmp_discovery",
+            "config": {},
+        })
+        assert "seconds" in result
+        assert result["seconds"] > 0
+
+    def test_handle_stage_estimate_custom_config(self, tools_handler):
+        """Custom config changes the estimate."""
+        result = tools_handler.invoke("stage_estimate", {
+            "stage_type": "icmp_discovery",
+            "config": {"ping_config": {"timeout": 5.0, "attempts": 3}},
+        })
+        assert result["seconds"] > 2.5  # default is 2.5
+
     def test_handle_arp_supported(self, tools_handler):
         """Test checking ARP support."""
         with patch(

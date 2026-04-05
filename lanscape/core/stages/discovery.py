@@ -99,6 +99,7 @@ class ICMPDiscoveryStage(ScanStageMixin):
 
     stage_type = StageType.ICMP_DISCOVERY
     stage_name = "ICMP Discovery"
+    counter_label = "IPs scanned"
 
     def __init__(
         self,
@@ -149,6 +150,7 @@ class ARPDiscoveryStage(ScanStageMixin):
 
     stage_type = StageType.ARP_DISCOVERY
     stage_name = "ARP Discovery"
+    counter_label = "IPs scanned"
 
     def __init__(
         self,
@@ -199,6 +201,7 @@ class PokeARPDiscoveryStage(ScanStageMixin):
 
     stage_type = StageType.POKE_ARP_DISCOVERY
     stage_name = "Poke → ARP Discovery"
+    counter_label = "IPs scanned"
 
     def __init__(
         self,
@@ -254,6 +257,7 @@ class ICMPARPDiscoveryStage(ScanStageMixin):
 
     stage_type = StageType.ICMP_ARP_DISCOVERY
     stage_name = "ICMP → ARP Discovery"
+    counter_label = "IPs scanned"
 
     def __init__(
         self,

@@ -23,6 +23,7 @@ class ScanStageMixin(ABC):
 
     stage_type: StageType
     stage_name: str
+    counter_label: str = "items"
 
     def __init__(self) -> None:
         self._total: int = 0
@@ -78,6 +79,7 @@ class ScanStageMixin(ABC):
             completed=self._completed,
             finished=self._finished,
             runtime=self.runtime,
+            counter_label=self.counter_label,
         )
 
     # ── Lifecycle ───────────────────────────────────────────────────

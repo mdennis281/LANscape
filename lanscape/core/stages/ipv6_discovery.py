@@ -35,6 +35,7 @@ class IPv6NDPDiscoveryStage(ScanStageMixin):
 
     stage_type = StageType.IPV6_NDP_DISCOVERY
     stage_name = "IPv6 NDP Discovery"
+    counter_label = "devices discovered"
 
     def __init__(
         self,
@@ -188,6 +189,7 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
 
     stage_type = StageType.IPV6_MDNS_DISCOVERY
     stage_name = "IPv6 mDNS Discovery"
+    counter_label = "devices discovered"
 
     _BASE_SERVICE_TYPES = {
         "_http._tcp.local.",

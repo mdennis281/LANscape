@@ -6,6 +6,8 @@ Covers ScanStageMixin, ScanContext, ScanPipeline, stage_builder, and stage confi
 
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
 from lanscape.core.scan_pipeline import ScanPipeline
@@ -18,9 +20,12 @@ from lanscape.core.scan_config import (
     ResilienceConfig, get_stage_config_defaults,
 )
 from lanscape.core.stage_builder import build_stages
-from lanscape.core.stages.discovery import ICMPDiscoveryStage
+from lanscape.core.stages.discovery import (
+    ICMPDiscoveryStage, ARPDiscoveryStage,
+    PokeARPDiscoveryStage, ICMPARPDiscoveryStage,
+)
 from lanscape.core.stages.port_scan import PortScanStage
-from lanscape.core.stages.ipv6_discovery import IPv6NDPDiscoveryStage
+from lanscape.core.stages.ipv6_discovery import IPv6NDPDiscoveryStage, IPv6MDNSDiscoveryStage
 from lanscape.core.scan_config import IPv6NDPDiscoveryStageConfig
 from lanscape.core.neighbor_table import NeighborEntry, NeighborTable
 
@@ -99,6 +104,14 @@ class TestScanStageMixin:
         assert progress.total == 10
         assert progress.completed == 5
         assert progress.finished is False
+        assert progress.counter_label == "items"  # default from base class
+
+    def test_stage_progress_counter_label(self):
+        """counter_label flows through to StageProgress snapshot."""
+        stage = _FakeStage()
+        stage.counter_label = "IPs scanned"
+        progress = stage.stage_progress()
+        assert progress.counter_label == "IPs scanned"
 
     def test_run_sets_running_and_finished(self):
         """run() sets running=True before execute, finished=True after."""
@@ -116,6 +129,23 @@ class TestScanStageMixin:
         stage.running = True
         stage.terminate()
         assert stage.running is False
+
+
+class TestConcreteStageCounterLabels:
+    """Each concrete stage must define a meaningful counter_label."""
+
+    @pytest.mark.parametrize("stage_cls,expected_label", [
+        (ICMPDiscoveryStage, "IPs scanned"),
+        (ARPDiscoveryStage, "IPs scanned"),
+        (PokeARPDiscoveryStage, "IPs scanned"),
+        (ICMPARPDiscoveryStage, "IPs scanned"),
+        (PortScanStage, "ports scanned"),
+        (IPv6NDPDiscoveryStage, "devices discovered"),
+        (IPv6MDNSDiscoveryStage, "devices discovered"),
+    ])
+    def test_counter_label(self, stage_cls, expected_label):
+        """Concrete stage has the expected counter_label class attribute."""
+        assert stage_cls.counter_label == expected_label
 
 
 # ---------------------------------------------------------------------------

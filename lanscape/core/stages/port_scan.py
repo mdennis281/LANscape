@@ -31,6 +31,7 @@ class PortScanStage(ScanStageMixin):
 
     stage_type = StageType.PORT_SCAN
     stage_name = "Port Scan"
+    counter_label = "ports scanned"
 
     def __init__(
         self,

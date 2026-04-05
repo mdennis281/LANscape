@@ -18,6 +18,7 @@ class StageProgress(BaseModel):
     completed: int = Field(default=0, ge=0, description="Completed work items")
     finished: bool = Field(default=False, description="Whether stage has finished")
     runtime: float = Field(default=0.0, ge=0, description="Elapsed seconds for this stage")
+    counter_label: str = Field(default="items", description="Label for the progress counter (e.g. 'IPs scanned', 'ports scanned')")
 
 
 class ScanErrorInfo(BaseModel):

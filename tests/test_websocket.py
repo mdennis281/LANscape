@@ -377,6 +377,22 @@ class TestToolsHandler:
         assert "port_scan_config" in port
         assert "service_scan_config" in port
 
+    def test_handle_stage_presets(self, tools_handler):
+        """Test getting stage presets."""
+        result = tools_handler.invoke("stage_presets")
+
+        assert "icmp_discovery" in result
+        assert "port_scan" in result
+
+        # Each stage should have all three presets
+        for stage_type, presets in result.items():
+            assert set(presets.keys()) == {"fast", "balanced", "accurate"}, (
+                f"{stage_type} missing preset(s)"
+            )
+
+        # Fast port scan uses 'small' port list
+        assert result["port_scan"]["fast"]["port_list"] == "small"
+
     def test_handle_arp_supported(self, tools_handler):
         """Test checking ARP support."""
         with patch(

@@ -1,6 +1,6 @@
 """
 Tests for the scan stage pipeline infrastructure.
-Covers ScanStageMixin, ScanContext, ScanPipeline, stage_builder, and stage configs.
+Covers ScanStageMixin, ScanContext, ScanPipeline, stage_builder, stage configs, and presets.
 """
 # pylint: disable=protected-access
 
@@ -18,7 +18,9 @@ from lanscape.core.scan_config import (
     ScanConfig, PipelineConfig, StageConfig,
     ICMPDiscoveryStageConfig, PortScanStageConfig,
     ResilienceConfig, get_stage_config_defaults,
+    STAGE_CONFIG_REGISTRY,
 )
+from lanscape.core.stage_presets import StagePreset, get_stage_presets
 from lanscape.core.stage_builder import build_stages
 from lanscape.core.stages.discovery import (
     ICMPDiscoveryStage, ARPDiscoveryStage,
@@ -446,6 +448,63 @@ class TestPipelineConfig:
         port_default = PortScanStageConfig()
         assert port['port_list'] == port_default.port_list
         assert port['scan_services'] == port_default.scan_services
+
+
+# ---------------------------------------------------------------------------
+# stage_presets
+# ---------------------------------------------------------------------------
+
+class TestStagePresets:
+    """Tests for the stage preset system."""
+
+    def test_get_stage_presets_returns_all_stages(self):
+        """get_stage_presets() returns presets for every registered stage."""
+        presets = get_stage_presets()
+        expected_types = {
+            'icmp_discovery', 'arp_discovery', 'poke_arp_discovery',
+            'icmp_arp_discovery', 'ipv6_ndp_discovery',
+            'ipv6_mdns_discovery', 'port_scan',
+        }
+        assert set(presets.keys()) == expected_types
+
+    def test_each_stage_has_three_presets(self):
+        """Every stage has fast, balanced, and accurate presets."""
+        presets = get_stage_presets()
+        for stage_type, preset_map in presets.items():
+            assert set(preset_map.keys()) == {'fast', 'balanced', 'accurate'}, (
+                f"{stage_type} missing preset(s)"
+            )
+
+    def test_balanced_matches_defaults(self):
+        """The balanced preset matches Pydantic model defaults."""
+        presets = get_stage_presets()
+        defaults = get_stage_config_defaults()
+        for stage_type in presets:
+            assert presets[stage_type]['balanced'] == defaults[stage_type], (
+                f"{stage_type} balanced preset differs from default"
+            )
+
+    def test_presets_are_valid_config_dicts(self):
+        """Every preset can be round-tripped through its config class."""
+        presets = get_stage_presets()
+        for stage_type_str, preset_map in presets.items():
+            stage_type = StageType(stage_type_str)
+            cfg_cls = STAGE_CONFIG_REGISTRY[stage_type]
+            for preset_name, cfg_dict in preset_map.items():
+                instance = cfg_cls.from_dict(cfg_dict)
+                assert instance.to_dict() == cfg_dict, (
+                    f"{stage_type_str}/{preset_name} round-trip failed"
+                )
+
+    def test_fast_port_scan_uses_small_list(self):
+        """Fast port scan preset uses the 'small' port list."""
+        presets = get_stage_presets()
+        assert presets['port_scan']['fast']['port_list'] == 'small'
+
+    def test_accurate_port_scan_uses_large_list(self):
+        """Accurate port scan preset uses the 'large' port list."""
+        presets = get_stage_presets()
+        assert presets['port_scan']['accurate']['port_list'] == 'large'
 
 
 # ---------------------------------------------------------------------------

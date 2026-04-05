@@ -31,6 +31,8 @@ from lanscape.core.scan_config import (
     ResilienceConfig,
 )
 
+from lanscape.core.stage_presets import StagePreset, get_stage_presets
+
 from lanscape.core.port_manager import PortManager
 
 # Neighbor table service (centralized ARP/NDP cache)

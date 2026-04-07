@@ -10,6 +10,7 @@ from lanscape.core.system_compat import (
     send_arp_request,
     is_ipv6,
 )
+from lanscape.core.neighbor_table import NeighborTableService
 log = logging.getLogger('MacLookup')
 
 
@@ -57,7 +58,6 @@ class MacResolver(JobStatsMixin):
     def _neighbor_cache_healthy(self) -> bool:
         """Return True if the NeighborTableService is running and has entries."""
         try:
-            from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
             svc = NeighborTableService.instance()
             if not svc.is_running:
                 return False
@@ -70,7 +70,6 @@ class MacResolver(JobStatsMixin):
     def _get_mac_by_neighbor_cache(self, ip: str) -> List[str]:
         """Retrieve MAC addresses from the NeighborTableService."""
         try:
-            from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
             svc = NeighborTableService.instance()
             return svc.get_macs(ip)
         except Exception as e:

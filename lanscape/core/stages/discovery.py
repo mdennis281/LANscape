@@ -13,6 +13,7 @@ from lanscape.core.scan_config import (
     ICMPARPDiscoveryStageConfig,
     ResilienceConfig,
 )
+from lanscape.core.models.scan import ScanWarningInfo
 from lanscape.core.net_tools.device import Device
 from lanscape.core.device_alive import IcmpLookup, ArpLookup, Poker
 from lanscape.core.system_compat import query_single_arp_entry
@@ -50,7 +51,6 @@ def _build_retry_infra(
 ):
     """Build the retry manager + multiplier controller used by all discovery stages."""
     def on_warning(warning_type: str, warning_data: dict):
-        from lanscape.core.models.scan import ScanWarningInfo  # pylint: disable=import-outside-toplevel
         context.warnings.append(ScanWarningInfo(
             type=warning_type,
             stage=stage.stage_name,

@@ -9,6 +9,7 @@ from lanscape.core.scan_context import ScanContext
 from lanscape.core.models.enums import StageType
 from lanscape.core.models.scan import ScanErrorInfo
 from lanscape.core.scan_config import PortScanStageConfig, ResilienceConfig
+from lanscape.core.models.scan import ScanWarningInfo
 from lanscape.core.net_tools.device import Device
 from lanscape.core.port_manager import PortManager
 from lanscape.core.decorators import job_tracker
@@ -60,7 +61,6 @@ class PortScanStage(ScanStageMixin):
         self.total = sum(len(ports) for _, ports in device_port_map)
 
         def on_warning(warning_type: str, warning_data: dict) -> None:
-            from lanscape.core.models.scan import ScanWarningInfo  # pylint: disable=import-outside-toplevel
             context.warnings.append(ScanWarningInfo(
                 type=warning_type,
                 stage=self.stage_name,

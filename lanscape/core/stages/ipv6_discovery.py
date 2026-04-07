@@ -19,6 +19,12 @@ from lanscape.core.system_compat import (
     is_ipv6,
 )
 
+try:
+    from zeroconf import Zeroconf, ServiceBrowser
+except ImportError:
+    Zeroconf = None  # type: ignore[misc,assignment]
+    ServiceBrowser = None  # type: ignore[misc,assignment]
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  IPv6 NDP Neighbor Discovery
@@ -229,9 +235,7 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
         if not NeighborTableService.instance().is_running:
             NeighborTableService.instance().start()
 
-        try:
-            from zeroconf import Zeroconf, ServiceBrowser  # pylint: disable=import-outside-toplevel
-        except ImportError:
+        if Zeroconf is None or ServiceBrowser is None:
             self.log.warning("zeroconf not installed — skipping mDNS discovery")
             self._completed = self.total
             return

@@ -12,7 +12,7 @@ from typing import List, Union
 from tabulate import tabulate
 
 # Local imports
-from lanscape.core.scan_config import ScanConfig, PipelineConfig
+from lanscape.core.scan_config import ScanConfig, PipelineConfig, StageConfig
 from lanscape.core.decorators import JobStats
 from lanscape.core.net_tools import (
     Device, is_internal_block, scan_config_uses_arp
@@ -146,8 +146,6 @@ class SubnetScanner():
         them to the pipeline.  If the scan has already finished, it is
         restarted in a new thread so the new stages execute.
         """
-        from lanscape.core.scan_config import StageConfig  # pylint: disable=import-outside-toplevel
-
         stage_entries = [StageConfig.from_dict(sc) for sc in stage_configs]
         temp_cfg = PipelineConfig(
             subnet=self.subnet_str,

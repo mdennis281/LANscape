@@ -20,6 +20,7 @@ from lanscape.core.scan_config import (
 )
 from lanscape.core.stage_presets import get_stage_presets
 from lanscape.core.stage_estimates import estimate_stage_time
+from lanscape.core.models.enums import StageType
 from lanscape.core.version_manager import (
     get_installed_version, is_update_available, get_latest_version
 )
@@ -182,11 +183,10 @@ class ToolsHandler(BaseHandler):
         Returns:
             Dict with 'seconds' float
         """
-        from lanscape.core.models.enums import StageType as ST  # pylint: disable=import-outside-toplevel
         stage_type_str = self._get_param(params, 'stage_type')
         config = params.get('config', {})
         try:
-            st = ST(stage_type_str)
+            st = StageType(stage_type_str)
             seconds = estimate_stage_time(st, config)
             return {'seconds': seconds}
         except Exception:

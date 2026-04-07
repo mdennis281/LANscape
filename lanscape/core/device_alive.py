@@ -13,6 +13,7 @@ from lanscape.core.scan_config import (
     ArpConfig, PokeConfig, ArpCacheConfig
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
+from lanscape.core.neighbor_table import NeighborTableService
 from lanscape.core.system_compat import (
     icmp_requires_privileged,
     get_ping_command,
@@ -141,7 +142,6 @@ class ArpCacheLookup():
         Returns:
             bool: True if the device is found in the cache, False otherwise.
         """
-        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
         svc = NeighborTableService.instance()
 
         if not svc.is_running:

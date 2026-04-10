@@ -96,7 +96,14 @@ def start_webapp_mode():
 def is_port_available(port: int) -> bool:
     """Check if a port is available for binding."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('localhost', port)) != 0
+        try:
+            s.bind(('', port))
+            return True
+        except OSError:
+            return False
+        except Exception:
+            log.debug(f'Error checking port {port} availability: {traceback.format_exc()}')
+            return False
 
 
 def validate_port_available(port: int, flag_name: str, retries: int = 10,

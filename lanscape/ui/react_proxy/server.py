@@ -327,12 +327,12 @@ class WebappServerController:
         # the frontend will discover the backend via mDNS or same-origin default).
         local_url = f'http://localhost:{self.http_port}'
 
-        # Open browser immediately — HTTP server is ready to serve the UI.
+        # Open browser immediately — HTTP server is already bound and ready.
         if open_browser:
-            log.debug('Scheduling browser open in %.1fs: %s', 0.3, local_url)
+            log.debug('Opening browser: %s', local_url)
             threading.Thread(
                 target=_open_browser,
-                args=(local_url, 0.3, self.http_port),
+                args=(local_url, 0, self.http_port),
                 daemon=True
             ).start()
 

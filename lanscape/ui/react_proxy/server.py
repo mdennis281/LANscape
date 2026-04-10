@@ -312,7 +312,31 @@ class WebappServerController:
             webapp_dir: Directory containing the webapp static files
             open_browser: Whether to open a browser window
         """
-        # Start WebSocket server in a thread
+        # Start HTTP server first — the UI only needs static files to load.
+        # The WS connection will be retried by the frontend until ready.
+        log.debug('Initializing HTTP static server on 0.0.0.0:%d...', self.http_port)
+        self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
+        log.debug('HTTP server bound and ready on port %d', self.http_port)
+
+        # Tell the handler the default route and mDNS status so
+        # /api/discover can include them in every response.
+        SPAHandler.default_route = build_default_route(self.http_port)
+        SPAHandler.mdns_enabled = self.mdns_enabled
+
+        # Build the localhost URL for the local browser (no ws-server param;
+        # the frontend will discover the backend via mDNS or same-origin default).
+        local_url = f'http://localhost:{self.http_port}'
+
+        # Open browser immediately — HTTP server is ready to serve the UI.
+        if open_browser:
+            log.debug('Scheduling browser open in %.1fs: %s', 0.3, local_url)
+            threading.Thread(
+                target=_open_browser,
+                args=(local_url, 0.3, self.http_port),
+                daemon=True
+            ).start()
+
+        # Start WebSocket server in a thread (UI retries until connected)
         ws_thread = threading.Thread(
             target=self._run_ws_server,
             args=(self._on_client_change,),
@@ -328,16 +352,6 @@ class WebappServerController:
         threading.Thread(
             target=_prewarm_capabilities, daemon=True, name='prewarm',
         ).start()
-
-        # Start HTTP server
-        log.debug('Initializing HTTP static server on 0.0.0.0:%d...', self.http_port)
-        self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
-        log.debug('HTTP server bound and ready on port %d', self.http_port)
-
-        # Tell the handler the default route and mDNS status so
-        # /api/discover can include them in every response.
-        SPAHandler.default_route = build_default_route(self.http_port)
-        SPAHandler.mdns_enabled = self.mdns_enabled
 
         # Start mDNS discovery in a background thread (unless disabled).
         # Zeroconf() + register_service() can block on Windows (multicast socket
@@ -366,19 +380,6 @@ class WebappServerController:
             threading.Thread(target=_start_discovery, daemon=True, name='mDNS-init').start()
         else:
             log.info('mDNS service disabled')
-
-        # Build the localhost URL for the local browser (no ws-server param;
-        # the frontend will discover the backend via mDNS or same-origin default).
-        local_url = f'http://localhost:{self.http_port}'
-
-        # Open browser
-        if open_browser:
-            log.debug('Scheduling browser open in %.1fs: %s', 0.3, local_url)
-            threading.Thread(
-                target=_open_browser,
-                args=(local_url, 0.3, self.http_port),
-                daemon=True
-            ).start()
 
         if self.persistent:
             log.info('Running in persistent mode. Press Ctrl+C to stop.')

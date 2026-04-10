@@ -40,7 +40,8 @@ class ToolsHandler(BaseHandler):
     - tools.stage_presets: Get fast/balanced/accurate presets per stage
     - tools.stage_estimate: Estimate time for one unit of work
     - tools.arp_supported: Check if ARP is supported on this system
-    - tools.app_info: Get app version, runtime args, and update status
+    - tools.app_info: Get app version, runtime args
+    - tools.update_check: Check for available updates
     """
 
     def __init__(self):
@@ -56,6 +57,7 @@ class ToolsHandler(BaseHandler):
         self.register('stage_estimate', self._handle_stage_estimate)
         self.register('arp_supported', self._handle_arp_supported)
         self.register('app_info', self._handle_app_info)
+        self.register('update_check', self._handle_update_check)
 
     @property
     def prefix(self) -> str:
@@ -135,12 +137,16 @@ class ToolsHandler(BaseHandler):
         """
         Get default scan configurations.
 
-        Adjusts presets that rely on ARP_LOOKUP when ARP is not supported.
+        When ``arp_supported`` is passed in *params* as ``false``, the
+        returned presets replace ARP-only stages with fallback equivalents.
+        Defaults to ``True`` so the first (fast) call assumes ARP works;
+        the frontend re-fetches after the real ARP check if needed.
 
         Returns:
             Dict of preset name -> ScanConfig dict
         """
-        return get_default_configs_with_arp_fallback(is_arp_supported())
+        arp_supported = params.get('arp_supported', True)
+        return get_default_configs_with_arp_fallback(arp_supported)
 
     def _handle_stage_defaults(
         self,
@@ -211,15 +217,15 @@ class ToolsHandler(BaseHandler):
         send_event: Optional[Callable] = None  # pylint: disable=unused-argument
     ) -> dict:
         """
-        Get application info including version, runtime args, and update status.
+        Get application info (fast path — no network or ARP calls).
+
+        Expensive checks (ARP support, update availability) are deferred
+        to ``tools.capabilities`` so the UI can render immediately.
 
         Returns:
             Dict with app info:
             - name: Application name
             - version: Current installed version
-            - arp_supported: Whether ARP is supported
-            - update_available: Whether an update is available
-            - latest_version: Latest available version (if update available)
             - runtime_args: Dict of current runtime arguments
         """
         args = parse_args()
@@ -234,19 +240,32 @@ class ToolsHandler(BaseHandler):
         if args.logfile:
             runtime_args['logfile'] = args.logfile
 
-        result = {
+        return {
             'name': 'LANscape',
             'version': get_installed_version(),
-            'arp_supported': is_arp_supported(),
             'runtime_args': runtime_args,
         }
 
-        # Check for updates (safely)
-        try:
-            result['update_available'] = is_update_available()
-            result['latest_version'] = get_latest_version()
-        except Exception:
-            result['update_available'] = False
-            result['latest_version'] = None
+    def _handle_update_check(
+        self,
+        params: dict[str, Any],  # pylint: disable=unused-argument
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Check for available updates on PyPI.
 
-        return result
+        Returns:
+            Dict with:
+            - update_available: Whether a newer version exists on PyPI
+            - latest_version: Latest version string (or None)
+        """
+        try:
+            return {
+                'update_available': is_update_available(),
+                'latest_version': get_latest_version(),
+            }
+        except Exception:  # pylint: disable=broad-exception-caught
+            return {
+                'update_available': False,
+                'latest_version': None,
+            }

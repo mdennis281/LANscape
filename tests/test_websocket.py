@@ -268,6 +268,7 @@ class TestToolsHandler:
         assert "tools.stage_defaults" in actions
         assert "tools.arp_supported" in actions
         assert "tools.app_info" in actions
+        assert "tools.update_check" in actions
 
     def test_handle_subnet_test_empty(self, tools_handler):
         """Test validating an empty subnet."""
@@ -342,17 +343,20 @@ class TestToolsHandler:
         assert result[0]["subnet"] == "192.168.1.0/24"
 
     def test_handle_config_defaults(self, tools_handler):
-        """Test getting default configs."""
-        with patch(
-            'lanscape.ui.ws.handlers.tools.is_arp_supported'
-        ) as mock:
-            mock.return_value = True
+        """Test getting default configs (always returns ARP-optimistic configs)."""
+        result = tools_handler.invoke("config_defaults")
 
-            result = tools_handler.invoke("config_defaults")
+        assert "balanced" in result
+        assert "accurate" in result
+        assert "fast" in result
 
-            assert "balanced" in result
-            assert "accurate" in result
-            assert "fast" in result
+    def test_handle_config_defaults_arp_false(self, tools_handler):
+        """Test getting default configs with arp_supported=false adjusts presets."""
+        result = tools_handler.invoke("config_defaults", {"arp_supported": False})
+
+        assert "balanced" in result
+        assert "accurate" in result
+        assert "fast" in result
 
     def test_handle_stage_defaults(self, tools_handler):
         """Test getting stage config defaults."""
@@ -424,16 +428,10 @@ class TestToolsHandler:
             assert result["supported"] is False
 
     def test_handle_app_info(self, tools_handler):
-        """Test getting app info."""
+        """Test getting app info (fast path — no ARP or update check)."""
         with patch(
             'lanscape.ui.ws.handlers.tools.get_installed_version',
             return_value='1.2.3',
-        ), patch(
-            'lanscape.ui.ws.handlers.tools.is_arp_supported',
-            return_value=True,
-        ), patch(
-            'lanscape.ui.ws.handlers.tools.is_update_available',
-            return_value=False,
         ), patch(
             'lanscape.ui.ws.handlers.tools.parse_args',
         ) as mock_args:
@@ -441,46 +439,56 @@ class TestToolsHandler:
             mock_args.return_value.ws_port = 8766
             mock_args.return_value.loglevel = 'INFO'
             mock_args.return_value.persistent = False
-            mock_args.return_value.webapp_update = False
             mock_args.return_value.logfile = None
 
             result = tools_handler.invoke("app_info")
 
             assert result["name"] == "LANscape"
             assert result["version"] == "1.2.3"
-            assert result["arp_supported"] is True
-            assert result["update_available"] is False
             assert "runtime_args" in result
             assert result["runtime_args"]["ui_port"] == 5001
+            # ARP and update fields should NOT be present (deferred to capabilities)
+            assert "arp_supported" not in result
+            assert "update_available" not in result
 
-    def test_handle_app_info_with_update(self, tools_handler):
-        """Test getting app info when update is available."""
+    def test_handle_update_check(self, tools_handler):
+        """Test checking for updates."""
         with patch(
-            'lanscape.ui.ws.handlers.tools.get_installed_version',
-            return_value='1.2.3',
+            'lanscape.ui.ws.handlers.tools.is_update_available',
+            return_value=False,
         ), patch(
-            'lanscape.ui.ws.handlers.tools.is_arp_supported',
-            return_value=True,
-        ), patch(
+            'lanscape.ui.ws.handlers.tools.get_latest_version',
+            return_value='1.0.0',
+        ):
+            result = tools_handler.invoke("update_check")
+
+            assert result["update_available"] is False
+            assert result["latest_version"] == '1.0.0'
+
+    def test_handle_update_check_available(self, tools_handler):
+        """Test update_check when an update is available."""
+        with patch(
             'lanscape.ui.ws.handlers.tools.is_update_available',
             return_value=True,
         ), patch(
             'lanscape.ui.ws.handlers.tools.get_latest_version',
-            return_value='1.3.0',
-        ), patch(
-            'lanscape.ui.ws.handlers.tools.parse_args',
-        ) as mock_args:
-            mock_args.return_value.ui_port = 5001
-            mock_args.return_value.ws_port = 8766
-            mock_args.return_value.loglevel = 'INFO'
-            mock_args.return_value.persistent = False
-            mock_args.return_value.webapp_update = False
-            mock_args.return_value.logfile = None
-
-            result = tools_handler.invoke("app_info")
+            return_value='2.0.0',
+        ):
+            result = tools_handler.invoke("update_check")
 
             assert result["update_available"] is True
-            assert result["latest_version"] == "1.3.0"
+            assert result["latest_version"] == '2.0.0'
+
+    def test_handle_update_check_error(self, tools_handler):
+        """Test update_check when PyPI call throws."""
+        with patch(
+            'lanscape.ui.ws.handlers.tools.is_update_available',
+            side_effect=RuntimeError('network error'),
+        ):
+            result = tools_handler.invoke("update_check")
+
+            assert result["update_available"] is False
+            assert result["latest_version"] is None
 
 
 # WebSocket Server Tests

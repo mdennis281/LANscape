@@ -2,6 +2,7 @@
 import socket
 import logging
 import time
+import threading
 import traceback
 
 from lanscape.core.logger import configure_logging
@@ -34,7 +35,9 @@ def main():
 
 def _main():
     log.info(f'LANscape v{get_installed_version()}')
-    try_check_update()
+
+    # Run update check in a background thread so it doesn't block server startup
+    threading.Thread(target=try_check_update, daemon=True, name='update-check').start()
 
     # Check if WebSocket server only mode is requested
     if args.ws_server:

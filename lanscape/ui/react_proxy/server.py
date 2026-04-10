@@ -321,6 +321,12 @@ class WebappServerController:
         ws_thread.start()
         log.debug(f'WebSocket server started on ws://{self.host}:{self.ws_port}')
 
+        # Pre-warm expensive checks in a background thread so that the
+        # first ``tools.capabilities`` call returns near-instantly.
+        threading.Thread(
+            target=_prewarm_capabilities, daemon=True, name='prewarm',
+        ).start()
+
         # Start HTTP server
         self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
 
@@ -365,7 +371,7 @@ class WebappServerController:
         if open_browser:
             threading.Thread(
                 target=_open_browser,
-                args=(local_url, 1.5, self.http_port),
+                args=(local_url, 0.3, self.http_port),
                 daemon=True
             ).start()
 
@@ -520,6 +526,30 @@ def _format_listen_urls(http_port: int) -> str:
     except OSError:
         pass
     return '\n'.join(f'  - {u}' for u in urls)
+
+
+def _prewarm_capabilities() -> None:
+    """Eagerly compute expensive capability checks in the background.
+
+    Called once at startup so the results are cached before the first
+    ``tools.arp_supported`` / ``tools.update_check`` request arrives from
+    the UI.  Both helpers cache their results for the process lifetime
+    (``@run_once`` / internal caching), so this is safe to call
+    concurrently.
+    """
+    # Import lazily to avoid circular imports and keep the import
+    # footprint of this module light.
+    try:
+        from lanscape.core.net_tools import is_arp_supported  # pylint: disable=import-outside-toplevel
+        is_arp_supported()
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+    try:
+        from lanscape.core.version_manager import is_update_available  # pylint: disable=import-outside-toplevel
+        is_update_available()
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
 
 
 def _open_browser(

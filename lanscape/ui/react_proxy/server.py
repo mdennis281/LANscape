@@ -318,17 +318,21 @@ class WebappServerController:
             args=(self._on_client_change,),
             daemon=True
         )
+        log.debug('Starting WebSocket server thread...')
         ws_thread.start()
-        log.debug(f'WebSocket server started on ws://{self.host}:{self.ws_port}')
 
         # Pre-warm expensive checks in a background thread so that the
-        # first ``tools.capabilities`` call returns near-instantly.
+        # first ``tools.arp_supported`` / ``tools.update_check`` request
+        # returns near-instantly.
+        log.debug('Starting pre-warm thread for ARP + PyPI cache')
         threading.Thread(
             target=_prewarm_capabilities, daemon=True, name='prewarm',
         ).start()
 
         # Start HTTP server
+        log.debug('Initializing HTTP static server on 0.0.0.0:%d...', self.http_port)
         self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
+        log.debug('HTTP server bound and ready on port %d', self.http_port)
 
         # Tell the handler the default route and mDNS status so
         # /api/discover can include them in every response.
@@ -369,6 +373,7 @@ class WebappServerController:
 
         # Open browser
         if open_browser:
+            log.debug('Scheduling browser open in %.1fs: %s', 0.3, local_url)
             threading.Thread(
                 target=_open_browser,
                 args=(local_url, 0.3, self.http_port),
@@ -573,9 +578,12 @@ def _open_browser(
     # on headless systems and handled gracefully with our own warning.
     logging.getLogger('pwa_launcher').setLevel(logging.CRITICAL)
     try:
-        log.debug(f'Opening browser: {url}')
-        return open_pwa(url, auto_profile=False)
+        log.debug('Calling pwa_launcher.open_pwa(%s, auto_profile=False)', url)
+        result = open_pwa(url, auto_profile=False)
+        log.debug('pwa_launcher returned: %s', result)
+        return result
     except ChromiumNotFoundError:
+        log.debug('ChromiumNotFoundError — falling back to webbrowser.open')
         success = webbrowser.open(url)
         if success:
             log.warning('Chromium not found, using default browser')
@@ -586,7 +594,7 @@ def _open_browser(
                 listen_urls,
             )
     except Exception as e:
-        log.debug(f'Browser open failed: {e}')
+        log.debug('pwa_launcher.open_pwa failed: %s', e)
         listen_urls = _format_listen_urls(http_port)
         log.info('Open your browser to:\n%s', listen_urls)
     return None

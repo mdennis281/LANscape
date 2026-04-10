@@ -2,14 +2,11 @@
 import socket
 import logging
 import time
-import threading
 import traceback
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
-from lanscape.core.version_manager import (
-    get_installed_version, is_update_available, get_latest_version
-)
+from lanscape.core.version_manager import get_installed_version
 from lanscape.ui.ws.server import run_server
 from lanscape.ui.react_proxy import start_webapp_server
 
@@ -36,9 +33,6 @@ def main():
 def _main():
     log.info(f'LANscape v{get_installed_version()}')
 
-    # Run update check in a background thread so it doesn't block server startup
-    threading.Thread(target=try_check_update, daemon=True, name='update-check').start()
-
     # Check if WebSocket server only mode is requested
     if args.ws_server:
         start_websocket_server()
@@ -46,18 +40,6 @@ def _main():
 
     # Default: Start webapp mode (React UI + WebSocket backend)
     start_webapp_mode()
-
-
-def try_check_update():
-    """Check for updates and log if available."""
-    try:
-        if is_update_available():
-            log.info('An update is available!')
-            log.info(
-                f'Run "pip install lanscape=={get_latest_version()}" to suppress this message.')
-    except BaseException:
-        log.debug(traceback.format_exc())
-        log.warning('Unable to check for updates.')
 
 
 def start_websocket_server():

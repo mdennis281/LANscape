@@ -1,8 +1,9 @@
 """Main entry point for the LANscape application when running as a module."""
-import socket
 import logging
 import time
 import traceback
+
+import psutil
 
 from lanscape.core.logger import configure_logging
 from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
@@ -93,17 +94,20 @@ def start_webapp_mode():
         raise
 
 
-def is_port_available(port: int) -> bool:
+def _get_bound_ports() -> set[int]:
+    """Return the set of all TCP ports currently bound on the system."""
+    return {
+        conn.laddr.port
+        for conn in psutil.net_connections(kind='tcp')
+        if conn.laddr
+    }
+
+
+def is_port_available(port: int, bound_ports: set[int] | None = None) -> bool:
     """Check if a port is available for binding."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.bind(('', port))
-            return True
-        except OSError:
-            return False
-        except Exception:
-            log.debug(f'Error checking port {port} availability: {traceback.format_exc()}')
-            return False
+    if bound_ports is None:
+        bound_ports = _get_bound_ports()
+    return port not in bound_ports
 
 
 def validate_port_available(port: int, flag_name: str, retries: int = 10,
@@ -143,8 +147,9 @@ def get_valid_port(port: int) -> int:
     """
     max_port = 65535
     start_port = port
+    bound_ports = _get_bound_ports()
     while port <= max_port:
-        if is_port_available(port):
+        if is_port_available(port, bound_ports):
             return port
         port += 1
     raise RuntimeError(

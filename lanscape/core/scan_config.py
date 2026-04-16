@@ -99,7 +99,7 @@ class ServiceScanStrategy(Enum):
 class ServiceScanConfig(ConfigBase):
     """Configuration for service scanning on open ports."""
     timeout: float = 5.0
-    lookup_type: ServiceScanStrategy = ServiceScanStrategy.BASIC
+    lookup_type: ServiceScanStrategy = ServiceScanStrategy.AGGRESSIVE
     max_concurrent_probes: int = 10
 
     def __str__(self):

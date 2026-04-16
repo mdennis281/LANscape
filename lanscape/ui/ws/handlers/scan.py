@@ -60,6 +60,7 @@ class ScanHandler(BaseHandler):
         self.register('subscribe', self._handle_subscribe)
         self.register('unsubscribe', self._handle_unsubscribe)
         self.register('list', self._handle_list)
+        self.register('history', self._handle_history)
         self.register('append_stages', self._handle_append_stages)
 
     @property
@@ -417,6 +418,23 @@ class ScanHandler(BaseHandler):
             'success': True,
             'scan_id': scan_id,
             'total_stages': len(scan.pipeline.stages),
+        }
+
+    def _handle_history(
+        self,
+        params: dict[str, Any],  # pylint: disable=unused-argument
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Get a lightweight list of all scan IDs for history navigation.
+
+        Returns:
+            Dict with scan_ids list (newest first)
+        """
+        return {
+            'scan_ids': [
+                scan.uid for scan in reversed(self._scan_manager.scans)
+            ]
         }
 
     def _handle_list(

@@ -264,7 +264,6 @@ class TestToolsHandler:
 
         assert "tools.subnet_test" in actions
         assert "tools.subnet_list" in actions
-        assert "tools.config_defaults" in actions
         assert "tools.stage_defaults" in actions
         assert "tools.arp_supported" in actions
         assert "tools.app_info" in actions
@@ -341,22 +340,6 @@ class TestToolsHandler:
 
         assert len(result) == 3
         assert result[0]["subnet"] == "192.168.1.0/24"
-
-    def test_handle_config_defaults(self, tools_handler):
-        """Test getting default configs (always returns ARP-optimistic configs)."""
-        result = tools_handler.invoke("config_defaults")
-
-        assert "balanced" in result
-        assert "accurate" in result
-        assert "fast" in result
-
-    def test_handle_config_defaults_arp_false(self, tools_handler):
-        """Test getting default configs with arp_supported=false adjusts presets."""
-        result = tools_handler.invoke("config_defaults", {"arp_supported": False})
-
-        assert "balanced" in result
-        assert "accurate" in result
-        assert "fast" in result
 
     def test_handle_stage_defaults(self, tools_handler):
         """Test getting stage config defaults."""

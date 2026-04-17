@@ -18,9 +18,7 @@ from lanscape.core.errors import SubnetTooLargeError
 from lanscape.core.auto_stages import (
     recommend_stages, _is_ipv6, _is_local_subnet, _matching_interface,
 )
-from lanscape.core.scan_config import (
-    get_default_configs_with_arp_fallback, get_stage_config_defaults
-)
+from lanscape.core.scan_config import get_stage_config_defaults
 from lanscape.core.stage_presets import get_stage_presets
 from lanscape.core.stage_estimates import estimate_stage_time
 from lanscape.core.models.enums import StageType
@@ -38,7 +36,6 @@ class ToolsHandler(BaseHandler):
     Supports actions:
     - tools.subnet_test: Validate a subnet string
     - tools.subnet_list: List all network subnets on the system
-    - tools.config_defaults: Get default scan configurations
     - tools.stage_defaults: Get default per-stage configurations
     - tools.stage_presets: Get fast/balanced/accurate presets per stage
     - tools.stage_estimate: Estimate time for one unit of work
@@ -56,7 +53,6 @@ class ToolsHandler(BaseHandler):
         self.register('subnet_test', self._handle_subnet_test)
         self.register('subnet_list', self._handle_subnet_list)
         self.register('auto_stages', self._handle_auto_stages)
-        self.register('config_defaults', self._handle_config_defaults)
         self.register('stage_defaults', self._handle_stage_defaults)
         self.register('stage_presets', self._handle_stage_presets)
         self.register('stage_estimate', self._handle_stage_estimate)
@@ -165,25 +161,6 @@ class ToolsHandler(BaseHandler):
             return subnets
         except Exception:
             return {'error': traceback.format_exc()}
-
-    def _handle_config_defaults(
-        self,
-        params: dict[str, Any],  # pylint: disable=unused-argument
-        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
-    ) -> dict:
-        """
-        Get default scan configurations.
-
-        When ``arp_supported`` is passed in *params* as ``false``, the
-        returned presets replace ARP-only stages with fallback equivalents.
-        Defaults to ``True`` so the first (fast) call assumes ARP works;
-        the frontend re-fetches after the real ARP check if needed.
-
-        Returns:
-            Dict of preset name -> ScanConfig dict
-        """
-        arp_supported = params.get('arp_supported', True)
-        return get_default_configs_with_arp_fallback(arp_supported)
 
     def _handle_stage_defaults(
         self,

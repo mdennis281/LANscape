@@ -86,6 +86,33 @@ class ScanPipeline:
         if self._terminated:
             self._terminated = False
 
+    def update_stage(self, index: int, new_stage: ScanStageMixin) -> None:
+        """Replace a future stage that has not yet started.
+
+        Only stages that are pending (not currently running or finished)
+        may be replaced.  Raises :class:`ValueError` for invalid indices
+        or stages that cannot be swapped.
+        """
+        if index < 0 or index >= len(self.stages):
+            raise ValueError(
+                f"Stage index {index} out of range (0–{len(self.stages) - 1})"
+            )
+
+        if self._current_index is not None and index <= self._current_index:
+            raise ValueError(
+                f"Cannot update stage {index}: it is currently running or already finished"
+            )
+
+        existing = self.stages[index]
+        if existing.finished:
+            raise ValueError(
+                f"Cannot update stage {index}: it has already finished"
+            )
+
+        log.info("Replacing pipeline stage %d (%s → %s)",
+                 index, existing.stage_name, new_stage.stage_name)
+        self.stages[index] = new_stage
+
     # ── Progress ────────────────────────────────────────────────────
 
     @property

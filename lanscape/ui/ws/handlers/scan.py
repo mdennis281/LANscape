@@ -62,6 +62,7 @@ class ScanHandler(BaseHandler):
         self.register('list', self._handle_list)
         self.register('history', self._handle_history)
         self.register('append_stages', self._handle_append_stages)
+        self.register('update_stage', self._handle_update_stage)
 
     @property
     def prefix(self) -> str:
@@ -417,6 +418,47 @@ class ScanHandler(BaseHandler):
         return {
             'success': True,
             'scan_id': scan_id,
+            'total_stages': len(scan.pipeline.stages),
+        }
+
+    def _handle_update_stage(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Update a pending (not yet started) stage on a running scan.
+
+        Params:
+            scan_id: The scan ID
+            index: Index of the stage to replace
+            stage_type: New stage type
+            config: New stage config dict
+
+        Returns:
+            Dict with success status and updated stage count
+        """
+        scan_id = self._get_param(params, 'scan_id', required=True)
+        index = self._get_param(params, 'index', required=True)
+        stage_type = self._get_param(params, 'stage_type', required=True)
+        config = self._get_param(params, 'config', default={})
+
+        scan = self._scan_manager.get_scan(scan_id)
+        if scan is None:
+            raise ValueError(f"Scan not found: {scan_id}")
+
+        scan.update_stage(index, {
+            'stage_type': stage_type,
+            'config': config,
+        })
+        self.log.info(
+            f"Updated stage {index} on scan {scan_id} to {stage_type}"
+        )
+
+        return {
+            'success': True,
+            'scan_id': scan_id,
+            'index': index,
             'total_stages': len(scan.pipeline.stages),
         }
 

@@ -375,6 +375,77 @@ class TestScanPipeline:
         pipeline.execute(ctx)
         assert new_stage.finished
 
+    def test_update_stage_replaces_pending(self):
+        """update_stage replaces a pending stage that has not run yet."""
+        s1 = _FakeStage(work_items=1)
+        s2 = _FakeStage(work_items=3)
+        pipeline = ScanPipeline([s1, s2])
+
+        replacement = _FakeStage(work_items=7)
+        pipeline.update_stage(1, replacement)
+
+        assert pipeline.stages[1] is replacement
+        assert pipeline.stages[0] is s1
+
+        ctx = ScanContext("10.0.0.0/24")
+        pipeline.execute(ctx)
+        assert replacement.completed == 7
+
+    def test_update_stage_rejects_finished(self):
+        """update_stage raises ValueError for a stage that already finished."""
+        s1 = _FakeStage(work_items=1)
+        s2 = _FakeStage(work_items=1)
+        pipeline = ScanPipeline([s1, s2])
+
+        ctx = ScanContext("10.0.0.0/24")
+        pipeline.execute(ctx)
+
+        with pytest.raises(ValueError, match="already finished"):
+            pipeline.update_stage(0, _FakeStage(work_items=1))
+
+    def test_update_stage_rejects_running(self):
+        """update_stage raises ValueError when targeting the currently running stage."""
+        replaced = []
+
+        class _SlowStage(ScanStageMixin):
+            stage_type = StageType.ICMP_DISCOVERY
+            stage_name = "Slow"
+
+            def __init__(self, pipeline_ref, replacement):
+                super().__init__()
+                self._pipeline = pipeline_ref
+                self._replacement = replacement
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 1
+                # Try to update *ourselves* while running
+                try:
+                    self._pipeline.update_stage(0, self._replacement)
+                except ValueError as exc:
+                    replaced.append(str(exc))
+                self.increment()
+
+        pipeline = ScanPipeline([])
+        replacement = _FakeStage(work_items=1)
+        slow = _SlowStage(pipeline, replacement)
+        pipeline.stages = [slow]
+
+        ctx = ScanContext("10.0.0.0/24")
+        pipeline.execute(ctx)
+
+        assert len(replaced) == 1
+        assert "currently running" in replaced[0]
+
+    def test_update_stage_rejects_out_of_range(self):
+        """update_stage raises ValueError for out-of-range index."""
+        pipeline = ScanPipeline([_FakeStage(work_items=1)])
+
+        with pytest.raises(ValueError, match="out of range"):
+            pipeline.update_stage(5, _FakeStage(work_items=1))
+
+        with pytest.raises(ValueError, match="out of range"):
+            pipeline.update_stage(-1, _FakeStage(work_items=1))
+
 
 # ---------------------------------------------------------------------------
 # PipelineConfig / StageConfig

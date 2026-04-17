@@ -159,6 +159,23 @@ class SubnetScanner():
         if not self.running:
             self._restart_pipeline()
 
+    def update_stage(self, index: int, stage_config: dict) -> None:
+        """Replace a pending (not yet started) stage on a running scan.
+
+        Builds a single concrete stage instance from the config dict and
+        swaps it into the pipeline at *index*.  Raises :class:`ValueError`
+        if the stage is already running or finished.
+        """
+        stage_entry = StageConfig.from_dict(stage_config)
+        temp_cfg = PipelineConfig(
+            subnet=self.subnet_str,
+            stages=[stage_entry],
+            resilience=self.pipeline_cfg.resilience,
+            hostname_config=self.pipeline_cfg.hostname_config,
+        )
+        new_instances = build_stages(temp_cfg)
+        self.pipeline.update_stage(index, new_instances[0])
+
     def _restart_pipeline(self) -> None:
         """Restart pipeline execution in a background thread for appended stages."""
         self.running = True

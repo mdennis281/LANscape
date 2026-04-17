@@ -41,6 +41,14 @@ class TestIsIpv6:
         """Invalid input returns False."""
         assert _is_ipv6('not-a-subnet') is False
 
+    def test_ipv6_range(self) -> None:
+        """IPv6 range (not valid CIDR) is still detected as IPv6."""
+        assert _is_ipv6('2601:2c5:4000:20e9::1000-2000') is True
+
+    def test_ipv4_range(self) -> None:
+        """IPv4 range is not IPv6."""
+        assert _is_ipv6('192.168.1.1-192.168.1.10') is False
+
 
 # ── IPv6 subnets ─────────────────────────────────────────────────────
 
@@ -63,6 +71,17 @@ class TestIPv6Recommendations:
         """All IPv6 stages use balanced preset."""
         recs = recommend_stages('2001:db8::/64', ip_count=100)
         assert all(r.preset == StagePreset.BALANCED for r in recs)
+
+    @patch('lanscape.core.auto_stages.get_all_network_subnets', return_value=[])
+    def test_ipv6_range_gets_ipv6_stages(self, _mock_subnets: object) -> None:
+        """IPv6 range (non-CIDR) should still get IPv6 stages, not ICMP."""
+        recs = recommend_stages('2601:2c5:4000:20e9::1000-2000', ip_count=4096)
+        types = _stage_types(recs)
+        assert types == [
+            'ipv6_ndp_discovery',
+            'ipv6_mdns_discovery',
+            'port_scan',
+        ]
 
 
 # ── IPv4 small local Windows ────────────────────────────────────────

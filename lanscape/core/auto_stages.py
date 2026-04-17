@@ -46,14 +46,16 @@ class StageRecommendation:
 
 
 def _is_ipv6(subnet: str) -> bool:
-    """Return True if *subnet* is an IPv6 network."""
+    """Return True if *subnet* is an IPv6 address, network, or range."""
+    # Ranges like "2601:…::1000-2000" aren't valid CIDR — fall back to
+    # checking for a colon in the address portion (before any '/').
     try:
         return isinstance(
             ipaddress.ip_network(subnet, strict=False),
             ipaddress.IPv6Network,
         )
     except ValueError:
-        return False
+        return ':' in subnet.split('/')[0]
 
 
 def _is_local_subnet(subnet: str) -> bool:

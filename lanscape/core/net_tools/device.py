@@ -28,6 +28,7 @@ from lanscape.core.system_compat import (
     resolve_hostname_host_cmd,
     _build_ptr_query,
     _resolve_ipv6_scope_id,
+    get_local_mac_for_ip,
 )
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
 from lanscape.core.neighbor_table import NeighborTableService
@@ -302,10 +303,20 @@ class Device(BaseModel):
 
     @job_tracker
     def _get_mac_addresses(self):
-        """Get the possible MAC addresses of a network device given its IP address."""
+        """Get the possible MAC addresses of a network device given its IP address.
+
+        If the IP belongs to a local interface (i.e. the scanning host itself),
+        the MAC is read directly from the OS interface info because the device
+        never appears in its own ARP/neighbor table.
+        """
         if not self.macs:
-            svc = NeighborTableService.instance()
-            self.macs = svc.get_macs_wait(self.ip)
+            # Check if this IP belongs to a local interface first
+            local_mac = get_local_mac_for_ip(self.ip)
+            if local_mac:
+                self.macs = [local_mac]
+            else:
+                svc = NeighborTableService.instance()
+                self.macs = svc.get_macs_wait(self.ip)
         mac_selector.import_macs(self.macs)
         return self.macs
 

@@ -665,6 +665,47 @@ def clear_screen() -> None:
     os.system('cls' if psutil.WINDOWS else 'clear')
 
 
+# ── Local interface MAC lookup ──────────────────────────────────────
+
+# Cache mapping local IPs → MACs (built lazily on first call).
+_local_ip_mac_cache: Optional[dict] = None
+
+
+def _build_local_ip_mac_map() -> dict[str, str]:
+    """Build a mapping of every local IP address to its interface MAC."""
+    ip_to_mac: dict[str, str] = {}
+    for _iface, addrs in psutil.net_if_addrs().items():
+        mac = None
+        ips: list[str] = []
+        for a in addrs:
+            # psutil uses AF_LINK on macOS/BSD, AF_PACKET on Linux,
+            # and a negative sentinel on Windows — all for L2 addresses.
+            if a.family in (psutil.AF_LINK, getattr(socket, 'AF_PACKET', -1)):
+                if a.address and a.address != '00:00:00:00:00:00':
+                    mac = a.address.lower().replace('-', ':')
+            elif a.family in (socket.AF_INET, socket.AF_INET6):
+                addr = a.address.split('%')[0]  # strip scope-id
+                ips.append(addr)
+        if mac:
+            for ip in ips:
+                ip_to_mac[ip] = mac
+    return ip_to_mac
+
+
+def get_local_mac_for_ip(ip: str) -> Optional[str]:
+    """Return the MAC address of the local interface that owns *ip*, or ``None``."""
+    global _local_ip_mac_cache  # pylint: disable=global-statement
+    if _local_ip_mac_cache is None:
+        _local_ip_mac_cache = _build_local_ip_mac_map()
+    return _local_ip_mac_cache.get(ip)
+
+
+def refresh_local_ip_mac_cache() -> None:
+    """Force-rebuild the local IP→MAC cache (e.g. after interface changes)."""
+    global _local_ip_mac_cache  # pylint: disable=global-statement
+    _local_ip_mac_cache = _build_local_ip_mac_map()
+
+
 def configure_asyncio_exception_handler(loop) -> None:
     """
     Configure a custom exception handler for asyncio event loops.

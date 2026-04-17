@@ -15,6 +15,9 @@ from lanscape.core.net_tools import (
 )
 from lanscape.core.ip_parser import parse_ip_input
 from lanscape.core.errors import SubnetTooLargeError
+from lanscape.core.auto_stages import (
+    recommend_stages, _is_ipv6, _is_local_subnet, _matching_interface,
+)
 from lanscape.core.scan_config import (
     get_default_configs_with_arp_fallback, get_stage_config_defaults
 )
@@ -41,6 +44,7 @@ class ToolsHandler(BaseHandler):
     - tools.stage_estimate: Estimate time for one unit of work
     - tools.arp_supported: Check if ARP is supported on this system
     - tools.app_info: Get app version, runtime args
+    - tools.auto_stages: Recommend scan stages for a subnet
     - tools.update_check: Check for available updates
     """
 
@@ -51,6 +55,7 @@ class ToolsHandler(BaseHandler):
         # Register handlers
         self.register('subnet_test', self._handle_subnet_test)
         self.register('subnet_list', self._handle_subnet_list)
+        self.register('auto_stages', self._handle_auto_stages)
         self.register('config_defaults', self._handle_config_defaults)
         self.register('stage_defaults', self._handle_stage_defaults)
         self.register('stage_presets', self._handle_stage_presets)
@@ -89,7 +94,10 @@ class ToolsHandler(BaseHandler):
             return {
                 'valid': True,
                 'msg': f"{length} IP{'s' if length > 1 else ''}",
-                'count': length
+                'count': length,
+                'is_ipv6': _is_ipv6(subnet),
+                'is_local': _is_local_subnet(subnet),
+                'matching_interface': _matching_interface(subnet),
             }
         except SubnetTooLargeError as e:
             return {
@@ -105,6 +113,35 @@ class ToolsHandler(BaseHandler):
                 'error': traceback.format_exc(),
                 'count': -1
             }
+
+    def _handle_auto_stages(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Recommend scan stages for a subnet based on system context.
+
+        Params:
+            subnet: The target subnet string
+
+        Returns:
+            Dict with 'stages' list of recommended stage configs
+        """
+        subnet = self._get_param(params, 'subnet')
+        if not subnet:
+            return {'stages': [], 'error': 'subnet is required'}
+
+        try:
+            recommendations = recommend_stages(
+                subnet=subnet,
+                arp_supported=is_arp_supported(),
+            )
+            return {
+                'stages': [r.to_dict() for r in recommendations],
+            }
+        except Exception:
+            return {'stages': [], 'error': traceback.format_exc()}
 
     def _handle_subnet_list(
         self,

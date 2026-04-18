@@ -446,6 +446,91 @@ class TestScanPipeline:
         with pytest.raises(ValueError, match="out of range"):
             pipeline.update_stage(-1, _FakeStage(work_items=1))
 
+    def test_consolidates_after_discovery_stage(self):
+        """Pipeline consolidates devices sharing a MAC after each discovery stage."""
+
+        class _DiscoveryStage(ScanStageMixin):
+            stage_type = StageType.ICMP_DISCOVERY
+            stage_name = "Fake Discovery"
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 2
+                mac = "AA:BB:CC:DD:EE:FF"
+                for suffix in ("::1000", "::1001"):
+                    dev = Device(ip=f"2001:db8{suffix}")
+                    dev.alive = True
+                    dev.macs = [mac]
+                    context.add_device(dev)
+                    self.increment()
+
+        ctx = ScanContext("2001:db8::/32")
+        pipeline = ScanPipeline([_DiscoveryStage()])
+        pipeline.execute(ctx)
+
+        assert len(ctx.devices) == 1
+        assert "2001:db8::1001" in ctx.devices[0].merged_ips
+
+    def test_no_consolidation_after_port_scan(self):
+        """Pipeline does NOT consolidate after non-discovery stages."""
+
+        class _PortScanStage(ScanStageMixin):
+            stage_type = StageType.PORT_SCAN
+            stage_name = "Fake Port Scan"
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 1
+                self.increment()
+
+        ctx = ScanContext("2001:db8::/32")
+        dev1 = Device(ip="2001:db8::1000")
+        dev1.alive = True
+        dev1.macs = ["AA:BB:CC:DD:EE:FF"]
+        dev2 = Device(ip="2001:db8::1001")
+        dev2.alive = True
+        dev2.macs = ["AA:BB:CC:DD:EE:FF"]
+        ctx.add_device(dev1)
+        ctx.add_device(dev2)
+
+        pipeline = ScanPipeline([_PortScanStage()])
+        pipeline.execute(ctx)
+
+        # Devices should NOT be consolidated — port_scan is not a discovery stage
+        assert len(ctx.devices) == 2
+
+    def test_cross_stage_consolidation(self):
+        """Devices discovered in separate stages are still consolidated."""
+
+        class _Stage1(ScanStageMixin):
+            stage_type = StageType.IPV6_NDP_DISCOVERY
+            stage_name = "NDP"
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 1
+                dev = Device(ip="2001:db8::1000")
+                dev.alive = True
+                dev.hostname = "myhost.local"
+                context.add_device(dev)
+                self.increment()
+
+        class _Stage2(ScanStageMixin):
+            stage_type = StageType.IPV6_MDNS_DISCOVERY
+            stage_name = "mDNS"
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 1
+                dev = Device(ip="2001:db8::1001")
+                dev.alive = True
+                dev.hostname = "myhost.local"
+                context.add_device(dev)
+                self.increment()
+
+        ctx = ScanContext("2001:db8::/32")
+        pipeline = ScanPipeline([_Stage1(), _Stage2()])
+        pipeline.execute(ctx)
+
+        assert len(ctx.devices) == 1
+        assert "2001:db8::1001" in ctx.devices[0].merged_ips
+
 
 # ---------------------------------------------------------------------------
 # PipelineConfig / StageConfig

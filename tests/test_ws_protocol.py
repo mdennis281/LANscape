@@ -308,6 +308,67 @@ class TestScanDeltaTracker:
         assert len(delta["devices"]) == 1
         assert delta["devices"][0]["ip"] == "192.168.1.2"
 
+    def test_get_scan_delta_removed_device(self):
+        """Test get_scan_delta detects devices removed by consolidation."""
+        tracker = ScanDeltaTracker()
+        results1 = {
+            "subnet": "2001:db8::/32",
+            "running": True,
+            "devices": [
+                {"ip": "2001:db8::1000", "hostname": "host-a"},
+                {"ip": "2001:db8::1001", "hostname": "host-a"},
+                {"ip": "2001:db8::1002", "hostname": "host-b"},
+            ]
+        }
+        # After consolidation, ::1001 was merged into ::1000
+        results2 = {
+            "subnet": "2001:db8::/32",
+            "running": True,
+            "devices": [
+                {"ip": "2001:db8::1000", "hostname": "host-a",
+                 "merged_ips": ["2001:db8::1001"]},
+                {"ip": "2001:db8::1002", "hostname": "host-b"},
+            ]
+        }
+
+        tracker.get_scan_delta(results1)
+        delta = tracker.get_scan_delta(results2)
+
+        assert delta["has_changes"] is True
+        assert "2001:db8::1001" in delta["removed_ips"]
+        assert len(delta["removed_ips"]) == 1
+        # The primary device should show as changed (merged_ips added)
+        changed_ips = [d["ip"] for d in delta["devices"]]
+        assert "2001:db8::1000" in changed_ips
+
+    def test_get_scan_delta_removed_device_not_retracked(self):
+        """Removed devices should not reappear in subsequent deltas."""
+        tracker = ScanDeltaTracker()
+        results_before = {
+            "subnet": "10.0.0.0/24",
+            "running": True,
+            "devices": [
+                {"ip": "10.0.0.1"},
+                {"ip": "10.0.0.2"},
+            ]
+        }
+        results_after = {
+            "subnet": "10.0.0.0/24",
+            "running": True,
+            "devices": [
+                {"ip": "10.0.0.1"},
+            ]
+        }
+
+        tracker.get_scan_delta(results_before)
+        delta1 = tracker.get_scan_delta(results_after)
+        assert "10.0.0.2" in delta1["removed_ips"]
+
+        # Second call with same results — no changes
+        delta2 = tracker.get_scan_delta(results_after)
+        assert delta2["has_changes"] is False
+        assert len(delta2["removed_ips"]) == 0
+
 
 # BaseHandler Tests
 ###############################################################################

@@ -60,6 +60,14 @@ class ScanPipeline:
             if self._on_stage_change:
                 self._on_stage_change(stage)
             stage.run(context)
+
+            # After every discovery stage, consolidate devices that
+            # share a hostname or MAC into a single entry.
+            if stage.stage_type.value.endswith("_discovery"):
+                merged = context.consolidate_devices()
+                if merged:
+                    log.info("Consolidated %d duplicate device(s)", merged)
+
             idx += 1
 
         self._current_index = None

@@ -16,6 +16,10 @@ SERVICES = _svc_resources.get_jsonc('definitions.jsonc')
 # Skip printer ports because they cause blank pages to be printed
 PRINTER_PORTS = [9100, 631]
 
+# Global override — set to False via --printer-mayhem to disable printer
+# port safety library-wide.  Per-scan control via ServiceScanConfig.printer_safety.
+PRINTER_SAFETY = True
+
 
 def _load_binary_signatures() -> List[BinarySignature]:
     """Load binary protocol signatures from ``binary_signatures.jsonc``."""

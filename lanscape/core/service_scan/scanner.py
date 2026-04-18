@@ -7,6 +7,7 @@ import traceback
 from lanscape.core.scan_config import ServiceScanConfig
 from lanscape.core.service_scan.models import ServiceScanResult
 from lanscape.core.service_scan.resources import PRINTER_PORTS
+from lanscape.core.service_scan import resources as svc_resources
 from lanscape.core.service_scan.identification import _identify_service, _clean_response
 from lanscape.core.service_scan.probes import _multi_probe_generic
 from lanscape.core.system_compat import configure_asyncio_exception_handler
@@ -20,7 +21,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
     async def _async_scan_service(
         ip: str, port: int, cfg: ServiceScanConfig,
     ) -> ServiceScanResult:
-        if cfg.printer_safety and port in PRINTER_PORTS:
+        if (cfg.printer_safety and svc_resources.PRINTER_SAFETY) and port in PRINTER_PORTS:
             return ServiceScanResult(
                 service="Printer", response=None, request=None,
                 probes_sent=0, probes_received=0,

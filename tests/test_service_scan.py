@@ -116,6 +116,23 @@ def test_printer_ports_detection(default_config):
         assert result.service == "Printer"
 
 
+def test_printer_safety_disabled():
+    """Test that printer_safety=False allows probing printer ports."""
+    cfg = ServiceScanConfig(printer_safety=False, timeout=0.5,
+                            lookup_type=ServiceScanStrategy.LAZY)
+    for port in PRINTER_PORTS:
+        result = scan_service("127.0.0.1", port, cfg)
+        assert isinstance(result, ServiceScanResult)
+        # Should NOT short-circuit to "Printer" — it actually probes
+        assert result.service != "Printer" or result.probes_sent > 0
+
+
+def test_printer_safety_default_is_true():
+    """Test that printer_safety defaults to True."""
+    cfg = ServiceScanConfig()
+    assert cfg.printer_safety is True
+
+
 # Service Scanning Tests
 #######################
 

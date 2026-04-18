@@ -20,7 +20,7 @@ def scan_service(ip: str, port: int, cfg: ServiceScanConfig) -> ServiceScanResul
     async def _async_scan_service(
         ip: str, port: int, cfg: ServiceScanConfig,
     ) -> ServiceScanResult:
-        if port in PRINTER_PORTS:
+        if cfg.printer_safety and port in PRINTER_PORTS:
             return ServiceScanResult(
                 service="Printer", response=None, request=None,
                 probes_sent=0, probes_received=0,

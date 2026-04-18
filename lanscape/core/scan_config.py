@@ -101,6 +101,7 @@ class ServiceScanConfig(ConfigBase):
     timeout: float = 5.0
     lookup_type: ServiceScanStrategy = ServiceScanStrategy.AGGRESSIVE
     max_concurrent_probes: int = 10
+    printer_safety: bool = True
 
     def __str__(self):
         return f'ServiceScanCfg(timeout={self.timeout})'

@@ -10,6 +10,7 @@ from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_por
 from lanscape.core.version_manager import get_installed_version
 from lanscape.ui.ws.server import run_server
 from lanscape.ui.react_proxy import start_webapp_server
+from lanscape.core.scan_config import ServiceScanConfig
 
 log = logging.getLogger('core')
 
@@ -22,6 +23,10 @@ def main():
     global args  # pylint: disable=global-statement
     args = parse_args()
     configure_logging(args.loglevel, args.logfile)
+
+    if not args.printer_safety:
+        ServiceScanConfig.model_fields['printer_safety'].default = False
+
     try:
         _main()
     except KeyboardInterrupt:

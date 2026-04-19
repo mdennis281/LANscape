@@ -2,6 +2,7 @@
 
 import ipaddress
 import subprocess
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
@@ -9,6 +10,7 @@ from typing import List, Optional
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
 from lanscape.core.models.enums import StageType
+from lanscape.core.models.scan import StageEvalContext
 from lanscape.core.scan_config import IPv6NDPDiscoveryStageConfig, IPv6MDNSDiscoveryStageConfig
 from lanscape.core.net_tools.device import Device
 from lanscape.core.ip_parser import get_address_count
@@ -19,9 +21,11 @@ from lanscape.core.system_compat import (
     is_ipv6,
 )
 
+log = logging.getLogger(__name__)
 try:
     from zeroconf import Zeroconf, ServiceBrowser
 except ImportError:
+    log.debug("zeroconf library not found — mDNS discovery will be unavailable")
     Zeroconf = None  # type: ignore[misc,assignment]
     ServiceBrowser = None  # type: ignore[misc,assignment]
 
@@ -53,6 +57,11 @@ class IPv6NDPDiscoveryStage(ScanStageMixin):
         self.cfg = cfg
         self._subnet_hint = subnet_hint
         self._neighbor_svc: Optional[NeighborTableService] = None
+
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        if not eval_ctx.is_ipv6:
+            return "NDP discovery is IPv6-only"
+        return None
 
     def execute(self, context: ScanContext) -> None:
         subnet_str = self._subnet_hint or context.subnet
@@ -226,6 +235,11 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
     ) -> None:
         super().__init__()
         self.cfg = cfg
+
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        if not eval_ctx.is_ipv6:
+            return "mDNS discovery is IPv6-only"
+        return None
 
     def execute(self, context: ScanContext) -> None:
         # Progress tracks elapsed time in half-second ticks

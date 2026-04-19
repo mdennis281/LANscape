@@ -4,10 +4,10 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from time import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from lanscape.core.models.enums import StageType
-from lanscape.core.models.scan import StageProgress
+from lanscape.core.models.scan import StageEvalContext, StageProgress
 
 if TYPE_CHECKING:
     from lanscape.core.scan_context import ScanContext
@@ -29,6 +29,8 @@ class ScanStageMixin(ABC):
         self._total: int = 0
         self._completed: int = 0
         self._finished: bool = False
+        self._skipped: bool = False
+        self._skip_reason: Optional[str] = None
         self.running: bool = False
         self._lock = threading.Lock()
         self._start_time: float = 0.0
@@ -78,9 +80,28 @@ class ScanStageMixin(ABC):
             total=self._total,
             completed=self._completed,
             finished=self._finished,
+            skipped=self._skipped,
+            skip_reason=self._skip_reason,
             runtime=self.runtime,
             counter_label=self.counter_label,
         )
+
+    # ── Skip guard ──────────────────────────────────────────────────
+
+    def can_execute(self, _eval_ctx: StageEvalContext) -> Optional[str]:
+        """Return ``None`` if the stage can run, or a reason string to skip.
+
+        Subclasses override this to enforce pre-conditions (e.g. IPv4-only,
+        local subnet required).  The default implementation always allows
+        execution.
+        """
+        return None
+
+    def mark_skipped(self, reason: str) -> None:
+        """Mark this stage as skipped without executing it."""
+        self._finished = True
+        self._skipped = True
+        self._skip_reason = reason
 
     # ── Lifecycle ───────────────────────────────────────────────────
 

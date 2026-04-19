@@ -1,11 +1,11 @@
 """IPv4 device discovery stages."""
 
-from typing import List
+from typing import List, Optional
 
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
 from lanscape.core.models.enums import StageType
-from lanscape.core.models.scan import ScanErrorInfo
+from lanscape.core.models.scan import ScanErrorInfo, StageEvalContext
 from lanscape.core.scan_config import (
     ICMPDiscoveryStageConfig,
     ARPDiscoveryStageConfig,
@@ -113,6 +113,11 @@ class ICMPDiscoveryStage(ScanStageMixin):
         self.subnet_ips = subnet_ips
         self.resilience = resilience or ResilienceConfig()
 
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        if eval_ctx.is_ipv6:
+            return "ICMP discovery is IPv4-only"
+        return None
+
     def execute(self, context: ScanContext) -> None:
         self.total = len(self.subnet_ips)
         retry_mgr, max_retries = _build_retry_infra(
@@ -164,6 +169,15 @@ class ARPDiscoveryStage(ScanStageMixin):
         self.subnet_ips = subnet_ips
         self.resilience = resilience or ResilienceConfig()
 
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        if eval_ctx.is_ipv6:
+            return "ARP discovery is IPv4-only"
+        if not eval_ctx.is_local:
+            return "ARP requires a local IPv4 subnet"
+        if not eval_ctx.arp_supported:
+            return "ARP not supported on this system"
+        return None
+
     def execute(self, context: ScanContext) -> None:
         self.total = len(self.subnet_ips)
         retry_mgr, max_retries = _build_retry_infra(
@@ -214,6 +228,13 @@ class PokeARPDiscoveryStage(ScanStageMixin):
         self.cfg = cfg
         self.subnet_ips = subnet_ips
         self.resilience = resilience or ResilienceConfig()
+
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        if eval_ctx.is_ipv6:
+            return "Poke+ARP discovery is IPv4-only"
+        if not eval_ctx.is_local:
+            return "Poke+ARP requires a local IPv4 subnet"
+        return None
 
     def execute(self, context: ScanContext) -> None:
         self.total = len(self.subnet_ips)
@@ -270,6 +291,13 @@ class ICMPARPDiscoveryStage(ScanStageMixin):
         self.cfg = cfg
         self.subnet_ips = subnet_ips
         self.resilience = resilience or ResilienceConfig()
+
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        if eval_ctx.is_ipv6:
+            return "ICMP+ARP discovery is IPv4-only"
+        if not eval_ctx.is_local:
+            return "ICMP+ARP requires a local IPv4 subnet"
+        return None
 
     def execute(self, context: ScanContext) -> None:
         self.total = len(self.subnet_ips)

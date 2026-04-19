@@ -10,6 +10,42 @@ from lanscape.core.models.enums import ScanStage, StageType
 from lanscape.core.models.device import DeviceResult
 
 
+class StageEvalContext(BaseModel):
+    """Context used by stages to decide whether they can execute."""
+    subnet: str = Field(description="Target subnet string")
+    is_ipv6: bool = Field(description="Whether the target subnet is IPv6")
+    is_local: bool = Field(
+        description="Whether the target subnet overlaps a local interface"
+    )
+    matching_interface: Optional[str] = Field(
+        default=None, description="Name of the overlapping local interface"
+    )
+    arp_supported: bool = Field(description="Whether the system supports ARP")
+    os_platform: str = Field(
+        description="Normalised OS: 'windows', 'linux', or 'darwin'"
+    )
+
+    @classmethod
+    def build(cls, subnet: str, arp_supported: bool = True) -> 'StageEvalContext':
+        """Construct from a subnet string by probing the local system."""
+        # Deferred import to avoid circular dependency:
+        # scan.py → subnet_utils → scan_config → ... → scan.py
+        from lanscape.core.net_tools.subnet_utils import (  # pylint: disable=import-outside-toplevel
+            is_ipv6_subnet,
+            is_local_subnet,
+            matching_interface,
+            get_os_platform,
+        )
+        return cls(
+            subnet=subnet,
+            is_ipv6=is_ipv6_subnet(subnet),
+            is_local=is_local_subnet(subnet),
+            matching_interface=matching_interface(subnet),
+            arp_supported=arp_supported,
+            os_platform=get_os_platform(),
+        )
+
+
 class StageProgress(BaseModel):
     """Progress snapshot for a single scan stage."""
     stage_name: str = Field(description="Human-readable stage name")
@@ -17,8 +53,16 @@ class StageProgress(BaseModel):
     total: int = Field(default=0, ge=0, description="Total work items")
     completed: int = Field(default=0, ge=0, description="Completed work items")
     finished: bool = Field(default=False, description="Whether stage has finished")
+    skipped: bool = Field(default=False, description="Whether stage was skipped by a guard")
+    skip_reason: Optional[str] = Field(
+        default=None, description="Reason the stage was skipped"
+    )
     runtime: float = Field(default=0.0, ge=0, description="Elapsed seconds for this stage")
-    counter_label: str = Field(default="items", description="Label for the progress counter (e.g. 'IPs scanned', 'ports scanned')")
+    counter_label: str = Field(
+        default="items",
+        description="Label for the progress counter (e.g. 'IPs scanned')"
+    )
+
 
 
 class ScanErrorInfo(BaseModel):

@@ -35,6 +35,8 @@ from lanscape.core.stage_presets import StagePreset, get_stage_presets
 from lanscape.core.stage_estimates import estimate_stage_time, get_all_estimates
 from lanscape.core.auto_stages import recommend_stages, StageRecommendation
 
+from lanscape.core.models.scan import StageEvalContext
+
 from lanscape.core.port_manager import PortManager
 
 # Neighbor table service (centralized ARP/NDP cache)

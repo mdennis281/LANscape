@@ -5,7 +5,7 @@ from typing import Callable, List, Optional
 
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
-from lanscape.core.models.scan import StageProgress
+from lanscape.core.models.scan import StageEvalContext, StageProgress, ScanWarningInfo
 
 
 log = logging.getLogger(__name__)
@@ -23,11 +23,13 @@ class ScanPipeline:
         self,
         stages: List[ScanStageMixin],
         on_stage_change: Optional[Callable[[ScanStageMixin], None]] = None,
+        eval_ctx: Optional[StageEvalContext] = None,
     ) -> None:
         self.stages = stages
         self._current_index: Optional[int] = None
         self._terminated: bool = False
         self._on_stage_change = on_stage_change
+        self._eval_ctx = eval_ctx
 
     # ── Execution ───────────────────────────────────────────────────
 
@@ -38,7 +40,15 @@ class ScanPipeline:
         starts are automatically picked up.  Stages that have already
         finished (e.g. from a prior run) are skipped so that a restart
         only executes newly-appended stages.
+
+        Before each stage runs, its :meth:`~ScanStageMixin.can_execute`
+        guard is checked.  If the guard returns a reason string the stage
+        is marked *skipped* and a warning is emitted.
         """
+        # Build eval context lazily if not provided at construction time
+        if self._eval_ctx is None:
+            self._eval_ctx = StageEvalContext.build(context.subnet)
+
         idx = 0
         while idx < len(self.stages):
             if self._terminated:
@@ -53,6 +63,25 @@ class ScanPipeline:
                 continue
 
             self._current_index = idx
+
+            # ── Skip guard ──────────────────────────────────────────
+            skip_reason = stage.can_execute(self._eval_ctx)
+            if skip_reason is not None:
+                log.info(
+                    "Pipeline stage %d/%d: %s — SKIPPED (%s)",
+                    idx + 1, len(self.stages), stage.stage_name, skip_reason,
+                )
+                stage.mark_skipped(skip_reason)
+                context.warnings.append(ScanWarningInfo(
+                    type="stage_skipped",
+                    message=f"{stage.stage_name} skipped: {skip_reason}",
+                    stage=stage.stage_name,
+                ))
+                if self._on_stage_change:
+                    self._on_stage_change(stage)
+                idx += 1
+                continue
+
             log.info(
                 "Pipeline stage %d/%d: %s",
                 idx + 1, len(self.stages), stage.stage_name,

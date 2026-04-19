@@ -5,14 +5,16 @@ Recommends scan stages based on subnet characteristics (size, IPv4/IPv6,
 local vs remote), system capabilities (ARP support, OS), and interface context.
 """
 
-import ipaddress
 from typing import List, Optional
-
-import psutil
 
 from lanscape.core.models.enums import StageType
 from lanscape.core.stage_presets import StagePreset, get_stage_presets
-from lanscape.core.net_tools.subnet_utils import get_all_network_subnets
+from lanscape.core.net_tools.subnet_utils import (
+    is_ipv6_subnet as _is_ipv6,
+    is_local_subnet as _is_local_subnet,
+    matching_interface as _matching_interface,
+    get_os_platform as _get_os_platform,
+)
 from lanscape.core.ip_parser import get_address_count
 
 
@@ -43,62 +45,6 @@ class StageRecommendation:
             'config': config,
             'reason': self.reason,
         }
-
-
-def _is_ipv6(subnet: str) -> bool:
-    """Return True if *subnet* is an IPv6 address, network, or range."""
-    # Ranges like "2601:…::1000-2000" aren't valid CIDR — fall back to
-    # checking for a colon in the address portion (before any '/').
-    try:
-        return isinstance(
-            ipaddress.ip_network(subnet, strict=False),
-            ipaddress.IPv6Network,
-        )
-    except ValueError:
-        return ':' in subnet.split('/')[0]
-
-
-def _is_local_subnet(subnet: str) -> bool:
-    """Return True if *subnet* overlaps with any interface on this machine."""
-    try:
-        target = ipaddress.ip_network(subnet, strict=False)
-    except ValueError:
-        return False
-
-    for entry in get_all_network_subnets():
-        try:
-            iface_net = ipaddress.ip_network(entry['subnet'], strict=False)
-            if target.overlaps(iface_net):
-                return True
-        except ValueError:
-            continue
-    return False
-
-
-def _matching_interface(subnet: str) -> Optional[str]:
-    """Return the name of the first interface whose subnet overlaps *subnet*."""
-    try:
-        target = ipaddress.ip_network(subnet, strict=False)
-    except ValueError:
-        return None
-
-    for entry in get_all_network_subnets():
-        try:
-            iface_net = ipaddress.ip_network(entry['subnet'], strict=False)
-            if target.overlaps(iface_net):
-                return entry.get('interface')
-        except ValueError:
-            continue
-    return None
-
-
-def _get_os_platform() -> str:
-    """Return a normalised OS identifier: 'windows', 'linux', or 'darwin'."""
-    if psutil.WINDOWS:
-        return 'windows'
-    if psutil.LINUX:
-        return 'linux'
-    return 'darwin'
 
 
 def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-arguments

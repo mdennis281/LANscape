@@ -27,8 +27,58 @@ ScanContext (shared state)
 | [`PipelineConfig`](../config/pipeline-config.md) | `lanscape.PipelineConfig` | Declarative pipeline definition — subnet, stage list, resilience settings |
 | `ScanStageMixin` | `lanscape.ScanStageMixin` | Abstract base class for all stages |
 | `ScanContext` | `lanscape.ScanContext` | Thread-safe shared state passed between stages |
-| `ScanPipeline` | `lanscape.ScanPipeline` | Sequential stage executor |
+| `ScanPipeline` | `lanscape.ScanPipeline` | Sequential stage executor with automatic stage guards |
+| `StageEvalContext` | `lanscape.StageEvalContext` | Environment context used by stage guards to decide whether to run or skip |
 | `build_stages()` | `lanscape.build_stages` | Factory that builds stage instances from a `PipelineConfig` |
+
+---
+
+## StageEvalContext
+
+`lanscape.StageEvalContext`
+
+A Pydantic model that captures environment facts about the target subnet. The pipeline passes this to each stage's `can_execute()` guard so stages can decide whether they apply.
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subnet` | `str` | Target subnet string |
+| `is_ipv6` | `bool` | Whether the target subnet is IPv6 |
+| `is_local` | `bool` | Whether the target subnet overlaps a local interface |
+| `matching_interface` | `str \| None` | Name of the overlapping local interface (or `None`) |
+| `arp_supported` | `bool` | Whether the system supports ARP |
+| `os_platform` | `str` | Normalised OS: `"windows"`, `"linux"`, or `"darwin"` |
+
+### Factory
+
+```python
+StageEvalContext.build(subnet: str, arp_supported: bool = True) -> StageEvalContext
+```
+
+Probes the local system and returns a fully populated context. This is the recommended way to create one:
+
+```python
+from lanscape import StageEvalContext
+
+ctx = StageEvalContext.build("192.168.1.0/24")
+print(ctx.is_ipv6)    # False
+print(ctx.is_local)   # True
+print(ctx.os_platform) # "windows"
+```
+
+You can also construct one manually for testing or non-standard setups:
+
+```python
+ctx = StageEvalContext(
+    subnet="fd00::/64",
+    is_ipv6=True,
+    is_local=True,
+    matching_interface="eth0",
+    arp_supported=False,
+    os_platform="linux",
+)
+```
 
 ---
 
@@ -64,15 +114,20 @@ Subclasses must define:
 | `stage_progress() -> StageProgress` | Return an immutable progress snapshot |
 | `run(context)` | Entry-point called by `ScanPipeline` — wraps `execute()` with bookkeeping |
 | `execute(context)` | **Abstract.** Implement your stage logic here. |
+| `can_execute(eval_ctx) -> str \| None` | Return `None` to allow execution, or a reason string to skip. Default: always allows. |
+| `mark_skipped(reason)` | Mark the stage as skipped without executing it |
 | `terminate()` | Request graceful stop by setting `running = False` |
 
 ### Lifecycle
 
 ```
-ScanPipeline calls stage.run(context)
-  ├─ sets running = True, finished = False
-  ├─ calls stage.execute(context)      ◄── your code
-  └─ sets running = False, finished = True
+ScanPipeline calls stage.can_execute(eval_ctx)
+  ├─ returns None      → stage.run(context)
+  │                        ├─ sets running = True, finished = False
+  │                        ├─ calls stage.execute(context)      ◄── your code
+  │                        └─ sets running = False, finished = True
+  └─ returns reason    → stage.mark_skipped(reason)
+                           └─ sets finished = True, skipped = True
 ```
 
 ---
@@ -114,19 +169,29 @@ ScanContext(subnet: str)
 
 `lanscape.ScanPipeline`
 
-Sequential executor for an ordered list of stages.
+Sequential executor for an ordered list of stages. Before running each stage, the pipeline checks its `can_execute()` guard. Stages that return a skip reason are marked as skipped and a `ScanWarningInfo(type="stage_skipped")` warning is added to the context.
 
 ### Constructor
 
 ```python
-ScanPipeline(stages: List[ScanStageMixin])
+ScanPipeline(
+    stages: List[ScanStageMixin],
+    on_stage_change: Callable[[ScanStageMixin], None] | None = None,
+    eval_ctx: StageEvalContext | None = None,
+)
 ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `stages` | `List[ScanStageMixin]` | *required* | Ordered list of stages to execute |
+| `on_stage_change` | `Callable \| None` | `None` | Callback fired when a new stage starts (or is skipped) |
+| `eval_ctx` | [`StageEvalContext`](#stageevalcontext) `\| None` | `None` | Pre-built evaluation context. If `None`, built lazily from the subnet at execution time. |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| `execute(context)` | Run each stage in order, passing the shared context |
+| `execute(context)` | Run each stage in order, passing the shared context. Skips stages whose `can_execute()` guard returns a reason. |
 | `terminate()` | Terminate the current stage and skip remaining stages |
 
 ### Properties
@@ -174,6 +239,44 @@ from lanscape import (
 )
 ```
 
+### Stage Guards
+
+Each built-in discovery stage overrides `can_execute()` to skip itself when the target subnet doesn't match its requirements. The pipeline evaluates these guards automatically — you don't need to filter stages manually.
+
+| Stage | Skips when | Reason |
+|-------|-----------|--------|
+| `ICMPDiscoveryStage` | IPv6 subnet | ICMP discovery is IPv4-only |
+| `ARPDiscoveryStage` | IPv6 subnet, non-local subnet, or ARP unsupported | ARP requires local IPv4 + elevated privileges |
+| `PokeARPDiscoveryStage` | IPv6 subnet or non-local subnet | Poke+ARP requires local IPv4 |
+| `ICMPARPDiscoveryStage` | IPv6 subnet or non-local subnet | ICMP+ARP requires local IPv4 |
+| `IPv6NDPDiscoveryStage` | IPv4 subnet | NDP discovery is IPv6-only |
+| `IPv6MDNSDiscoveryStage` | IPv4 subnet | mDNS discovery is IPv6-only |
+| `PortScanStage` | *(never skips)* | Runs on any subnet type |
+
+This means you can build a single pipeline with both IPv4 and IPv6 stages — incompatible stages are skipped automatically:
+
+```python
+from lanscape import PipelineConfig, StageConfig, StageType, ScanManager
+
+cfg = PipelineConfig(
+    subnet="192.168.1.0/24",
+    stages=[
+        StageConfig(stage_type=StageType.ICMP_ARP_DISCOVERY),
+        StageConfig(stage_type=StageType.IPV6_NDP_DISCOVERY),  # auto-skipped for IPv4
+        StageConfig(stage_type=StageType.PORT_SCAN),
+    ],
+)
+
+sm = ScanManager()
+scan = sm.new_scan(cfg)
+sm.wait_until_complete(scan.uid)
+
+# Check which stages were skipped
+for stage in scan.results.get_metadata().stages:
+    if stage.skipped:
+        print(f"Skipped: {stage.stage_name} — {stage.skip_reason}")
+```
+
 ---
 
 ## Creating Custom Stages
@@ -183,9 +286,11 @@ Subclass `ScanStageMixin` to build your own stage. The minimum requirements are:
 1. Set `stage_type` and `stage_name` class attributes
 2. Implement `execute(context: ScanContext)`
 3. Use `self.total`, `self.increment()`, and `self.running` for progress tracking
+4. Optionally override `can_execute(eval_ctx)` to add a skip guard
 
 ```python
-from lanscape import ScanStageMixin, ScanContext, StageType
+from lanscape import ScanStageMixin, ScanContext, StageType, StageEvalContext
+from typing import Optional
 
 
 class BannerGrabStage(ScanStageMixin):
@@ -198,6 +303,12 @@ class BannerGrabStage(ScanStageMixin):
         super().__init__()
         self.ports = ports
         self.timeout = timeout
+
+    def can_execute(self, eval_ctx: StageEvalContext) -> Optional[str]:
+        # Example: skip banner grabbing on IPv6 subnets
+        if eval_ctx.is_ipv6:
+            return "Banner grabbing not supported on IPv6"
+        return None
 
     def execute(self, context: ScanContext) -> None:
         devices = context.get_unscanned_devices()
@@ -251,17 +362,22 @@ for device in context.devices:
 
 Immutable snapshot of a single stage's progress. Available in `ScanMetadata.stages`.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `stage_name` | `str` | Human-readable stage name |
-| `stage_type` | [`StageType`](../config/enums.md#stagetype) | Stage type identifier |
-| `total` | `int` | Total work items |
-| `completed` | `int` | Completed work items |
-| `finished` | `bool` | Whether the stage has finished |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `stage_name` | `str` | *required* | Human-readable stage name |
+| `stage_type` | [`StageType`](../config/enums.md#stagetype) | *required* | Stage type identifier |
+| `total` | `int` | `0` | Total work items |
+| `completed` | `int` | `0` | Completed work items |
+| `finished` | `bool` | `False` | Whether the stage has finished |
+| `skipped` | `bool` | `False` | Whether the stage was skipped by a guard |
+| `skip_reason` | `str \| None` | `None` | Reason the stage was skipped |
 
 ```python
 meta = scan.results.get_metadata()
 for stage in meta.stages:
-    pct = (stage.completed / stage.total * 100) if stage.total else 0
-    print(f"{stage.stage_name}: {pct:.0f}% ({'done' if stage.finished else 'running'})")
+    if stage.skipped:
+        print(f"{stage.stage_name}: SKIPPED — {stage.skip_reason}")
+    else:
+        pct = (stage.completed / stage.total * 100) if stage.total else 0
+        print(f"{stage.stage_name}: {pct:.0f}% ({'done' if stage.finished else 'running'})")
 ```

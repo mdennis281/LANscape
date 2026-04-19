@@ -9,7 +9,8 @@ from lanscape import (
     DeviceResult, ServiceInfo, ProbeResponseInfo,
     DeviceErrorInfo, ScanErrorInfo, ScanWarningInfo,
     ScanMetadata, ScanResults, ScanSummary,
-    DeviceStage, ScanStage, StageType, StageProgress
+    DeviceStage, ScanStage, StageType, StageProgress,
+    StageEvalContext,
 )
 ```
 
@@ -153,13 +154,23 @@ Progress snapshot for a single pipeline stage. Available in `ScanMetadata.stages
 | `total` | `int` | `0` | Total work items in this stage |
 | `completed` | `int` | `0` | Completed work items |
 | `finished` | `bool` | `False` | Whether the stage has finished executing |
+| `skipped` | `bool` | `False` | Whether the stage was skipped by a guard |
+| `skip_reason` | `str \| None` | `None` | Reason the stage was skipped (e.g. `"ICMP discovery is IPv4-only"`) |
 
 ```python
 meta = scan.results.get_metadata()
 for i, stage in enumerate(meta.stages):
-    marker = "▶" if i == meta.current_stage_index else ("✓" if stage.finished else "·")
-    pct = (stage.completed / stage.total * 100) if stage.total else 0
-    print(f"  {marker} {stage.stage_name}: {pct:.0f}%")
+    if stage.skipped:
+        marker = "⊘"
+        detail = stage.skip_reason
+    elif stage.finished:
+        marker = "✓"
+        detail = "done"
+    else:
+        marker = "▶" if i == meta.current_stage_index else "·"
+        pct = (stage.completed / stage.total * 100) if stage.total else 0
+        detail = f"{pct:.0f}%"
+    print(f"  {marker} {stage.stage_name}: {detail}")
 ```
 
 ---
@@ -240,5 +251,26 @@ for warning in results.metadata.warnings:
     if warning.old_multiplier is not None:
         print(f"  Multiplier: {warning.old_multiplier:.2f} -> {warning.new_multiplier:.2f}")
 ```
+
+> **`type="stage_skipped"` warnings:** When a pipeline stage is skipped by its guard, a `ScanWarningInfo` with `type="stage_skipped"` is emitted. The `message` contains the stage name and skip reason, and `stage` is set to the stage name. See [Stage Guards](../scanner/scan-pipeline.md#stage-guards) for the full skip-reason table.
+
+---
+
+## Pipeline Models
+
+### StageEvalContext
+
+`lanscape.StageEvalContext`
+
+Environment context used by stage guards to decide whether a stage should run or be skipped. See the [Scan Pipeline — StageEvalContext](../scanner/scan-pipeline.md#stageevalcontext) section for full details and examples.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subnet` | `str` | Target subnet string |
+| `is_ipv6` | `bool` | Whether the target subnet is IPv6 |
+| `is_local` | `bool` | Whether the target subnet overlaps a local interface |
+| `matching_interface` | `str \| None` | Name of the overlapping local interface |
+| `arp_supported` | `bool` | Whether the system supports ARP |
+| `os_platform` | `str` | Normalised OS: `"windows"`, `"linux"`, or `"darwin"` |
 
 

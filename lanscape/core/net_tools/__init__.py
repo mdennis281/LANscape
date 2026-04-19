@@ -22,6 +22,10 @@ from lanscape.core.net_tools.subnet_utils import (  # noqa: F401
     is_internal_block,
     scan_config_uses_arp,
     is_arp_supported,
+    is_ipv6_subnet,
+    is_local_subnet,
+    matching_interface,
+    get_os_platform,
 )
 
 # Previously imported here; keep re-export for callers that expect it

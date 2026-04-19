@@ -259,3 +259,62 @@ def is_arp_supported() -> bool:
         return True
     except (Scapy_Exception, PermissionError, RuntimeError, Exception):  # noqa: BLE001
         return False
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Subnet classification helpers (used by auto_stages & scan_pipeline)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def is_ipv6_subnet(subnet: str) -> bool:
+    """Return True if *subnet* is an IPv6 address, network, or range."""
+    try:
+        return isinstance(
+            ipaddress.ip_network(subnet, strict=False),
+            ipaddress.IPv6Network,
+        )
+    except ValueError:
+        return ':' in subnet.split('/')[0]
+
+
+def is_local_subnet(subnet: str) -> bool:
+    """Return True if *subnet* overlaps with any interface on this machine."""
+    try:
+        target = ipaddress.ip_network(subnet, strict=False)
+    except ValueError:
+        return False
+
+    for entry in get_all_network_subnets():
+        try:
+            iface_net = ipaddress.ip_network(entry['subnet'], strict=False)
+            if target.overlaps(iface_net):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def matching_interface(subnet: str) -> str | None:
+    """Return the name of the first interface whose subnet overlaps *subnet*."""
+    try:
+        target = ipaddress.ip_network(subnet, strict=False)
+    except ValueError:
+        return None
+
+    for entry in get_all_network_subnets():
+        try:
+            iface_net = ipaddress.ip_network(entry['subnet'], strict=False)
+            if target.overlaps(iface_net):
+                return entry.get('interface')
+        except ValueError:
+            continue
+    return None
+
+
+def get_os_platform() -> str:
+    """Return a normalised OS identifier: 'windows', 'linux', or 'darwin'."""
+    if psutil.WINDOWS:
+        return 'windows'
+    if psutil.LINUX:
+        return 'linux'
+    return 'darwin'

@@ -26,6 +26,25 @@ from lanscape import StageType
 
 ---
 
+## WarningCategory
+
+`lanscape.WarningCategory`
+
+Categorizes scan warnings for grouping in the UI. Used by [`ScanWarningInfo`](../models/overview.md#scanwarninginfo).
+
+```python
+from lanscape import WarningCategory
+```
+
+| Value | String | Description |
+|-------|--------|-------------|
+| `WarningCategory.CONCURRENCY` | `"concurrency"` | Thread multiplier was reduced due to job failures |
+| `WarningCategory.STAGE_SKIP` | `"stage_skip"` | A pipeline stage was skipped by its guard |
+| `WarningCategory.CAPABILITY` | `"capability"` | A feature is degraded (missing dependency, permission fallback) |
+| `WarningCategory.RESILIENCE` | `"resilience"` | A job failed permanently or a subsystem refresh failed |
+
+---
+
 ## ScanType
 
 `lanscape.ScanType`

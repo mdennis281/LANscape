@@ -97,8 +97,8 @@ class TestMultiplierController:
         """Test that warning callback is called on failure."""
         warnings_received = []
 
-        def warning_handler(warning_type: str, warning_data: dict):
-            warnings_received.append((warning_type, warning_data))
+        def warning_handler(warning):
+            warnings_received.append(warning)
 
         controller = MultiplierController(
             initial_multiplier=1.0,
@@ -110,20 +110,18 @@ class TestMultiplierController:
         controller.on_failure()
 
         assert len(warnings_received) == 1
-        warning_type, warning_data = warnings_received[0]
-        assert warning_type == 'multiplier_reduced'
-        assert warning_data['old_multiplier'] == 1.0
-        assert warning_data['new_multiplier'] == 0.75
-        assert warning_data['decrease_percent'] == 25.0
-        assert 'message' in warning_data
-        assert 'timestamp' in warning_data
+        w = warnings_received[0]
+        assert w.category.value == 'concurrency'
+        assert '100%' in w.title
+        assert '75%' in w.title
+        assert w.timestamp is not None
 
     def test_on_warning_callback_with_context(self):
-        """Test that context dict is included in warning callback data."""
+        """Test that context dict is included in warning body."""
         warnings_received = []
 
-        def warning_handler(warning_type: str, warning_data: dict):
-            warnings_received.append((warning_type, warning_data))
+        def warning_handler(warning):
+            warnings_received.append(warning)
 
         controller = MultiplierController(
             initial_multiplier=1.0,
@@ -140,21 +138,19 @@ class TestMultiplierController:
         })
 
         assert len(warnings_received) == 1
-        _, warning_data = warnings_received[0]
-        assert warning_data['failed_job'] == '192.168.1.50'
-        assert warning_data['error_message'] == 'Connection refused'
-        assert warning_data['retry_attempt'] == 1
-        assert warning_data['max_retries'] == 2
-        # Standard fields are still present
-        assert warning_data['old_multiplier'] == 1.0
-        assert warning_data['new_multiplier'] == 0.75
+        w = warnings_received[0]
+        assert '192.168.1.50' in w.body
+        assert 'Connection refused' in w.body
+        # Concurrency info in title
+        assert '100%' in w.title
+        assert '75%' in w.title
 
     def test_on_failure_without_context(self):
-        """Test that on_failure works without context (backward compatible)."""
+        """Test that on_failure works without context."""
         warnings_received = []
 
-        def warning_handler(warning_type: str, warning_data: dict):
-            warnings_received.append((warning_type, warning_data))
+        def warning_handler(warning):
+            warnings_received.append(warning)
 
         controller = MultiplierController(
             initial_multiplier=1.0,
@@ -166,9 +162,10 @@ class TestMultiplierController:
         controller.on_failure()
 
         assert len(warnings_received) == 1
-        _, warning_data = warnings_received[0]
-        assert 'failed_job' not in warning_data
-        assert 'error_message' not in warning_data
+        w = warnings_received[0]
+        assert w.category.value == 'concurrency'
+        # Body should still contain the decrease info
+        assert w.body is not None
 
 
 class TestRetryJob:
@@ -310,8 +307,8 @@ class TestThreadPoolRetryManager:
         """Test that warnings from failed jobs include the job ID and error."""
         warnings_received = []
 
-        def warning_handler(warning_type: str, warning_data: dict):
-            warnings_received.append((warning_type, warning_data))
+        def warning_handler(warning):
+            warnings_received.append(warning)
 
         controller = MultiplierController(
             initial_multiplier=1.0,
@@ -340,11 +337,9 @@ class TestThreadPoolRetryManager:
 
         # Should have at least one warning with context
         assert len(warnings_received) >= 1
-        _, warning_data = warnings_received[0]
-        assert warning_data['failed_job'] == '192.168.1.99'
-        assert 'connection timed out' in warning_data['error_message']
-        assert warning_data['retry_attempt'] == 1
-        assert warning_data['max_retries'] == 1
+        w = warnings_received[0]
+        assert '192.168.1.99' in w.body
+        assert 'connection timed out' in w.body
 
     def test_worker_count_reduces_with_multiplier(self):
         """Test that worker count is recalculated when multiplier decreases."""

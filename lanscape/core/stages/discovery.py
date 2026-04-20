@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
-from lanscape.core.models.enums import StageType
+from lanscape.core.models.enums import StageType, WarningCategory
 from lanscape.core.models.scan import ScanErrorInfo, StageEvalContext
 from lanscape.core.scan_config import (
     ICMPDiscoveryStageConfig,
@@ -43,6 +43,22 @@ def _discover_device(
         device.stage = 'found'
 
 
+def _check_icmp_fallback(stage: ScanStageMixin, context: ScanContext) -> None:
+    """Emit a one-time warning if ICMP fell back to system ping."""
+    if IcmpLookup.used_fallback():
+        context.warnings.append(ScanWarningInfo(
+            category=WarningCategory.CAPABILITY,
+            title="Using system ping fallback",
+            body=(
+                "Raw ICMP sockets are unavailable (permission denied). "
+                "Falling back to the system `ping` command, which is slower.\n\n"
+                "Run with elevated privileges for faster ICMP scanning."
+            ),
+            stage=stage.stage_name,
+        ))
+        IcmpLookup.reset_fallback_flag()
+
+
 def _build_retry_infra(
     stage: ScanStageMixin,
     context: ScanContext,
@@ -50,13 +66,9 @@ def _build_retry_infra(
     resilience: ResilienceConfig,
 ):
     """Build the retry manager + multiplier controller used by all discovery stages."""
-    def on_warning(warning_type: str, warning_data: dict):
-        context.warnings.append(ScanWarningInfo(
-            type=warning_type,
-            stage=stage.stage_name,
-            **warning_data,
-        ))
-        stage.log.warning("Stage warning [%s]: %s", warning_type, warning_data.get("message", ""))
+    def on_warning(warning: ScanWarningInfo):
+        context.warnings.append(warning)
+        stage.log.warning("Stage warning [%s]: %s", warning.category, warning.title)
 
     mc = MultiplierController(
         initial_multiplier=resilience.t_multiplier,
@@ -65,6 +77,7 @@ def _build_retry_infra(
         min_multiplier=0.1,
         on_warning=on_warning,
     )
+    mc.stage_name = stage.stage_name
 
     retry_config = RetryConfig(
         max_retries=resilience.failure_retry_cnt,
@@ -143,6 +156,7 @@ class ICMPDiscoveryStage(ScanStageMixin):
             for ip in self.subnet_ips
         ]
         retry_mgr.execute_all(jobs)
+        _check_icmp_fallback(self, context)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -329,3 +343,4 @@ class ICMPARPDiscoveryStage(ScanStageMixin):
             for ip in self.subnet_ips
         ]
         retry_mgr.execute_all(jobs)
+        _check_icmp_fallback(self, context)

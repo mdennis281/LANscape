@@ -6,6 +6,7 @@ from typing import Callable, List, Optional
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
 from lanscape.core.models.scan import StageEvalContext, StageProgress, ScanWarningInfo
+from lanscape.core.models.enums import WarningCategory
 
 
 log = logging.getLogger(__name__)
@@ -73,8 +74,9 @@ class ScanPipeline:
                 )
                 stage.mark_skipped(skip_reason)
                 context.warnings.append(ScanWarningInfo(
-                    type="stage_skipped",
-                    message=f"{stage.stage_name} skipped: {skip_reason}",
+                    category=WarningCategory.STAGE_SKIP,
+                    title=f"**{stage.stage_name}** skipped",
+                    body=f"Reason: {skip_reason}",
                     stage=stage.stage_name,
                 ))
                 if self._on_stage_change:

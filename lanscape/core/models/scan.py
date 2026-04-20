@@ -6,7 +6,7 @@ from typing import List, Optional, Any, Dict
 
 from pydantic import BaseModel, Field
 
-from lanscape.core.models.enums import ScanStage, StageType
+from lanscape.core.models.enums import ScanStage, StageType, WarningCategory
 from lanscape.core.models.device import DeviceResult
 
 
@@ -72,18 +72,18 @@ class ScanErrorInfo(BaseModel):
 
 
 class ScanWarningInfo(BaseModel):
-    """Serializable representation of a scan-level warning."""
-    type: str = Field(description="Warning type identifier")
-    message: str = Field(description="Human-readable warning message")
-    old_multiplier: Optional[float] = Field(default=None, description="Previous multiplier")
-    new_multiplier: Optional[float] = Field(default=None, description="New multiplier")
-    decrease_percent: Optional[float] = Field(default=None, description="Percent decrease")
+    """Serializable representation of a scan-level warning.
+
+    The backend owns all formatting — ``title`` and ``body`` may contain
+    Markdown which the UI renders directly.
+    """
+    category: WarningCategory = Field(description="Warning category for grouping")
+    title: str = Field(description="Short markdown summary (shown collapsed)")
+    body: Optional[str] = Field(
+        default=None, description="Longer markdown details (shown expanded)"
+    )
+    stage: Optional[str] = Field(default=None, description="Stage name when warning occurred")
     timestamp: Optional[float] = Field(default=None, description="Unix timestamp")
-    failed_job: Optional[str] = Field(default=None, description="Job ID that triggered the warning")
-    error_message: Optional[str] = Field(default=None, description="Error from the failed job")
-    stage: Optional[str] = Field(default=None, description="Scan stage when warning occurred")
-    retry_attempt: Optional[int] = Field(default=None, description="Which retry attempt failed")
-    max_retries: Optional[int] = Field(default=None, description="Maximum retries configured")
 
 
 class ScanMetadata(BaseModel):

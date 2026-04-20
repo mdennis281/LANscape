@@ -577,6 +577,7 @@ class NeighborTableService:
         self._refresh_cond = threading.Condition()
         self._refresh_count: int = 0
         self._running = False
+        self._fetch_failure_reasons: List[str] = []
 
     # ── Singleton accessor ──────────────────────────────────────────
 
@@ -676,6 +677,12 @@ class NeighborTableService:
         table = self._ipv6_table if ':' in ip else self._ipv4_table
         return table.get_macs(ip)
 
+    def drain_fetch_failures(self) -> List[str]:
+        """Return and clear any fetch failure reasons accumulated since last drain."""
+        failures = list(self._fetch_failure_reasons)
+        self._fetch_failure_reasons.clear()
+        return failures
+
     def get_macs_wait(self, ip: str) -> List[str]:
         """Return MACs for *ip*, waiting for one fresh refresh if not cached.
 
@@ -763,6 +770,7 @@ class NeighborTableService:
     def _fetch_entries(self, want_v6: bool) -> List[NeighborEntry]:
         """Try each command in order for the given protocol. First success wins."""
         commands = get_table_commands(want_v6)
+        last_error: Optional[str] = None
         for cmd in commands:
             try:
                 output = subprocess.check_output(
@@ -780,5 +788,11 @@ class NeighborTableService:
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
                     FileNotFoundError, OSError) as exc:
                 log.debug("Command %s failed: %s", cmd[:2], exc)
+                last_error = str(exc)
                 continue
+        if last_error:
+            proto = 'IPv6' if want_v6 else 'IPv4'
+            self._fetch_failure_reasons.append(
+                f"{proto} neighbor table refresh failed: {last_error}"
+            )
         return []

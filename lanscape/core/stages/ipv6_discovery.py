@@ -10,7 +10,8 @@ from typing import List, Optional
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
 from lanscape.core.models.enums import StageType
-from lanscape.core.models.scan import StageEvalContext
+from lanscape.core.models.scan import StageEvalContext, ScanWarningInfo
+from lanscape.core.models.enums import WarningCategory
 from lanscape.core.scan_config import IPv6NDPDiscoveryStageConfig, IPv6MDNSDiscoveryStageConfig
 from lanscape.core.net_tools.device import Device
 from lanscape.core.ip_parser import get_address_count
@@ -89,6 +90,16 @@ class IPv6NDPDiscoveryStage(ScanStageMixin):
         # Harvest NDP entries and add devices
         if self.running:
             self._harvest_ndp_devices(context)
+
+        # Emit warnings for neighbor table fetch failures
+        if self._neighbor_svc:
+            for reason in self._neighbor_svc.drain_fetch_failures():
+                context.warnings.append(ScanWarningInfo(
+                    category=WarningCategory.RESILIENCE,
+                    title="Neighbor table refresh issue",
+                    body=reason,
+                    stage=self.stage_name,
+                ))
 
     def _detect_scopes(self):
         """Determine which interface scopes to probe."""
@@ -251,6 +262,16 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
 
         if Zeroconf is None or ServiceBrowser is None:
             self.log.warning("zeroconf not installed — skipping mDNS discovery")
+            context.warnings.append(ScanWarningInfo(
+                category=WarningCategory.CAPABILITY,
+                title="IPv6 mDNS unavailable",
+                body=(
+                    "The `zeroconf` package is not installed. "
+                    "mDNS-based IPv6 device discovery has been skipped.\n\n"
+                    "Install with: `pip install zeroconf`"
+                ),
+                stage=self.stage_name,
+            ))
             self._completed = self.total
             return
 

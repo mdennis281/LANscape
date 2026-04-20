@@ -88,6 +88,7 @@ from lanscape.core.models import (
     ScanListItem,
     StageType,
     StageProgress,
+    WarningCategory,
 )
 
 # Scan pipeline infrastructure

@@ -60,12 +60,8 @@ class PortScanStage(ScanStageMixin):
 
         self.total = sum(len(ports) for _, ports in device_port_map)
 
-        def on_warning(warning_type: str, warning_data: dict) -> None:
-            context.warnings.append(ScanWarningInfo(
-                type=warning_type,
-                stage=self.stage_name,
-                **warning_data,
-            ))
+        def on_warning(warning: ScanWarningInfo) -> None:
+            context.warnings.append(warning)
 
         mc = MultiplierController(
             initial_multiplier=self.resilience.t_multiplier,
@@ -74,6 +70,7 @@ class PortScanStage(ScanStageMixin):
             min_multiplier=0.1,
             on_warning=on_warning,
         )
+        mc.stage_name = self.stage_name
         retry_config = RetryConfig(
             max_retries=self.resilience.failure_retry_cnt,
             multiplier_decrease=self.resilience.failure_multiplier_decrease,

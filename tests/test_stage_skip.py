@@ -359,9 +359,9 @@ class TestPipelineSkipFlow:
 
         assert len(ctx.warnings) == 1
         w = ctx.warnings[0]
-        assert w.type == "stage_skipped"
-        assert "Dummy" in w.message
-        assert "bad subnet" in w.message
+        assert w.category.value == "stage_skip"
+        assert "Dummy" in w.title
+        assert "bad subnet" in w.body
 
     def test_on_stage_change_fires_for_skipped(self):
         """The on_stage_change callback fires even for skipped stages."""

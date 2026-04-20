@@ -23,6 +23,14 @@ class ScanStage(str, Enum):
     TERMINATED = "terminated"
 
 
+class WarningCategory(str, Enum):
+    """Category grouping for scan warnings."""
+    CONCURRENCY = "concurrency"
+    STAGE_SKIP = "stage_skip"
+    CAPABILITY = "capability"
+    RESILIENCE = "resilience"
+
+
 class StageType(str, Enum):
     """Type identifier for each composable scan stage."""
     ICMP_DISCOVERY = "icmp_discovery"

@@ -59,6 +59,18 @@ def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
 
 class IcmpLookup():
     """ICMP ping-based device reachability check."""
+    _used_fallback: bool = False
+
+    @classmethod
+    def used_fallback(cls) -> bool:
+        """Whether ICMP fell back to system ping during this stage."""
+        return cls._used_fallback
+
+    @classmethod
+    def reset_fallback_flag(cls) -> None:
+        """Reset the fallback flag (call before each scan stage)."""
+        cls._used_fallback = False
+
     @classmethod
     @job_tracker
     def execute(cls, device: Device, cfg: PingConfig) -> bool:
@@ -86,6 +98,7 @@ class IcmpLookup():
             return device.alive is True
         except SocketPermissionError:
             # Fallback to system ping command when raw sockets aren't available
+            cls._used_fallback = True
             return cls._ping_fallback(device, cfg)
 
     @classmethod

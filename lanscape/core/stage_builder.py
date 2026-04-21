@@ -51,4 +51,9 @@ def build_stages(pipeline_cfg: PipelineConfig) -> List[ScanStageMixin]:
         elif st == StageType.PORT_SCAN:
             stages.append(PortScanStage(typed_cfg, resilience=resilience))
 
+        # Propagate auto-stage metadata to the stage instance
+        if stages:
+            stages[-1].auto = stage_cfg.auto
+            stages[-1].reason = stage_cfg.reason
+
     return stages

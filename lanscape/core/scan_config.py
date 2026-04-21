@@ -380,6 +380,8 @@ class StageConfig(ConfigBase):
     """A single stage entry in a pipeline configuration."""
     stage_type: StageType
     config: Dict[str, Any] = Field(default_factory=dict)
+    auto: Optional[bool] = Field(default=None, description="Whether this stage was auto-recommended")
+    reason: Optional[str] = Field(default=None, description="Reason the stage was auto-recommended")
 
     def get_typed_config(self) -> ConfigBase:
         """Return the config dict parsed into its stage-specific model."""

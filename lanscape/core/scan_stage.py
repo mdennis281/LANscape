@@ -36,6 +36,8 @@ class ScanStageMixin(ABC):
         self._start_time: float = 0.0
         self._end_time: float = 0.0
         self.log = logging.getLogger(self.__class__.__name__)
+        self.auto: Optional[bool] = None
+        self.reason: Optional[str] = None
 
     # ── Progress properties ─────────────────────────────────────────
 
@@ -84,6 +86,8 @@ class ScanStageMixin(ABC):
             skip_reason=self._skip_reason,
             runtime=self.runtime,
             counter_label=self.counter_label,
+            auto=self.auto,
+            reason=self.reason,
         )
 
     # ── Skip guard ──────────────────────────────────────────────────

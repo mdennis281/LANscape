@@ -101,3 +101,41 @@ docker run -d --name lanscape \
 | `LANSCAPE_LOG_FILE` | `None` | Path to log file (optional) |
 
 If you change `LANSCAPE_UI_PORT` or `LANSCAPE_WS_PORT`, update your `-p` mappings (bridge mode) or firewall rules accordingly.
+
+---
+
+## Controlled Troubleshooting Lab (Windows/macOS/Linux)
+
+If you want a reproducible environment to debug UI behavior or scanner performance, use the dedicated lab compose file:
+
+```sh
+docker compose -f docker/docker-compose.troubleshoot.yml up --build -d
+```
+
+This stack runs:
+- `scanner` from local source (your current branch)
+- deterministic mock targets (web, ssh, postgres, redis, mail)
+
+Endpoints:
+- UI: `http://localhost:5001`
+- WebSocket: `ws://localhost:6969`
+
+Recommended test subnet inside the lab:
+- `172.31.0.0/24`
+
+Useful commands:
+
+```sh
+# follow scanner logs
+docker compose -f docker/docker-compose.troubleshoot.yml logs -f scanner
+
+# list container health
+docker compose -f docker/docker-compose.troubleshoot.yml ps
+
+# stop and remove everything
+docker compose -f docker/docker-compose.troubleshoot.yml down -v
+```
+
+Notes:
+- This is for controlled behavior/perf testing, not full LAN discovery on your physical network.
+- Since it uses bridge networking, discovery semantics differ from Linux host-network production mode.

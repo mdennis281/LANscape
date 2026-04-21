@@ -1,0 +1,141 @@
+# LANscape Controlled Troubleshooting Lab (cross-platform)
+#
+# Purpose:
+# - Bring up a stable, repeatable network with known services.
+# - Expose LANscape UI + WS endpoint for interactive debugging.
+# - Run backend from local source (current branch) rather than PyPI image.
+#
+# Start:
+#   docker compose -f docker/docker-compose.troubleshoot.yml up --build -d
+#
+# Stop:
+#   docker compose -f docker/docker-compose.troubleshoot.yml down -v
+#
+# Endpoints:
+#   WS: ws://localhost:6969
+#   Point local UI at: http://localhost:3000?ws-server=ws://localhost:6969
+
+name: lanscape-lab
+
+services:
+  scanner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: lanscape-lab-scanner
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    command:
+      - "--persistent"
+      - "--ws-port"
+      - "8766"
+      - "--loglevel"
+      - "DEBUG"
+      - "--mdns-off"
+    ports:
+      - "6969:8766"
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.2
+    depends_on:
+      mock-web:
+        condition: service_healthy
+      mock-ssh:
+        condition: service_healthy
+      mock-postgres:
+        condition: service_healthy
+      mock-redis:
+        condition: service_healthy
+      mock-mail:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8766"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mock-web:
+    image: nginx:alpine
+    container_name: lanscape-lab-web
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.10
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  mock-ssh:
+    image: lscr.io/linuxserver/openssh-server:9.8_p1-r1-ls147
+    container_name: lanscape-lab-ssh
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - PASSWORD_ACCESS=true
+      - USER_PASSWORD=testpass
+      - USER_NAME=testuser
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.11
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 2222 || nc -z localhost 22"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  mock-postgres:
+    image: postgres:16-alpine
+    container_name: lanscape-lab-postgres
+    environment:
+      - POSTGRES_PASSWORD=testpass
+      - POSTGRES_USER=testuser
+      - POSTGRES_DB=testdb
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.12
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  mock-redis:
+    image: redis:7-alpine
+    container_name: lanscape-lab-redis
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.13
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  mock-mail:
+    image: greenmail/standalone:2.1.2
+    container_name: lanscape-lab-mail
+    environment:
+      - GREENMAIL_OPTS=-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.14
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '(echo > /dev/tcp/localhost/3025) 2>/dev/null && (echo > /dev/tcp/localhost/3143) 2>/dev/null'"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
+networks:
+  labnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

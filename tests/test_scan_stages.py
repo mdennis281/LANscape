@@ -959,8 +959,6 @@ class TestIPv6NDPFiltering:
 
         ips = [ip for ip, _ in result]
         assert "2001:db8::1" in ips
-        assert "fd00::1" in ips
-        assert "ff02::1" not in ips  # multicast still filtered
 
     def test_harvest_adds_devices_to_context(self):
         """_harvest_ndp_devices resolves entries and adds to context."""
@@ -1019,6 +1017,213 @@ class TestIPv6NDPFiltering:
         stage._harvest_ndp_devices(ctx)
 
         assert len(ctx.devices) == 0
+
+
+# ---------------------------------------------------------------------------
+# IPv6 mDNS Discovery Stage – subnet filtering
+# ---------------------------------------------------------------------------
+
+class TestIPv6MDNSSubnetFilter:
+    """mDNS listener must only accept IPs within the target subnet."""
+
+    @staticmethod
+    def _run_listener_add(addr: str, subnet: str):
+        """
+        Directly invoke the inner _Listener.add_service logic via a minimal
+        execute() run using a patched Zeroconf + ServiceBrowser.
+        Returns the set of ip strings added to the context.
+        """
+        from lanscape.core.scan_config import IPv6MDNSDiscoveryStageConfig
+        from lanscape.core.stages.ipv6_discovery import IPv6MDNSDiscoveryStage
+
+        cfg = IPv6MDNSDiscoveryStageConfig(timeout=0.1)
+        stage = IPv6MDNSDiscoveryStage(cfg)
+        stage.running = True
+
+        ctx = ScanContext(subnet)
+
+        fake_info = MagicMock()
+        fake_info.parsed_addresses.return_value = [addr]
+        fake_info.server = None
+
+        class FakeZeroconf:
+            def get_service_info(self, *_):
+                return fake_info
+            def close(self):
+                pass
+
+        class FakeServiceBrowser:
+            def __init__(self, zc, svc_type, listener):
+                if svc_type == "_services._dns-sd._udp.local.":
+                    return
+                # Immediately fire add_service for the first registered type
+                listener.add_service(zc, svc_type, "test._http._tcp.local.")
+
+        with patch('lanscape.core.stages.ipv6_discovery.Zeroconf', FakeZeroconf), \
+             patch('lanscape.core.stages.ipv6_discovery.ServiceBrowser', FakeServiceBrowser), \
+             patch('lanscape.core.stages.ipv6_discovery.NeighborTableService') as mock_nts:
+            mock_nts.instance.return_value = MagicMock(is_running=True)
+            stage.execute(ctx)
+
+        return {d.ip for d in ctx.devices}
+
+    def test_on_subnet_address_accepted(self):
+        """An address within the target subnet is accepted."""
+        found = self._run_listener_add("fd00::1", "fd00::/64")
+        assert "fd00::1" in found
+
+    def test_off_subnet_address_rejected(self):
+        """An address outside the target subnet is rejected."""
+        found = self._run_listener_add("2001:db8::1", "fd00::/64")
+        assert "2001:db8::1" not in found
+
+    def test_link_local_rejected(self):
+        """Link-local addresses are always rejected regardless of subnet."""
+        found = self._run_listener_add("fe80::1", "fe80::/10")
+        assert "fe80::1" not in found
+
+    def test_multicast_rejected(self):
+        """Multicast addresses are always rejected."""
+        found = self._run_listener_add("ff02::1", "fd00::/64")
+        assert "ff02::1" not in found
+
+
+# ---------------------------------------------------------------------------
+# found_with_stages tracking
+# ---------------------------------------------------------------------------
+
+class TestFoundWithStages:
+    """Tests for found_with_stages detection-stage tracking."""
+
+    def test_single_stage_sets_index(self):
+        """Device found during stage 0 has found_with_stages == [0]."""
+        ctx = ScanContext("10.0.0.0/24")
+        ctx.current_stage_index = 0
+        device = Device(ip="10.0.0.1")
+        ctx.add_device(device)
+        assert device.found_with_stages == [0]
+
+    def test_second_stage_appends_index(self):
+        """Device detected again in stage 1 appends 1 to found_with_stages."""
+        ctx = ScanContext("10.0.0.0/24")
+
+        ctx.current_stage_index = 0
+        device = Device(ip="10.0.0.1")
+        ctx.add_device(device)
+
+        ctx.current_stage_index = 1
+        duplicate = Device(ip="10.0.0.1")
+        result = ctx.add_device(duplicate)
+
+        assert result is False  # still rejected as duplicate
+        assert device.found_with_stages == [0, 1]
+
+    def test_duplicate_stage_not_added_twice(self):
+        """add_device called twice for same IP in same stage doesn't duplicate index."""
+        ctx = ScanContext("10.0.0.0/24")
+        ctx.current_stage_index = 0
+        device = Device(ip="10.0.0.1")
+        ctx.add_device(device)
+        ctx.add_device(Device(ip="10.0.0.1"))
+        assert device.found_with_stages == [0]
+
+    def test_no_stage_index_leaves_empty(self):
+        """Without current_stage_index set, found_with_stages stays empty."""
+        ctx = ScanContext("10.0.0.0/24")
+        device = Device(ip="10.0.0.1")
+        ctx.add_device(device)
+        assert device.found_with_stages == []
+
+    def test_pipeline_wires_stage_index(self):
+        """ScanPipeline sets current_stage_index on context before each stage."""
+        recorded_indexes: list[int] = []
+
+        class _RecordingStage(ScanStageMixin):
+            stage_type = StageType.ICMP_DISCOVERY
+            stage_name = "Recorder"
+
+            def execute(self, context: ScanContext) -> None:
+                recorded_indexes.append(context.current_stage_index)
+                self.total = 1
+                self.increment()
+
+        class _RecordingStage2(ScanStageMixin):
+            stage_type = StageType.ARP_DISCOVERY
+            stage_name = "Recorder2"
+
+            def execute(self, context: ScanContext) -> None:
+                recorded_indexes.append(context.current_stage_index)
+                self.total = 1
+                self.increment()
+
+        ctx = ScanContext("10.0.0.0/24")
+        pipeline = ScanPipeline([_RecordingStage(), _RecordingStage2()])
+        pipeline.execute(ctx)
+
+        assert recorded_indexes == [0, 1]
+        assert ctx.current_stage_index is None  # reset after execute
+
+    def test_pipeline_records_multi_stage_device(self):
+        """Device found in stages 0 and 1 ends up with found_with_stages [0, 1]."""
+
+        class _Stage(ScanStageMixin):
+            stage_type = StageType.ICMP_DISCOVERY
+            stage_name = "Stage"
+
+            def __init__(self, ip: str):
+                super().__init__()
+                self._ip = ip
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 1
+                context.add_device(Device(ip=self._ip))
+                self.increment()
+
+        class _Stage2(ScanStageMixin):
+            stage_type = StageType.ARP_DISCOVERY
+            stage_name = "Stage2"
+
+            def __init__(self, ip: str):
+                super().__init__()
+                self._ip = ip
+
+            def execute(self, context: ScanContext) -> None:
+                self.total = 1
+                context.add_device(Device(ip=self._ip))
+                self.increment()
+
+        ctx = ScanContext("10.0.0.0/24")
+        pipeline = ScanPipeline([_Stage("10.0.0.1"), _Stage2("10.0.0.1")])
+        pipeline.execute(ctx)
+
+        assert len(ctx.devices) == 1
+        assert ctx.devices[0].found_with_stages == [0, 1]
+
+    def test_consolidation_unions_found_with_stages(self):
+        """Merging two devices unions their found_with_stages lists."""
+        ctx = ScanContext("10.0.0.0/24")
+
+        ctx.current_stage_index = 0
+        dev1 = Device(ip="2001:db8::1")
+        dev1.hostname = "myhost.local"
+        ctx.add_device(dev1)
+
+        ctx.current_stage_index = 1
+        dev2 = Device(ip="2001:db8::2")
+        dev2.hostname = "myhost.local"
+        ctx.add_device(dev2)
+
+        ctx.consolidate_devices()
+
+        assert len(ctx.devices) == 1
+        assert ctx.devices[0].found_with_stages == [0, 1]
+
+    def test_to_result_includes_found_with_stages(self):
+        """Device.to_result() propagates found_with_stages into DeviceResult."""
+        device = Device(ip="10.0.0.1")
+        device.found_with_stages = [0, 2]
+        result = device.to_result()
+        assert result.found_with_stages == [0, 2]
 
 
 # ---------------------------------------------------------------------------

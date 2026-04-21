@@ -7,14 +7,14 @@ Provides handlers for:
 - App info (version, runtime args)
 """
 
+import ipaddress
 import traceback
 from typing import Any, Callable, Optional
 
 from lanscape.core.net_tools import (
     get_all_network_subnets, is_arp_supported, smart_select_primary_subnet
 )
-from lanscape.core.ip_parser import parse_ip_input
-from lanscape.core.errors import SubnetTooLargeError
+from lanscape.core.ip_parser import parse_ip_input, get_address_count
 from lanscape.core.auto_stages import (
     recommend_stages, _is_ipv6, _is_local_subnet, _matching_interface,
 )
@@ -27,6 +27,38 @@ from lanscape.core.version_manager import (
 )
 from lanscape.core.runtime_args import parse_args
 from lanscape.ui.ws.handlers.base import BaseHandler
+
+
+def _format_ip_count(count: int) -> str:
+    """Format a large IP count into a human-readable abbreviated string.
+
+    Examples:
+        12_450          -> "12.45k IPs"
+        1_200_005       -> "1.2M IPs"
+        1_300_400_100   -> "1.3B IPs"
+        2_500_000_000_000 -> "2.5T IPs"
+        >= 10^15        -> scientific notation
+    """
+    if count < 1_000:
+        return f"{count} IP{'s' if count != 1 else ''}"
+    if count < 1_000_000:
+        val = count / 1_000
+        # 2 decimal places, strip trailing zeros
+        formatted = f"{val:.2f}".rstrip('0').rstrip('.')
+        return f"{formatted}k IPs"
+    if count < 1_000_000_000:
+        val = count / 1_000_000
+        formatted = f"{val:.1f}".rstrip('0').rstrip('.')
+        return f"{formatted}M IPs"
+    if count < 1_000_000_000_000:
+        val = count / 1_000_000_000
+        formatted = f"{val:.1f}".rstrip('0').rstrip('.')
+        return f"{formatted}B IPs"
+    if count < 1_000_000_000_000_000:
+        val = count / 1_000_000_000_000
+        formatted = f"{val:.1f}".rstrip('0').rstrip('.')
+        return f"{formatted}T IPs"
+    return f"{count:.2e} IPs"
 
 
 class ToolsHandler(BaseHandler):
@@ -85,22 +117,23 @@ class ToolsHandler(BaseHandler):
             return {'valid': False, 'msg': 'Subnet cannot be blank', 'count': -1}
 
         try:
-            ips = parse_ip_input(subnet)
-            length = len(ips)
+            is_cidr = '/' in subnet and ',' not in subnet
+            if is_cidr:
+                # Fast path for CIDR: arithmetic only, no IP list allocation
+                ipaddress.ip_network(subnet, strict=False)  # validate
+                count = get_address_count(subnet)
+            else:
+                # Range / comma-separated inputs are inherently bounded
+                ips = parse_ip_input(subnet)
+                count = len(ips)
+
             return {
                 'valid': True,
-                'msg': f"{length} IP{'s' if length > 1 else ''}",
-                'count': length,
+                'msg': _format_ip_count(count),
+                'count': count,
                 'is_ipv6': _is_ipv6(subnet),
                 'is_local': _is_local_subnet(subnet),
                 'matching_interface': _matching_interface(subnet),
-            }
-        except SubnetTooLargeError as e:
-            return {
-                'valid': False,
-                'msg': f'subnet too large ({e.count:,} IPs)',
-                'error': traceback.format_exc(),
-                'count': e.count
             }
         except Exception:
             return {

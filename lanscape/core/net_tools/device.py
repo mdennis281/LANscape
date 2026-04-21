@@ -179,6 +179,7 @@ class Device(BaseModel):
     merged_ips: List[str] = []
     ipv4_addresses: List[str] = []
     ipv6_addresses: List[str] = []
+    found_with_stages: List[int] = []
 
     _log: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger('Device'))
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -534,6 +535,7 @@ class Device(BaseModel):
             errors=error_infos,
             ipv4_addresses=self.ipv4_addresses,
             ipv6_addresses=self.ipv6_addresses,
+            found_with_stages=list(self.found_with_stages),
         )
 
 

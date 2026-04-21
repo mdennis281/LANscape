@@ -123,17 +123,30 @@ def send_arp_request(ip: str, timeout: float = 1.0) -> tuple:
     Imports Scapy lazily so non-Scapy code paths never pay the cost.
 
     ARP is IPv4-only; calling with an IPv6 address returns ``([], [])``.
+    The outgoing interface is resolved from the OS routing table so the
+    packet is always sent on the correct adapter (e.g. not a VPN / virtual
+    interface) even when the system has multiple network adapters.
     """
     if is_ipv6(ip):
         return ([], [])
 
     from scapy.sendrecv import srp          # pylint: disable=import-outside-toplevel
     from scapy.layers.l2 import ARP, Ether  # pylint: disable=import-outside-toplevel
+    from scapy.config import conf as scapy_conf  # pylint: disable=import-outside-toplevel
+
+    # Resolve the outbound interface via Scapy's routing table so we pick
+    # the correct adapter when multiple interfaces are present (e.g. a
+    # ZeroTier / VPN adapter is the "default" but the physical NIC is the
+    # right one for a LAN target).
+    try:
+        iface = scapy_conf.route.route(ip)[0]
+    except Exception:  # pylint: disable=broad-except
+        iface = scapy_conf.iface
 
     arp_request = ARP(pdst=ip)
     broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
     packet = broadcast / arp_request
-    answered, unanswered = srp(packet, timeout=timeout, verbose=False)
+    answered, unanswered = srp(packet, timeout=timeout, verbose=False, iface=iface)
     return answered, unanswered
 
 

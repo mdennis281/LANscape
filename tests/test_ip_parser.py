@@ -12,7 +12,6 @@ from lanscape.core.ip_parser import (
     parse_ip_input,
     parse_ip_range,
 )
-from lanscape.core.errors import SubnetTooLargeError
 
 
 # ---------------------------------------------------------------------------
@@ -58,10 +57,10 @@ class TestParseIpInputIPv4:
         # 1 + 6 + 2 = 9
         assert len(result) == 9
 
-    def test_subnet_too_large_raises(self):
-        """Subnets exceeding MAX_IPS_ALLOWED raise SubnetTooLargeError."""
-        with pytest.raises(SubnetTooLargeError):
-            parse_ip_input("10.0.0.0/8")
+    def test_large_subnet_no_error(self):
+        """Large subnets (e.g. /16) are now parsed without raising."""
+        result = parse_ip_input("10.0.0.0/16")
+        assert len(result) == 65534
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +105,10 @@ class TestParseIpInputIPv6:
         # 1 + 6 + 3 = 10
         assert len(result) == 10
 
-    def test_ipv6_subnet_too_large_raises(self):
-        """Large IPv6 subnets raise SubnetTooLargeError."""
-        with pytest.raises(SubnetTooLargeError):
-            parse_ip_input("fd00::/64")
+    def test_ipv6_large_subnet_no_error(self):
+        """Large IPv6 subnets (e.g. /112) are now parsed without raising."""
+        result = parse_ip_input("fd00::/112")
+        assert len(result) == 65535
 
     def test_single_ipv6_128(self):
         """/128 yields exactly 1 host."""

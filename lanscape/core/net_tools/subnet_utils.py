@@ -9,7 +9,10 @@ from typing import List
 import psutil
 from scapy.error import Scapy_Exception
 
-from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip_input
+from lanscape.core.ip_parser import get_address_count, parse_ip_input
+
+# Cap used in subnet listing to avoid JS integer overflow for very large IPv6 subnets
+_SUBNET_LIST_CAP = 100_000
 from lanscape.core.decorators import run_once
 from lanscape.core.scan_config import ScanType
 from lanscape.core.system_compat import (
@@ -148,7 +151,7 @@ def get_all_network_subnets() -> List[dict]:
                     seen.add(key)
                     # Cap address_cnt to avoid JS integer overflow for large IPv6 subnets
                     raw_count = get_address_count(subnet)
-                    capped_count = min(raw_count, MAX_IPS_ALLOWED)
+                    capped_count = min(raw_count, _SUBNET_LIST_CAP)
                     subnets.append({
                         'subnet': subnet,
                         'address_cnt': capped_count,
@@ -187,7 +190,7 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
         subnet_str = subnet.get("subnet", "")
         address_cnt = subnet.get("address_cnt", 0)
 
-        if address_cnt >= MAX_IPS_ALLOWED:
+        if address_cnt >= _SUBNET_LIST_CAP:
             continue
 
         if _is_deprioritized_subnet(subnet_str):

@@ -3,7 +3,7 @@
 import logging
 import threading
 from time import time
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from lanscape.core.net_tools.device import Device
 from lanscape.core.models.scan import ScanErrorInfo, ScanWarningInfo
@@ -26,7 +26,12 @@ class ScanContext:
         self._lock = threading.Lock()
         self._devices: List[Device] = []
         self._device_ips: Set[str] = set()
+        self._device_map: Dict[str, Device] = {}
         self._scanned_ports: Dict[str, Set[int]] = {}
+
+        # Set by ScanPipeline before each stage executes so add_device can
+        # record which stage discovered each device.
+        self.current_stage_index: Optional[int] = None
 
         self.errors: List[ScanErrorInfo] = []
         self.warnings: List[ScanWarningInfo] = []
@@ -42,12 +47,27 @@ class ScanContext:
     def add_device(self, device: Device) -> bool:
         """Add a device if its IP hasn't been seen yet.
 
+        Always records the current stage index (if set) on the device.
+        For duplicate IPs the existing device's ``found_with_stages`` list
+        is updated rather than adding a second entry.
+
         Returns ``True`` if the device was added, ``False`` if duplicate.
         """
         with self._lock:
-            if device.ip in self._device_ips:
+            if self.current_stage_index is not None:
+                if device.ip in self._device_map:
+                    # Duplicate — append stage to existing device's tracking list
+                    existing = self._device_map[device.ip]
+                    if self.current_stage_index not in existing.found_with_stages:
+                        existing.found_with_stages.append(self.current_stage_index)
+                    return False
+                # New device — record the discovering stage now
+                device.found_with_stages = [self.current_stage_index]
+            elif device.ip in self._device_ips:
                 return False
+
             self._device_ips.add(device.ip)
+            self._device_map[device.ip] = device
             self._devices.append(device)
             return True
 
@@ -94,6 +114,11 @@ class ScanContext:
                 elif primary is not device:
                     # Duplicate — merge into primary
                     primary.merged_ips.append(device.ip)
+                    # Union found_with_stages (preserve order, dedup)
+                    for idx in device.found_with_stages:
+                        if idx not in primary.found_with_stages:
+                            primary.found_with_stages.append(idx)
+                    primary.found_with_stages.sort()
                     to_remove.append(device)
                     # Also register this device's keys under the primary
                     # so future devices with overlapping keys merge too

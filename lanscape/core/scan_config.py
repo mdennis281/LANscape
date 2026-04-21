@@ -1,7 +1,7 @@
 """Configuration module for network scanning operations."""
 
 import os
-from typing import List, Dict, Optional, Any
+from typing import ClassVar, List, Dict, Optional, Any
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -291,6 +291,7 @@ class ScanConfig(ConfigBase):
 
 class ICMPDiscoveryStageConfig(ConfigBase):
     """Config for the ICMP discovery stage."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = 25_000
     ping_config: PingConfig = Field(default_factory=PingConfig)
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
     t_cnt: int = (os.cpu_count() or 4) * 6
@@ -298,6 +299,7 @@ class ICMPDiscoveryStageConfig(ConfigBase):
 
 class ARPDiscoveryStageConfig(ConfigBase):
     """Config for the ARP broadcast discovery stage."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = 25_000
     arp_config: ArpConfig = Field(default_factory=ArpConfig)
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
     t_cnt: int = (os.cpu_count() or 4) * 6
@@ -305,6 +307,7 @@ class ARPDiscoveryStageConfig(ConfigBase):
 
 class PokeARPDiscoveryStageConfig(ConfigBase):
     """Config for the Poke→ARP cache discovery stage."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = 64_000
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
@@ -313,6 +316,7 @@ class PokeARPDiscoveryStageConfig(ConfigBase):
 
 class ICMPARPDiscoveryStageConfig(ConfigBase):
     """Config for the ICMP→ARP cache discovery stage."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = 25_000
     ping_config: PingConfig = Field(default_factory=PingConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
@@ -320,7 +324,8 @@ class ICMPARPDiscoveryStageConfig(ConfigBase):
 
 
 class IPv6NDPDiscoveryStageConfig(ConfigBase):
-    """Config for the IPv6 NDP neighbor discovery stage."""
+    """Config for the IPv6 NDP neighbor discovery stage (passive, not IP-enumeration based)."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = None
     neighbor_table_config: NeighborTableConfig = Field(default_factory=NeighborTableConfig)
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
     t_cnt: int = (os.cpu_count() or 4) * 4
@@ -328,14 +333,16 @@ class IPv6NDPDiscoveryStageConfig(ConfigBase):
 
 
 class IPv6MDNSDiscoveryStageConfig(ConfigBase):
-    """Config for the IPv6 mDNS discovery stage."""
+    """Config for the IPv6 mDNS discovery stage (passive multicast listener)."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = None
     timeout: float = 5.0
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
     interface: Optional[str] = None
 
 
 class PortScanStageConfig(ConfigBase):
-    """Config for the port scanning stage."""
+    """Config for the port scanning stage (operates on found devices, not subnet range)."""
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = None
     port_list: str = "medium"
     port_scan_config: PortScanConfig = Field(default_factory=PortScanConfig)
     service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)

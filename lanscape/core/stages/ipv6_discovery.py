@@ -256,6 +256,16 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
         # Progress tracks elapsed time in half-second ticks
         self.total = max(int(self.cfg.timeout / 0.5), 1)
 
+        # Build subnet filter — only report IPs within the target subnet
+        subnet_net: Optional[ipaddress.IPv6Network] = None
+        if context.subnet:
+            try:
+                net = ipaddress.ip_network(context.subnet, strict=False)
+                if net.version == 6:
+                    subnet_net = net
+            except ValueError:
+                pass
+
         # Ensure neighbor table service is running for MAC resolution
         if not NeighborTableService.instance().is_running:
             NeighborTableService.instance().start()
@@ -293,6 +303,8 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
                     except ValueError:
                         continue
                     if v6.is_multicast or v6.is_loopback or v6.is_link_local:
+                        continue
+                    if subnet_net is not None and v6 not in subnet_net:
                         continue
                     dev = Device(ip=addr)
                     dev.alive = True

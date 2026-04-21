@@ -90,7 +90,9 @@ class ScanPipeline:
             )
             if self._on_stage_change:
                 self._on_stage_change(stage)
+            context.current_stage_index = idx
             stage.run(context)
+            context.current_stage_index = None
 
             # After every discovery stage, consolidate devices that
             # share a hostname or MAC into a single entry.

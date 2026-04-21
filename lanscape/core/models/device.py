@@ -86,6 +86,10 @@ class DeviceResult(BaseModel):
         default_factory=list,
         description="All discovered IPv6 addresses for this device"
     )
+    found_with_stages: List[int] = Field(
+        default_factory=list,
+        description="0-based pipeline stage indexes that detected this device"
+    )
 
     @computed_field  # type: ignore[misc]
     @property

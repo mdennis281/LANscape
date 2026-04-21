@@ -27,6 +27,7 @@ from lanscape.ui.react_proxy.discovery import (
     DiscoveryService,
     DiscoverResponse,
     build_default_route,
+    build_ws_url_for_client,
     get_local_address_strings,
 )
 from lanscape.core.system_compat import configure_asyncio_exception_handler
@@ -71,6 +72,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
     discovery: Optional['DiscoveryService'] = None
     mdns_enabled: bool = True
     default_route: str = 'http://localhost:5001'
+    ws_port: int = 8766
     _cached_version: Optional[VersionResponse] = None
 
     def __init__(self, *args, directory: str = None, **kwargs):
@@ -137,10 +139,14 @@ class SPAHandler(SimpleHTTPRequestHandler):
         if self.discovery is not None:
             instances = self.discovery.get_instances()
 
+        client_ip = self.client_address[0]
+        ws_url = build_ws_url_for_client(client_ip, self.ws_port)
+
         response = DiscoverResponse(
             mdns_enabled=self.mdns_enabled,
             default_route=self.default_route,
             instances=instances,
+            ws_url=ws_url,
         )
 
         payload = response.model_dump_json().encode('utf-8')
@@ -318,10 +324,11 @@ class WebappServerController:
         self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
         log.debug('HTTP server bound and ready on port %d', self.http_port)
 
-        # Tell the handler the default route and mDNS status so
+        # Tell the handler the default route, WS port, and mDNS status so
         # /api/discover can include them in every response.
         SPAHandler.default_route = build_default_route(self.http_port)
         SPAHandler.mdns_enabled = self.mdns_enabled
+        SPAHandler.ws_port = self.ws_port
 
         # Build the localhost URL for the local browser (no ws-server param;
         # the frontend will discover the backend via mDNS or same-origin default).

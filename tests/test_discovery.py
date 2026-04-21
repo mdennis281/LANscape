@@ -18,6 +18,7 @@ from lanscape.ui.react_proxy.discovery import (
     _get_local_addresses,
     _get_local_subnets,
     build_default_route,
+    build_ws_url_for_client,
 )
 
 
@@ -567,6 +568,26 @@ class TestDiscoverResponse:
         )
         assert resp.mdns_enabled is False
 
+    def test_ws_url_default_empty(self):
+        """Test that ws_url defaults to empty string."""
+        resp = DiscoverResponse(
+            mdns_enabled=False,
+            default_route='http://localhost:5001',
+            instances=[],
+        )
+        assert resp.ws_url == ''
+
+    def test_ws_url_round_trip(self):
+        """Test ws_url is preserved in JSON round-trip."""
+        resp = DiscoverResponse(
+            mdns_enabled=False,
+            default_route='http://10.0.4.1:5001',
+            instances=[],
+            ws_url='ws://10.0.4.1:8769',
+        )
+        data = json.loads(resp.model_dump_json())
+        assert data['ws_url'] == 'ws://10.0.4.1:8769'
+
 
 class TestBuildDefaultRoute:
     """Tests for the build_default_route helper."""
@@ -591,3 +612,98 @@ class TestBuildDefaultRoute:
         mock_addrs.return_value = ['192.168.1.100']
         result = build_default_route(9999)
         assert result == 'http://192.168.1.100:9999'
+
+
+class TestBuildWsUrlForClient:
+    """Tests for the build_ws_url_for_client helper."""
+
+    def test_loopback_client_returns_localhost(self):
+        """Loopback client should always get ws://localhost."""
+        result = build_ws_url_for_client('127.0.0.1', 8769)
+        assert result == 'ws://localhost:8769'
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_matches_correct_subnet_interface(self, mock_psutil):
+        """Client on a known subnet picks the matching interface address."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(
+            family=socket.AF_INET,
+            address='10.0.4.1',
+            netmask='255.255.240.0',
+        )
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        result = build_ws_url_for_client('10.0.11.5', 8769)
+        assert result == 'ws://10.0.4.1:8769'
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_no_matching_subnet_falls_back_to_first_lan(self, mock_psutil):
+        """When no subnet matches, falls back to first LAN address."""
+        mock_psutil.net_if_stats.return_value = {
+            'eth0': MagicMock(isup=True),
+        }
+        mock_addr = MagicMock(
+            family=socket.AF_INET,
+            address='192.168.50.1',
+            netmask='255.255.255.0',
+        )
+        mock_psutil.net_if_addrs.return_value = {'eth0': [mock_addr]}
+
+        # Client is on a completely different subnet
+        with patch(
+            'lanscape.ui.react_proxy.discovery.get_local_address_strings',
+            return_value=['192.168.50.1'],
+        ):
+            result = build_ws_url_for_client('172.20.0.5', 8769)
+        assert result == 'ws://192.168.50.1:8769'
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_no_interfaces_falls_back_to_localhost(self, mock_psutil):
+        """When no interfaces are available, falls back to localhost."""
+        mock_psutil.net_if_stats.return_value = {}
+        mock_psutil.net_if_addrs.return_value = {}
+
+        with patch(
+            'lanscape.ui.react_proxy.discovery.get_local_address_strings',
+            return_value=[],
+        ):
+            result = build_ws_url_for_client('192.168.1.50', 8769)
+        assert result == 'ws://localhost:8769'
+
+    def test_invalid_client_ip_falls_back_to_localhost(self):
+        """Invalid IP string should gracefully return localhost."""
+        result = build_ws_url_for_client('not-an-ip', 8766)
+        assert result == 'ws://localhost:8766'
+
+    @patch('lanscape.ui.react_proxy.discovery.psutil')
+    def test_skips_virtual_interfaces(self, mock_psutil):
+        """Virtual interfaces should not be matched even if subnet overlaps."""
+        mock_psutil.net_if_stats.return_value = {
+            'docker0': MagicMock(isup=True),
+            'eth0': MagicMock(isup=True),
+        }
+        mock_docker_addr = MagicMock(
+            family=socket.AF_INET,
+            address='172.17.0.1',
+            netmask='255.255.0.0',
+        )
+        mock_eth_addr = MagicMock(
+            family=socket.AF_INET,
+            address='192.168.1.1',
+            netmask='255.255.255.0',
+        )
+        mock_psutil.net_if_addrs.return_value = {
+            'docker0': [mock_docker_addr],
+            'eth0': [mock_eth_addr],
+        }
+
+        # Client is on the docker subnet — should NOT match docker0
+        # and should fall through to the LAN fallback
+        with patch(
+            'lanscape.ui.react_proxy.discovery.get_local_address_strings',
+            return_value=['192.168.1.1'],
+        ):
+            result = build_ws_url_for_client('172.17.0.5', 8766)
+        assert result == 'ws://192.168.1.1:8766'

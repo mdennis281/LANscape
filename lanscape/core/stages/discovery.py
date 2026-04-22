@@ -91,9 +91,10 @@ def _build_retry_infra(
             traceback=tb_str,
         ))
 
-    max_workers = max(1, int(t_cnt * resilience.t_multiplier))
+    # Pass the unscaled base count — MultiplierController (initial_multiplier=t_multiplier)
+    # applies the multiplier itself, so pre-scaling here would double-apply it.
     retry_manager = ThreadPoolRetryManager(
-        max_workers=max_workers,
+        max_workers=max(1, t_cnt),
         retry_config=retry_config,
         multiplier_controller=mc,
         thread_name_prefix=stage.__class__.__name__,

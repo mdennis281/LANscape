@@ -83,9 +83,10 @@ class PortScanStage(ScanStageMixin):
                 traceback=tb_str,
             ))
 
-        max_workers = max(1, int(self.cfg.t_cnt_device * self.resilience.t_multiplier))
+        # Pass the unscaled base count — MultiplierController (initial_multiplier=t_multiplier)
+        # applies the multiplier itself, so pre-scaling here would double-apply it.
         retry_manager = ThreadPoolRetryManager(
-            max_workers=max_workers,
+            max_workers=max(1, self.cfg.t_cnt_device),
             retry_config=retry_config,
             multiplier_controller=mc,
             thread_name_prefix="PortScan",

@@ -120,6 +120,10 @@ class ScanContext:
                             primary.found_with_stages.append(idx)
                     primary.found_with_stages.sort()
                     to_remove.append(device)
+                    # Remap merged device's IP to the primary in _device_map so
+                    # future add_device calls for this IP update the primary, not
+                    # the stale removed device object.
+                    self._device_map[device.ip] = primary
                     # Also register this device's keys under the primary
                     # so future devices with overlapping keys merge too
                     for key in keys:

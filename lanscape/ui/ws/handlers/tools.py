@@ -168,7 +168,6 @@ class ToolsHandler(BaseHandler):
         try:
             recommendations = recommend_stages(
                 subnet=subnet,
-                arp_supported=is_arp_supported(),
             )
             return {
                 'stages': [r.to_dict() for r in recommendations],

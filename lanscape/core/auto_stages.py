@@ -104,7 +104,6 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
     ip_count: Optional[int] = None,
     is_ipv6: Optional[bool] = None,
     is_local: Optional[bool] = None,
-    arp_supported: bool = True,
     os_platform: Optional[str] = None,
 ) -> List[StageRecommendation]:
     """Return a list of recommended scan stages for the given subnet context.
@@ -114,7 +113,6 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         ip_count: Number of IPs in the subnet.  Computed from *subnet* if ``None``.
         is_ipv6: Whether the subnet is IPv6.  Detected from *subnet* if ``None``.
         is_local: Whether the subnet overlaps a local interface.  Detected if ``None``.
-        arp_supported: Whether the system supports ARP (from ``is_arp_supported``).
         os_platform: ``'windows'``, ``'linux'``, or ``'darwin'``.  Detected if ``None``.
 
     Returns:

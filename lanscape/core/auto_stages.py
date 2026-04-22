@@ -63,7 +63,7 @@ def _recommend_ipv4_local_windows(
     if ip_count > _ICMP_MAX:
         return [StageRecommendation(
             StageType.POKE_ARP_DISCOVERY,
-            StagePreset.BALANCED,
+            StagePreset.FAST,
             f'Large local subnet on Windows ({ip_count:,} IPs)'
             ' — Poke+ARP scales, exceeds ICMP limit',
         )]
@@ -185,7 +185,7 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         # No viable discovery stage for this subnet size
         return []
 
-    preset = StagePreset.BALANCED if is_large else StagePreset.ACCURATE
+    preset = StagePreset.FAST if is_large else StagePreset.BALANCED
     reason = 'Non-local subnet — ARP not usable across L2 boundary' if not is_local \
         else 'ARP not supported on this system — falling back to ICMP'
 

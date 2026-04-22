@@ -63,7 +63,7 @@ def _recommend_ipv4_local_windows(
     if ip_count > _ICMP_MAX:
         return [StageRecommendation(
             StageType.POKE_ARP_DISCOVERY,
-            StagePreset.FAST,
+            StagePreset.BALANCED,
             f'Large local subnet on Windows ({ip_count:,} IPs)'
             ' — Poke+ARP scales, exceeds ICMP limit',
         )]
@@ -75,7 +75,7 @@ def _recommend_ipv4_local_windows(
         )]
     return [StageRecommendation(
         StageType.ICMP_ARP_DISCOVERY,
-        StagePreset.ACCURATE,
+        StagePreset.BALANCED,
         'Small local subnet on Windows — ICMP+ARP is reliable',
     )]
 
@@ -86,16 +86,10 @@ def _recommend_ipv4_local_unix(
     """Return discovery stages for a local Linux/macOS subnet, or [] if unsupported."""
     if ip_count > _ICMP_MAX:
         return []
-    if is_large:
-        return [StageRecommendation(
-            StageType.ICMP_ARP_DISCOVERY,
-            StagePreset.BALANCED,
-            'Large local subnet on Linux/Mac — lightweight ICMP (poke unreliable)',
-        )]
     return [StageRecommendation(
         StageType.ICMP_ARP_DISCOVERY,
-        StagePreset.ACCURATE,
-        'Small local subnet on Linux/Mac — ICMP+ARP is reliable',
+        StagePreset.BALANCED,
+        'Local subnet on Linux/Mac — ICMP+ARP discovery',
     )]
 
 
@@ -185,18 +179,18 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         # No viable discovery stage for this subnet size
         return []
 
-    preset = StagePreset.FAST if is_large else StagePreset.BALANCED
+    port_preset = StagePreset.FAST if is_large else StagePreset.BALANCED
     reason = 'Non-local subnet — ARP not usable across L2 boundary' if not is_local \
         else 'ARP not supported on this system — falling back to ICMP'
 
     stages.append(StageRecommendation(
         StageType.ICMP_DISCOVERY,
-        preset,
+        StagePreset.BALANCED,
         reason,
     ))
     stages.append(StageRecommendation(
         StageType.PORT_SCAN,
-        preset,
+        port_preset,
         f'Port scan ({"fast" if is_large else "balanced"} — {ip_count} IPs)',
     ))
     return stages

@@ -87,7 +87,7 @@ class TestIPv6Recommendations:
 # ── IPv4 small local Windows ────────────────────────────────────────
 
 class TestIPv4SmallLocalWindows:
-    """Small local subnet on Windows → icmp_arp + port_scan (accurate)."""
+    """Small local subnet on Windows → icmp_arp (balanced) + port_scan (accurate)."""
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
            return_value=[{'subnet': '192.168.1.0/24', 'interface': 'Ethernet'}])
@@ -104,15 +104,17 @@ class TestIPv4SmallLocalWindows:
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
            return_value=[{'subnet': '192.168.1.0/24', 'interface': 'Ethernet'}])
-    def test_presets_accurate(self, _mock_subnets: object) -> None:
-        """All stages use accurate preset."""
+    def test_discovery_balanced_port_scan_accurate(self, _mock_subnets: object) -> None:
+        """Discovery uses balanced, port scan uses accurate for small subnet."""
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
             arp_supported=True,
             os_platform='windows',
         )
-        assert all(r.preset == StagePreset.ACCURATE for r in recs)
+        presets_by_type = {r.stage_type.value: r.preset for r in recs}
+        assert presets_by_type['icmp_arp_discovery'] == StagePreset.BALANCED
+        assert presets_by_type['port_scan'] == StagePreset.ACCURATE
 
 
 # ── IPv4 large local Windows ────────────────────────────────────────
@@ -149,7 +151,7 @@ class TestIPv4LargeLocalWindows:
 # ── IPv4 small local Linux ──────────────────────────────────────────
 
 class TestIPv4SmallLocalLinux:
-    """Small local subnet on Linux → icmp_arp + port_scan (accurate)."""
+    """Small local subnet on Linux → icmp_arp (balanced) + port_scan (accurate)."""
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
            return_value=[{'subnet': '192.168.1.0/24', 'interface': 'eth0'}])
@@ -166,21 +168,23 @@ class TestIPv4SmallLocalLinux:
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
            return_value=[{'subnet': '192.168.1.0/24', 'interface': 'eth0'}])
-    def test_presets_accurate(self, _mock_subnets: object) -> None:
-        """All stages use accurate preset."""
+    def test_discovery_balanced_port_scan_accurate(self, _mock_subnets: object) -> None:
+        """Discovery uses balanced, port scan uses accurate for small subnet."""
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
             arp_supported=True,
             os_platform='linux',
         )
-        assert all(r.preset == StagePreset.ACCURATE for r in recs)
+        presets_by_type = {r.stage_type.value: r.preset for r in recs}
+        assert presets_by_type['icmp_arp_discovery'] == StagePreset.BALANCED
+        assert presets_by_type['port_scan'] == StagePreset.ACCURATE
 
 
 # ── IPv4 large local Linux ──────────────────────────────────────────
 
 class TestIPv4LargeLocalLinux:
-    """Large local subnet on Linux → icmp (balanced) + port_scan (balanced).
+    """Large local subnet on Linux → icmp_arp (balanced) + port_scan (balanced).
     NOT poke_arp — it's unreliable on Linux/Mac."""
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
@@ -196,18 +200,6 @@ class TestIPv4LargeLocalLinux:
         types = _stage_types(recs)
         assert types == ['icmp_arp_discovery', 'port_scan']
         assert 'poke_arp_discovery' not in types
-
-    @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
-           return_value=[{'subnet': '10.0.0.0/20', 'interface': 'eth0'}])
-    def test_presets_balanced(self, _mock_subnets: object) -> None:
-        """All stages use balanced preset."""
-        recs = recommend_stages(
-            '10.0.0.0/20',
-            ip_count=4094,
-            arp_supported=True,
-            os_platform='linux',
-        )
-        assert all(r.preset == StagePreset.BALANCED for r in recs)
 
 
 # ── IPv4 large local macOS ──────────────────────────────────────────
@@ -266,10 +258,12 @@ class TestNonLocalSubnet:
         assert all(r.preset == StagePreset.BALANCED for r in recs)
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets', return_value=[])
-    def test_large_non_local_fast(self, _mock_subnets: object) -> None:
-        """Large non-local uses fast preset."""
+    def test_large_non_local_discovery_balanced_port_fast(self, _mock_subnets: object) -> None:
+        """Large non-local: discovery balanced, port scan fast."""
         recs = recommend_stages('10.1.0.0/20', ip_count=4094, is_local=False)
-        assert all(r.preset == StagePreset.FAST for r in recs)
+        presets_by_type = {r.stage_type.value: r.preset for r in recs}
+        assert presets_by_type['icmp_discovery'] == StagePreset.BALANCED
+        assert presets_by_type['port_scan'] == StagePreset.FAST
 
 
 # ── ARP not supported ───────────────────────────────────────────────

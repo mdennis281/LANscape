@@ -63,7 +63,7 @@ def _recommend_ipv4_local_windows(
     if ip_count > _ICMP_MAX:
         return [StageRecommendation(
             StageType.POKE_ARP_DISCOVERY,
-            StagePreset.BALANCED,
+            StagePreset.FAST,
             f'Large local subnet on Windows ({ip_count:,} IPs)'
             ' — Poke+ARP scales, exceeds ICMP limit',
         )]
@@ -75,21 +75,27 @@ def _recommend_ipv4_local_windows(
         )]
     return [StageRecommendation(
         StageType.ICMP_ARP_DISCOVERY,
-        StagePreset.BALANCED,
+        StagePreset.ACCURATE,
         'Small local subnet on Windows — ICMP+ARP is reliable',
     )]
 
 
 def _recommend_ipv4_local_unix(
-    ip_count: int
+    ip_count: int, is_large: bool
 ) -> Optional[List[StageRecommendation]]:
     """Return discovery stages for a local Linux/macOS subnet, or [] if unsupported."""
     if ip_count > _ICMP_MAX:
         return []
+    if is_large:
+        return [StageRecommendation(
+            StageType.ICMP_ARP_DISCOVERY,
+            StagePreset.BALANCED,
+            'Large local subnet on Linux/Mac — lightweight ICMP (poke unreliable)',
+        )]
     return [StageRecommendation(
         StageType.ICMP_ARP_DISCOVERY,
-        StagePreset.BALANCED,
-        'Local subnet on Linux/Mac — ICMP+ARP discovery',
+        StagePreset.ACCURATE,
+        'Small local subnet on Linux/Mac — ICMP+ARP is reliable',
     )]
 
 
@@ -154,12 +160,14 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         ))
         return stages
 
-    # ── IPv4 — local + ARP supported ────────────────────────────────
-    if is_local and arp_supported:
+    # ── IPv4 — local subnet ──────────────────────────────────────────
+    # ICMP_ARP and POKE_ARP stages use OS ARP cache table queries,
+    # not scapy ARP sends, so arp_supported (scapy capability) is irrelevant here.
+    if is_local:
         if os_platform == 'windows':
             discovery = _recommend_ipv4_local_windows(ip_count, is_large)
         else:
-            discovery = _recommend_ipv4_local_unix(ip_count)
+            discovery = _recommend_ipv4_local_unix(ip_count, is_large)
 
         if not discovery and discovery is not None:
             return []
@@ -174,23 +182,22 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         ))
         return stages
 
-    # ── IPv4 — non-local or ARP not supported ───────────────────────
+    # ── IPv4 — non-local ─────────────────────────────────────────────
     if ip_count > _ICMP_MAX:
         # No viable discovery stage for this subnet size
         return []
 
-    port_preset = StagePreset.FAST if is_large else StagePreset.BALANCED
-    reason = 'Non-local subnet — ARP not usable across L2 boundary' if not is_local \
-        else 'ARP not supported on this system — falling back to ICMP'
+    preset = StagePreset.FAST if is_large else StagePreset.BALANCED
+    reason = 'Non-local subnet — ARP not usable across L2 boundary'
 
     stages.append(StageRecommendation(
         StageType.ICMP_DISCOVERY,
-        StagePreset.BALANCED,
+        preset,
         reason,
     ))
     stages.append(StageRecommendation(
         StageType.PORT_SCAN,
-        port_preset,
+        preset,
         f'Port scan ({"fast" if is_large else "balanced"} — {ip_count} IPs)',
     ))
     return stages

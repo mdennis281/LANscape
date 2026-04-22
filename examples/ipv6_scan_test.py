@@ -46,14 +46,14 @@ for d in devices:
     if mac:
         mac_groups[mac.upper()].append(d)
 
-print(f"\n--- Hostname groups ---")
+print("\n--- Hostname groups ---")
 for h, devs in hostname_groups.items():
     if len(devs) > 1:
         print(f"  DUPLICATE hostname '{h}': {[d.ip for d in devs]}")
     else:
         print(f"  OK '{h}': {devs[0].ip}")
 
-print(f"\n--- MAC groups ---")
+print("\n--- MAC groups ---")
 for m, devs in mac_groups.items():
     if len(devs) > 1:
         print(f"  DUPLICATE MAC {m}: {[d.ip for d in devs]}")

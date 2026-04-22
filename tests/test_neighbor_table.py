@@ -31,7 +31,7 @@ from lanscape.core.neighbor_table import (
     _normalize_ip,
     _normalize_mac,
 )
-from lanscape.core.system_compat import query_single_arp_entry
+from lanscape.core.system_compat import query_single_arp_entry, _SINGLE_ARP_MAC_RE
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -696,6 +696,45 @@ class TestNeighborTableServiceLifecycle:
 # ═══════════════════════════════════════════════════════════════════
 #  Live integration tests
 # ═══════════════════════════════════════════════════════════════════
+
+class TestSingleArpMacRegex:
+    """Unit tests for _SINGLE_ARP_MAC_RE — the regex used by query_single_arp_entry.
+
+    macOS arp(8) omits leading zeros per octet (e.g. ``6:94:e6:c8:e4:22``),
+    so the regex must accept 1–2 hex digits per octet.
+    """
+
+    def test_standard_full_octets(self):
+        """Matches a standard two-digit-per-octet MAC."""
+        m = _SINGLE_ARP_MAC_RE.search("? (10.0.0.1) at aa:bb:cc:dd:ee:ff on en0")
+        assert m is not None
+        assert m.group(1) == 'aa:bb:cc:dd:ee:ff'
+
+    def test_macos_single_digit_leading_octet(self):
+        """Matches macOS output where the first octet has no leading zero."""
+        line = "? (192.168.64.1) at 6:94:e6:c8:e4:22 on feth2275 ifscope [ethernet]"
+        m = _SINGLE_ARP_MAC_RE.search(line)
+        assert m is not None
+        assert m.group(1) == '6:94:e6:c8:e4:22'
+
+    def test_macos_multiple_short_octets(self):
+        """Matches when several octets have only one hex digit."""
+        line = "? (10.1.1.1) at 0:c:29:ab:cd:ef on en0 [ethernet]"
+        m = _SINGLE_ARP_MAC_RE.search(line)
+        assert m is not None
+        assert m.group(1) == '0:c:29:ab:cd:ef'
+
+    def test_windows_dash_separated(self):
+        """Matches Windows-style dash-separated MAC."""
+        line = "  10.0.0.1              00-1b-21-38-a9-64     dynamic"
+        m = _SINGLE_ARP_MAC_RE.search(line)
+        assert m is not None
+
+    def test_no_match_for_incomplete(self):
+        """Does not match '(incomplete)' entries."""
+        line = "? (10.0.0.2) at (incomplete) on en0"
+        assert _SINGLE_ARP_MAC_RE.search(line) is None
+
 
 class TestLiveWindowsArpTable:
     """Live tests against the actual Windows ARP table."""

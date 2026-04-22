@@ -763,10 +763,12 @@ def configure_asyncio_exception_handler(loop) -> None:
 
 # ─── Per-device ARP/NDP cache query ────────────────────────────────
 
-# Regex for extracting a MAC from a single-target ARP/NDP result
+# Regex for extracting a MAC from a single-target ARP/NDP result.
+# Uses {1,2} per octet because macOS arp(8) omits leading zeros
+# (e.g. "6:94:e6:c8:e4:22" instead of "06:94:e6:c8:e4:22").
 _SINGLE_ARP_MAC_RE = re.compile(
-    r'([0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2}'
-    r'[:\-][0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2}[:\-][0-9a-fA-F]{2})'
+    r'([0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}'
+    r'[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2})'
 )
 
 
@@ -818,7 +820,9 @@ def query_single_arp_entry(ip: str, timeout: float = 3.0) -> Optional[str]:
 
         match = _SINGLE_ARP_MAC_RE.search(output)
         if match:
-            mac = match.group(1).lower().replace('-', ':')
+            raw = match.group(1).lower().replace('-', ':')
+            # Zero-pad each octet (macOS omits leading zeros)
+            mac = ':'.join(o.zfill(2) for o in raw.split(':'))
             # Reject null / broadcast MACs
             if mac not in ('00:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff'):
                 return mac

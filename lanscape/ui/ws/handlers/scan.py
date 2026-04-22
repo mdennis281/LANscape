@@ -439,7 +439,13 @@ class ScanHandler(BaseHandler):
             Dict with success status and updated stage count
         """
         scan_id = self._get_param(params, 'scan_id', required=True)
-        index = self._get_param(params, 'index', required=True)
+        raw_index = self._get_param(params, 'index', required=True)
+        try:
+            index = int(raw_index)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Parameter 'index' must be an integer, got: {raw_index!r}"
+            ) from exc
         stage_type = self._get_param(params, 'stage_type', required=True)
         config = self._get_param(params, 'config', default={})
 

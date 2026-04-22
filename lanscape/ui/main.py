@@ -1,5 +1,6 @@
 """Main entry point for the LANscape application when running as a module."""
 import logging
+import socket
 import time
 import traceback
 
@@ -99,8 +100,12 @@ def start_webapp_mode():
         raise
 
 
-def _get_bound_ports() -> set[int]:
-    """Return the set of all TCP ports currently bound on the system."""
+def _get_bound_ports() -> set[int] | None:
+    """Return the set of all TCP ports currently bound on the system.
+
+    Returns None if the information could not be collected (e.g. access denied),
+    so callers can fall back to a direct socket check.
+    """
     try:
         return {
             conn.laddr.port
@@ -108,14 +113,28 @@ def _get_bound_ports() -> set[int]:
             if conn.laddr
         }
     except (psutil.AccessDenied, OSError):
-        return set()
+        return None
+
+
+def _socket_port_in_use(port: int) -> bool:
+    """Fallback: attempt a non-blocking socket bind to determine if a port is in use."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('127.0.0.1', port))
+            return False
+        except OSError:
+            return True
 
 
 def is_port_available(port: int, bound_ports: set[int] | None = None) -> bool:
     """Check if a port is available for binding."""
-    if bound_ports is None:
-        bound_ports = _get_bound_ports()
-    return port not in bound_ports
+    if bound_ports is not None:
+        return port not in bound_ports
+    ports = _get_bound_ports()
+    if ports is not None:
+        return port not in ports
+    # psutil was unavailable/denied; fall back to a direct socket bind test
+    return not _socket_port_in_use(port)
 
 
 def validate_port_available(port: int, flag_name: str, retries: int = 10,

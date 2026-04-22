@@ -865,6 +865,7 @@ def _get_default_gateway_ip() -> str | None:
     return None
 
 
+@pytest.mark.integration
 class TestLiveArpQuerySingleEntry:
     """Live integration tests for query_single_arp_entry().
 

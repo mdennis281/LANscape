@@ -270,8 +270,9 @@ class ToolsHandler(BaseHandler):
         """
         Get application info (fast path — no network or ARP calls).
 
-        Expensive checks (ARP support, update availability) are deferred
-        to ``tools.capabilities`` so the UI can render immediately.
+        Expensive checks are deferred to separate actions so the UI can
+        render immediately: ARP support via ``tools.arp_supported`` and
+        update availability via ``tools.update_check``.
 
         Returns:
             Dict with app info:

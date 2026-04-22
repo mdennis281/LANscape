@@ -26,6 +26,14 @@ _IPV4_ENUM_STAGES = {
     StageType.ICMP_ARP_DISCOVERY,
 }
 
+# Dispatch map for IPv4 discovery stages (all share the same constructor signature)
+_IPV4_DISCOVERY_MAP: dict = {
+    StageType.ICMP_DISCOVERY: ICMPDiscoveryStage,
+    StageType.ARP_DISCOVERY: ARPDiscoveryStage,
+    StageType.POKE_ARP_DISCOVERY: PokeARPDiscoveryStage,
+    StageType.ICMP_ARP_DISCOVERY: ICMPARPDiscoveryStage,
+}
+
 
 def _instantiate_stage(
     st: StageType,
@@ -35,14 +43,8 @@ def _instantiate_stage(
     resilience,
 ) -> ScanStageMixin:
     """Instantiate a single stage from its type and resolved config."""
-    if st == StageType.ICMP_DISCOVERY:
-        return ICMPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
-    if st == StageType.ARP_DISCOVERY:
-        return ARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
-    if st == StageType.POKE_ARP_DISCOVERY:
-        return PokeARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
-    if st == StageType.ICMP_ARP_DISCOVERY:
-        return ICMPARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
+    if st in _IPV4_DISCOVERY_MAP:
+        return _IPV4_DISCOVERY_MAP[st](typed_cfg, subnet_ips, resilience=resilience)
     if st == StageType.IPV6_NDP_DISCOVERY:
         return IPv6NDPDiscoveryStage(typed_cfg, subnet_hint=subnet)
     if st == StageType.IPV6_MDNS_DISCOVERY:

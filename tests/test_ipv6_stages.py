@@ -273,6 +273,9 @@ class TestIPv6MDNSSubnetFilter:
                 # Immediately fire add_service for the first registered type
                 listener.add_service(zc, svc_type, "test._http._tcp.local.")
 
+            def cancel(self):
+                """No-op cancel (satisfies ServiceBrowser interface)."""
+
         with patch('lanscape.core.stages.ipv6_discovery.Zeroconf', FakeZeroconf), \
              patch('lanscape.core.stages.ipv6_discovery.ServiceBrowser', FakeServiceBrowser), \
              patch('lanscape.core.stages.ipv6_discovery.NeighborTableService') as mock_nts:

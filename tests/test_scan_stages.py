@@ -29,9 +29,6 @@ from lanscape.core.stages.discovery import (
 )
 from lanscape.core.stages.port_scan import PortScanStage
 from lanscape.core.stages.ipv6_discovery import IPv6NDPDiscoveryStage, IPv6MDNSDiscoveryStage
-from lanscape.core.scan_config import IPv6NDPDiscoveryStageConfig, IPv6MDNSDiscoveryStageConfig
-from lanscape.core.neighbor_table import NeighborEntry, NeighborTable
-from lanscape.core.subnet_scan import SubnetScanner
 
 
 # ---------------------------------------------------------------------------

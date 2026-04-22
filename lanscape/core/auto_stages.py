@@ -81,7 +81,7 @@ def _recommend_ipv4_local_windows(
 
 
 def _recommend_ipv4_local_unix(
-    ip_count: int, is_large: bool
+    ip_count: int
 ) -> Optional[List[StageRecommendation]]:
     """Return discovery stages for a local Linux/macOS subnet, or [] if unsupported."""
     if ip_count > _ICMP_MAX:
@@ -159,7 +159,7 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         if os_platform == 'windows':
             discovery = _recommend_ipv4_local_windows(ip_count, is_large)
         else:
-            discovery = _recommend_ipv4_local_unix(ip_count, is_large)
+            discovery = _recommend_ipv4_local_unix(ip_count)
 
         if not discovery and discovery is not None:
             return []

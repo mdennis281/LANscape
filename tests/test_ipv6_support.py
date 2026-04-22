@@ -106,8 +106,6 @@ class TestSendArpRequestInterfaceRouting:
 
     def test_uses_routed_interface_not_default(self):
         """srp is called with the interface resolved from conf.route, not conf.iface."""
-        from unittest.mock import patch, MagicMock
-
         mock_srp = MagicMock(return_value=([], []))
         mock_conf = MagicMock()
         mock_conf.route.route.return_value = ('eth0_routed', '10.0.1.5', '0.0.0.0')
@@ -129,8 +127,6 @@ class TestSendArpRequestInterfaceRouting:
 
     def test_falls_back_to_default_iface_on_route_error(self):
         """When conf.route.route raises, srp falls back to conf.iface."""
-        from unittest.mock import patch, MagicMock
-
         mock_srp = MagicMock(return_value=([], []))
         mock_conf = MagicMock()
         mock_conf.route.route.side_effect = Exception("no route")

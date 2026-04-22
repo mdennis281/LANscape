@@ -4,8 +4,6 @@ Tests for lanscape.core.ip_parser — IPv4 & IPv6 parsing utilities.
 
 import ipaddress
 
-import pytest
-
 from lanscape.core.ip_parser import (
     get_address_count,
     ip_range_to_list,

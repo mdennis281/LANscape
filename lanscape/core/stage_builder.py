@@ -27,6 +27,31 @@ _IPV4_ENUM_STAGES = {
 }
 
 
+def _instantiate_stage(
+    st: StageType,
+    typed_cfg,
+    subnet_ips: List,
+    subnet: str,
+    resilience,
+) -> ScanStageMixin:
+    """Instantiate a single stage from its type and resolved config."""
+    if st == StageType.ICMP_DISCOVERY:
+        return ICMPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
+    if st == StageType.ARP_DISCOVERY:
+        return ARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
+    if st == StageType.POKE_ARP_DISCOVERY:
+        return PokeARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
+    if st == StageType.ICMP_ARP_DISCOVERY:
+        return ICMPARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience)
+    if st == StageType.IPV6_NDP_DISCOVERY:
+        return IPv6NDPDiscoveryStage(typed_cfg, subnet_hint=subnet)
+    if st == StageType.IPV6_MDNS_DISCOVERY:
+        return IPv6MDNSDiscoveryStage(typed_cfg)
+    if st == StageType.PORT_SCAN:
+        return PortScanStage(typed_cfg, resilience=resilience)
+    raise ValueError(f"Unknown stage type: {st}")
+
+
 def build_stages(pipeline_cfg: PipelineConfig) -> List[ScanStageMixin]:
     """Instantiate concrete stage objects from a :class:`PipelineConfig`.
 
@@ -55,33 +80,16 @@ def build_stages(pipeline_cfg: PipelineConfig) -> List[ScanStageMixin]:
         subnet_ips = parse_ip_input(pipeline_cfg.subnet)
 
     resilience = pipeline_cfg.resilience
-
     stages: List[ScanStageMixin] = []
 
     for stage_cfg in pipeline_cfg.stages:
         typed_cfg = stage_cfg.get_typed_config()
-        st = stage_cfg.stage_type
-
-        if st == StageType.ICMP_DISCOVERY:
-            stages.append(ICMPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience))
-        elif st == StageType.ARP_DISCOVERY:
-            stages.append(ARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience))
-        elif st == StageType.POKE_ARP_DISCOVERY:
-            stages.append(PokeARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience))
-        elif st == StageType.ICMP_ARP_DISCOVERY:
-            stages.append(ICMPARPDiscoveryStage(typed_cfg, subnet_ips, resilience=resilience))
-        elif st == StageType.IPV6_NDP_DISCOVERY:
-            stages.append(IPv6NDPDiscoveryStage(
-                typed_cfg, subnet_hint=pipeline_cfg.subnet,
-            ))
-        elif st == StageType.IPV6_MDNS_DISCOVERY:
-            stages.append(IPv6MDNSDiscoveryStage(typed_cfg))
-        elif st == StageType.PORT_SCAN:
-            stages.append(PortScanStage(typed_cfg, resilience=resilience))
-
-        # Propagate auto-stage metadata to the stage instance
-        if stages:
-            stages[-1].auto = stage_cfg.auto
-            stages[-1].reason = stage_cfg.reason
+        stage = _instantiate_stage(
+            stage_cfg.stage_type, typed_cfg, subnet_ips,
+            pipeline_cfg.subnet, resilience,
+        )
+        stage.auto = stage_cfg.auto
+        stage.reason = stage_cfg.reason
+        stages.append(stage)
 
     return stages

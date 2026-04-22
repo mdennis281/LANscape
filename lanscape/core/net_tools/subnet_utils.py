@@ -9,16 +9,16 @@ from typing import List
 import psutil
 from scapy.error import Scapy_Exception
 
-from lanscape.core.ip_parser import get_address_count, parse_ip_input
-
-# Cap used in subnet listing to avoid JS integer overflow for very large IPv6 subnets
-_SUBNET_LIST_CAP = 100_000
 from lanscape.core.decorators import run_once
+from lanscape.core.ip_parser import get_address_count, parse_ip_input
 from lanscape.core.scan_config import ScanType
 from lanscape.core.system_compat import (
     get_primary_interface,
     send_arp_request,
 )
+
+# Cap used in subnet listing to avoid JS integer overflow for very large IPv6 subnets
+_SUBNET_LIST_CAP = 100_000
 
 log = logging.getLogger('NetTools')
 

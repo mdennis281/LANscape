@@ -4,13 +4,13 @@ Verifies that the scanning host's own IP is correctly identified and
 its MAC is populated from OS interface info (since a device never
 appears in its own ARP/neighbor table).
 """
+# pylint: disable=protected-access
 
 import socket
 from collections import namedtuple
 from unittest.mock import patch, MagicMock
 
-import pytest
-
+from lanscape.core.net_tools.device import Device
 from lanscape.core.system_compat import (
     get_local_mac_for_ip,
     refresh_local_ip_mac_cache,
@@ -43,6 +43,7 @@ class TestBuildLocalIpMacMap:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_maps_ipv4_to_mac(self, mock_psutil):
+        """IPv4 address is correctly mapped to MAC."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('aa:bb:cc:dd:ee:ff', '192.168.1.100'),
@@ -52,6 +53,7 @@ class TestBuildLocalIpMacMap:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_maps_ipv6_to_mac(self, mock_psutil):
+        """IPv6 address is correctly mapped to MAC."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('aa:bb:cc:dd:ee:ff', '192.168.1.100',
@@ -62,6 +64,7 @@ class TestBuildLocalIpMacMap:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_multiple_interfaces(self, mock_psutil):
+        """Multiple interfaces are all mapped correctly."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('aa:bb:cc:dd:ee:ff', '192.168.1.100'),
@@ -73,6 +76,7 @@ class TestBuildLocalIpMacMap:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_skips_zero_mac(self, mock_psutil):
+        """Interfaces with all-zero MAC are skipped."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'lo': _make_fake_addrs('00:00:00:00:00:00', '127.0.0.1'),
@@ -82,6 +86,7 @@ class TestBuildLocalIpMacMap:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_normalizes_windows_dashes_to_colons(self, mock_psutil):
+        """Windows dash-separated MACs are normalized to colon format."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'Ethernet': _make_fake_addrs('AA-BB-CC-DD-EE-FF', '192.168.1.50'),
@@ -108,6 +113,7 @@ class TestGetLocalMacForIp:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_returns_mac_for_local_ip(self, mock_psutil):
+        """Returns MAC when IP matches a local interface."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('de:ad:be:ef:00:01', '192.168.1.42'),
@@ -117,6 +123,7 @@ class TestGetLocalMacForIp:
 
     @patch('lanscape.core.system_compat.psutil')
     def test_returns_none_for_remote_ip(self, mock_psutil):
+        """Returns None when IP is not a local interface."""
         mock_psutil.AF_LINK = AF_LINK
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('de:ad:be:ef:00:01', '192.168.1.42'),
@@ -132,8 +139,6 @@ class TestDeviceSelfDetection:
     @patch('lanscape.core.net_tools.device.NeighborTableService')
     def test_local_ip_gets_interface_mac(self, mock_nts, mock_get_local):
         """When the device IP matches a local interface, use interface MAC."""
-        from lanscape.core.net_tools.device import Device
-
         mock_get_local.return_value = 'aa:bb:cc:dd:ee:ff'
         device = Device(ip='192.168.1.100', alive=True)
         device._get_mac_addresses()
@@ -145,8 +150,6 @@ class TestDeviceSelfDetection:
     @patch('lanscape.core.net_tools.device.NeighborTableService')
     def test_remote_ip_uses_neighbor_table(self, mock_nts, mock_get_local):
         """When the device IP is not local, fall back to NeighborTableService."""
-        from lanscape.core.net_tools.device import Device
-
         mock_get_local.return_value = None
         mock_svc = MagicMock()
         mock_svc.get_macs_wait.return_value = ['11:22:33:44:55:66']
@@ -162,8 +165,6 @@ class TestDeviceSelfDetection:
     @patch('lanscape.core.net_tools.device.NeighborTableService')
     def test_skips_lookup_if_macs_already_set(self, mock_nts, mock_get_local):
         """If macs are already populated, no lookups should happen."""
-        from lanscape.core.net_tools.device import Device
-
         device = Device(ip='192.168.1.100', alive=True, macs=['ff:ff:ff:ff:ff:ff'])
         device._get_mac_addresses()
 

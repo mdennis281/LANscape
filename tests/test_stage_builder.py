@@ -89,4 +89,4 @@ class TestMaxSubnetSizeClassVars:
     def test_max_subnet_size_not_in_schema(self):
         """MAX_SUBNET_SIZE should not appear in Pydantic model fields."""
         fields = ICMPDiscoveryStageConfig.model_fields
-        assert "MAX_SUBNET_SIZE" not in fields
+        assert "MAX_SUBNET_SIZE" not in fields.keys()

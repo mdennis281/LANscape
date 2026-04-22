@@ -2,8 +2,6 @@
 Tests for the tools WebSocket handler utilities.
 """
 
-import pytest
-
 from lanscape.ui.ws.handlers.tools import _format_ip_count
 
 
@@ -49,39 +47,39 @@ class TestFormatIpCount:
 
     # --- M tier (1,000,000 – 999,999,999) ---
 
-    def test_1_2M(self):
+    def test_one_point_two_million(self):
         """1,200,005 → 1.2M IPs (example from spec)."""
         assert _format_ip_count(1_200_005) == "1.2M IPs"
 
-    def test_exactly_1M(self):
+    def test_exactly_one_million(self):
         """1,000,000 → 1M IPs."""
         assert _format_ip_count(1_000_000) == "1M IPs"
 
-    def test_trailing_zero_stripped_M(self):
+    def test_trailing_zero_stripped_million(self):
         """10,000,000 → 10M IPs (not 10.0M)."""
         assert _format_ip_count(10_000_000) == "10M IPs"
 
     # --- B tier (1,000,000,000 – 999,999,999,999) ---
 
-    def test_1_3B(self):
+    def test_one_point_three_billion(self):
         """1,300,400,100 → 1.3B IPs (example from spec)."""
         assert _format_ip_count(1_300_400_100) == "1.3B IPs"
 
-    def test_exactly_1B(self):
+    def test_exactly_one_billion(self):
         """1,000,000,000 → 1B IPs."""
         assert _format_ip_count(1_000_000_000) == "1B IPs"
 
     # --- T tier (1,000,000,000,000 – 999,999,999,999,999) ---
 
-    def test_2_5T(self):
+    def test_two_point_five_trillion(self):
         """2,500,000,000,000 → 2.5T IPs (example from spec)."""
         assert _format_ip_count(2_500_000_000_000) == "2.5T IPs"
 
-    def test_exactly_1T(self):
+    def test_exactly_one_trillion(self):
         """1,000,000,000,000 → 1T IPs."""
         assert _format_ip_count(1_000_000_000_000) == "1T IPs"
 
-    def test_999T_upper_bound(self):
+    def test_nine_nine_nine_trillion_upper_bound(self):
         """999,999,999,999,999 stays in T tier."""
         result = _format_ip_count(999_999_999_999_999)
         assert result.endswith("T IPs")

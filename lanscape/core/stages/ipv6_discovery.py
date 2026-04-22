@@ -252,37 +252,47 @@ class IPv6MDNSDiscoveryStage(ScanStageMixin):
             return "mDNS discovery is IPv6-only"
         return None
 
+    def _build_mdns_subnet_filter(
+        self, context: ScanContext
+    ) -> Optional[ipaddress.IPv6Network]:
+        """Derive an IPv6 subnet filter from the scan context."""
+        if not context.subnet:
+            return None
+        try:
+            net = ipaddress.ip_network(context.subnet, strict=False)
+            if net.version == 6:
+                return net
+        except ValueError:
+            pass
+        return None
+
+    def _warn_zeroconf_unavailable(self, context: ScanContext) -> None:
+        """Log a warning and mark stage complete when zeroconf is not installed."""
+        self.log.warning("zeroconf not installed — skipping mDNS discovery")
+        context.warnings.append(ScanWarningInfo(
+            category=WarningCategory.CAPABILITY,
+            title="IPv6 mDNS unavailable",
+            body=(
+                "The `zeroconf` package is not installed. "
+                "mDNS-based IPv6 device discovery has been skipped.\n\n"
+                "Install with: `pip install zeroconf`"
+            ),
+            stage=self.stage_name,
+        ))
+        self._completed = self.total
+
     def execute(self, context: ScanContext) -> None:
         # Progress tracks elapsed time in half-second ticks
         self.total = max(int(self.cfg.timeout / 0.5), 1)
 
-        # Build subnet filter — only report IPs within the target subnet
-        subnet_net: Optional[ipaddress.IPv6Network] = None
-        if context.subnet:
-            try:
-                net = ipaddress.ip_network(context.subnet, strict=False)
-                if net.version == 6:
-                    subnet_net = net
-            except ValueError:
-                pass
+        subnet_net = self._build_mdns_subnet_filter(context)
 
         # Ensure neighbor table service is running for MAC resolution
         if not NeighborTableService.instance().is_running:
             NeighborTableService.instance().start()
 
         if Zeroconf is None or ServiceBrowser is None:
-            self.log.warning("zeroconf not installed — skipping mDNS discovery")
-            context.warnings.append(ScanWarningInfo(
-                category=WarningCategory.CAPABILITY,
-                title="IPv6 mDNS unavailable",
-                body=(
-                    "The `zeroconf` package is not installed. "
-                    "mDNS-based IPv6 device discovery has been skipped.\n\n"
-                    "Install with: `pip install zeroconf`"
-                ),
-                stage=self.stage_name,
-            ))
-            self._completed = self.total
+            self._warn_zeroconf_unavailable(context)
             return
 
         discovered: dict[str, Device] = {}

@@ -62,7 +62,9 @@ class StageProgress(BaseModel):
         default="items",
         description="Label for the progress counter (e.g. 'IPs scanned')"
     )
-    auto: Optional[bool] = Field(default=None, description="Whether this stage was auto-recommended")
+    auto: Optional[bool] = Field(
+        default=None, description="Whether this stage was auto-recommended"
+    )
     reason: Optional[str] = Field(default=None, description="Reason the stage was auto-recommended")
 
 

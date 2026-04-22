@@ -30,7 +30,6 @@ from typing import Dict
 
 from lanscape.core.models.enums import StageType
 from lanscape.core.scan_config import (
-    STAGE_CONFIG_REGISTRY,
     PingConfig,
     ArpConfig,
     ArpCacheConfig,

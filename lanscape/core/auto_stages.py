@@ -54,6 +54,51 @@ class StageRecommendation:
         }
 
 
+def _recommend_ipv4_local_windows(
+    ip_count: int, is_large: bool
+) -> Optional[List[StageRecommendation]]:
+    """Return discovery stages for a local Windows subnet, or None if unsupported."""
+    if ip_count > _POKE_ARP_MAX:
+        return []
+    if ip_count > _ICMP_MAX:
+        return [StageRecommendation(
+            StageType.POKE_ARP_DISCOVERY,
+            StagePreset.BALANCED,
+            f'Large local subnet on Windows ({ip_count:,} IPs)'
+            ' — Poke+ARP scales, exceeds ICMP limit',
+        )]
+    if is_large:
+        return [StageRecommendation(
+            StageType.POKE_ARP_DISCOVERY,
+            StagePreset.BALANCED,
+            'Large local subnet on Windows — Poke+ARP scales, skips ICMP wait',
+        )]
+    return [StageRecommendation(
+        StageType.ICMP_ARP_DISCOVERY,
+        StagePreset.ACCURATE,
+        'Small local subnet on Windows — ICMP+ARP is reliable',
+    )]
+
+
+def _recommend_ipv4_local_unix(
+    ip_count: int, is_large: bool
+) -> Optional[List[StageRecommendation]]:
+    """Return discovery stages for a local Linux/macOS subnet, or [] if unsupported."""
+    if ip_count > _ICMP_MAX:
+        return []
+    if is_large:
+        return [StageRecommendation(
+            StageType.ICMP_ARP_DISCOVERY,
+            StagePreset.BALANCED,
+            'Large local subnet on Linux/Mac — lightweight ICMP (poke unreliable)',
+        )]
+    return [StageRecommendation(
+        StageType.ICMP_ARP_DISCOVERY,
+        StagePreset.ACCURATE,
+        'Small local subnet on Linux/Mac — ICMP+ARP is reliable',
+    )]
+
+
 def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     subnet: str,
     ip_count: Optional[int] = None,
@@ -118,55 +163,20 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
     # ── IPv4 — local + ARP supported ────────────────────────────────
     if is_local and arp_supported:
         if os_platform == 'windows':
-            if ip_count > _POKE_ARP_MAX:
-                # No IPv4 discovery stage supports subnets this large
-                return []
-            if ip_count > _ICMP_MAX:
-                # Too large for ICMP, but poke+ARP can handle it on Windows
-                stages.append(StageRecommendation(
-                    StageType.POKE_ARP_DISCOVERY,
-                    StagePreset.FAST,
-                    f'Large local subnet on Windows ({ip_count:,} IPs) — Poke+ARP scales, exceeds ICMP limit',
-                ))
-            elif is_large:
-                # Large but within ICMP range: poke+ARP still faster on Windows
-                stages.append(StageRecommendation(
-                    StageType.POKE_ARP_DISCOVERY,
-                    StagePreset.FAST,
-                    'Large local subnet on Windows — Poke+ARP scales, skips ICMP wait',
-                ))
-            else:
-                # Small subnet: ICMP+ARP is reliable
-                stages.append(StageRecommendation(
-                    StageType.ICMP_ARP_DISCOVERY,
-                    StagePreset.BALANCED,
-                    'Small local subnet on Windows — ICMP+ARP is reliable',
-                ))
+            discovery = _recommend_ipv4_local_windows(ip_count, is_large)
         else:
-            # Linux / macOS — poke+ARP is unreliable, ICMP only
-            if ip_count > _ICMP_MAX:
-                # No viable discovery stage for this subnet size on Linux/Mac
-                return []
-            if is_large:
-                stages.append(StageRecommendation(
-                    StageType.ICMP_DISCOVERY,
-                    StagePreset.FAST,
-                    'Large local subnet on Linux/Mac — lightweight ICMP (poke unreliable)',
-                ))
-            else:
-                # ICMP+ARP works well for smaller subnets
-                stages.append(StageRecommendation(
-                    StageType.ICMP_ARP_DISCOVERY,
-                    StagePreset.BALANCED,
-                    'Small local subnet on Linux/Mac — ICMP+ARP is reliable',
-                ))
+            discovery = _recommend_ipv4_local_unix(ip_count, is_large)
+
+        if not discovery and discovery is not None:
+            return []
+        stages.extend(discovery or [])
 
         # Always add port scan after discovery
-        preset = StagePreset.FAST if is_large else StagePreset.BALANCED
+        preset = StagePreset.BALANCED if is_large else StagePreset.ACCURATE
         stages.append(StageRecommendation(
             StageType.PORT_SCAN,
             preset,
-            f'Port scan ({"fast" if is_large else "balanced"} — {ip_count} IPs)',
+            f'Port scan ({"balanced" if is_large else "accurate"} — {ip_count} IPs)',
         ))
         return stages
 
@@ -175,7 +185,7 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         # No viable discovery stage for this subnet size
         return []
 
-    preset = StagePreset.FAST if is_large else StagePreset.BALANCED
+    preset = StagePreset.BALANCED if is_large else StagePreset.ACCURATE
     reason = 'Non-local subnet — ARP not usable across L2 boundary' if not is_local \
         else 'ARP not supported on this system — falling back to ICMP'
 

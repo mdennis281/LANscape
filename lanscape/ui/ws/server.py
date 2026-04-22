@@ -377,6 +377,9 @@ class WebSocketServer:
 
         # Update tracking set
         self._previously_running_scans = currently_running
+        # Prune _completed_scans to only known scan IDs to prevent unbounded growth
+        known_scan_ids = {scan.uid for scan in self._scan_handler._scan_manager.scans}  # pylint: disable=protected-access
+        self._completed_scans &= known_scan_ids
 
     async def _send_scan_finished_to_subscribers(self, scan) -> None:
         """Send scan finished event (complete or terminated) to all subscribed clients."""

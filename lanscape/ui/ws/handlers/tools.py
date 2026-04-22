@@ -127,10 +127,14 @@ class ToolsHandler(BaseHandler):
                 ips = parse_ip_input(subnet)
                 count = len(ips)
 
+            # Cap count at JS Number.MAX_SAFE_INTEGER (2^53 - 1) to avoid
+            # precision loss when the value is serialised to JSON and parsed
+            # by a JavaScript client (e.g. large IPv6 /64 subnets).
+            js_safe_count = min(count, 2**53 - 1)
             return {
                 'valid': True,
                 'msg': _format_ip_count(count),
-                'count': count,
+                'count': js_safe_count,
                 'is_ipv6': _is_ipv6(subnet),
                 'is_local': _is_local_subnet(subnet),
                 'matching_interface': _matching_interface(subnet),

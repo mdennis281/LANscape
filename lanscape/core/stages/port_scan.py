@@ -1,7 +1,7 @@
 """Port scanning stage."""
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 from lanscape.core.scan_stage import ScanStageMixin
@@ -123,10 +123,13 @@ class PortScanStage(ScanStageMixin):
                 executor.submit(self._test_port, device, port): port
                 for port in ports
             }
-            for future in futures:
+            for future in as_completed(futures):
                 if not self.running:
                     break
-                future.result()
+                try:
+                    future.result()
+                except Exception as exc:
+                    log.debug('Port scan future raised: %s', exc)
 
         device.stage = 'complete'
         context.mark_port_scanned(device.ip, set(ports))

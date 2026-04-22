@@ -101,11 +101,14 @@ def start_webapp_mode():
 
 def _get_bound_ports() -> set[int]:
     """Return the set of all TCP ports currently bound on the system."""
-    return {
-        conn.laddr.port
-        for conn in psutil.net_connections(kind='tcp')
-        if conn.laddr
-    }
+    try:
+        return {
+            conn.laddr.port
+            for conn in psutil.net_connections(kind='tcp')
+            if conn.laddr
+        }
+    except (psutil.AccessDenied, OSError):
+        return set()
 
 
 def is_port_available(port: int, bound_ports: set[int] | None = None) -> bool:

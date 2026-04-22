@@ -96,7 +96,6 @@ class TestIPv4SmallLocalWindows:
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
-            arp_supported=True,
             os_platform='windows',
         )
         types = _stage_types(recs)
@@ -109,7 +108,6 @@ class TestIPv4SmallLocalWindows:
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
-            arp_supported=True,
             os_platform='windows',
         )
         assert all(r.preset == StagePreset.ACCURATE for r in recs)
@@ -127,7 +125,6 @@ class TestIPv4LargeLocalWindows:
         recs = recommend_stages(
             '10.0.0.0/20',
             ip_count=4094,
-            arp_supported=True,
             os_platform='windows',
         )
         types = _stage_types(recs)
@@ -140,7 +137,6 @@ class TestIPv4LargeLocalWindows:
         recs = recommend_stages(
             '10.0.0.0/20',
             ip_count=4094,
-            arp_supported=True,
             os_platform='windows',
         )
         assert all(r.preset == StagePreset.BALANCED for r in recs)
@@ -158,7 +154,6 @@ class TestIPv4SmallLocalLinux:
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
-            arp_supported=True,
             os_platform='linux',
         )
         types = _stage_types(recs)
@@ -171,7 +166,6 @@ class TestIPv4SmallLocalLinux:
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
-            arp_supported=True,
             os_platform='linux',
         )
         assert all(r.preset == StagePreset.ACCURATE for r in recs)
@@ -190,7 +184,6 @@ class TestIPv4LargeLocalLinux:
         recs = recommend_stages(
             '10.0.0.0/20',
             ip_count=4094,
-            arp_supported=True,
             os_platform='linux',
         )
         types = _stage_types(recs)
@@ -204,7 +197,6 @@ class TestIPv4LargeLocalLinux:
         recs = recommend_stages(
             '10.0.0.0/20',
             ip_count=4094,
-            arp_supported=True,
             os_platform='linux',
         )
         assert all(r.preset == StagePreset.BALANCED for r in recs)
@@ -222,7 +214,6 @@ class TestIPv4LargeLocalMac:
         recs = recommend_stages(
             '10.0.0.0/20',
             ip_count=4094,
-            arp_supported=True,
             os_platform='darwin',
         )
         types = _stage_types(recs)
@@ -240,7 +231,6 @@ class TestNonLocalSubnet:
         recs = recommend_stages(
             '8.8.8.0/24',
             ip_count=254,
-            arp_supported=True,
             os_platform='windows',
         )
         types = _stage_types(recs)
@@ -252,7 +242,6 @@ class TestNonLocalSubnet:
         recs = recommend_stages(
             '8.8.8.0/24',
             ip_count=254,
-            arp_supported=True,
             os_platform='windows',
         )
         types = _stage_types(recs)
@@ -272,19 +261,18 @@ class TestNonLocalSubnet:
         assert all(r.preset == StagePreset.FAST for r in recs)
 
 
-# ── ARP not supported ───────────────────────────────────────────────
+# ── ICMP+ARP cache fallback ──────────────────────────────────────────
 
 class TestArpNotSupported:
-    """arp_supported only gates scapy ARP sends; ICMP+ARP cache stages still work."""
+    """ICMP+ARP cache stages work on local unix subnets."""
 
     @patch('lanscape.core.net_tools.subnet_utils.get_all_network_subnets',
            return_value=[{'subnet': '192.168.1.0/24', 'interface': 'eth0'}])
     def test_local_unix_still_uses_icmp_arp(self, _mock_subnets: object) -> None:
-        """Local unix subnet uses ICMP+ARP cache even when scapy ARP is unsupported."""
+        """Local unix subnet uses ICMP+ARP cache stages."""
         recs = recommend_stages(
             '192.168.1.0/24',
             ip_count=254,
-            arp_supported=False,
             os_platform='linux',
         )
         types = _stage_types(recs)
@@ -303,7 +291,6 @@ class TestThresholdBoundary:
         recs = recommend_stages(
             '10.0.0.0/22',
             ip_count=_LARGE_SUBNET_THRESHOLD,
-            arp_supported=True,
             os_platform='windows',
         )
         # At threshold → treated as large → poke_arp on Windows
@@ -316,7 +303,6 @@ class TestThresholdBoundary:
         recs = recommend_stages(
             '10.0.0.0/22',
             ip_count=_LARGE_SUBNET_THRESHOLD - 1,
-            arp_supported=True,
             os_platform='windows',
         )
         # Below threshold → small → icmp_arp on Windows
@@ -372,7 +358,7 @@ class TestAutoDetection:
     @patch('lanscape.core.auto_stages._get_os_platform', return_value='linux')
     def test_auto_detects_local(self, _mock_os: object, _mock_subnets: object) -> None:
         """Auto-detects local subnet via interface overlap."""
-        recs = recommend_stages('192.168.1.0/24', ip_count=254, arp_supported=True)
+        recs = recommend_stages('192.168.1.0/24', ip_count=254)
         types = _stage_types(recs)
         # Local + Linux + small → icmp_arp
         assert 'icmp_arp_discovery' in types
@@ -381,7 +367,7 @@ class TestAutoDetection:
     @patch('lanscape.core.auto_stages._get_os_platform', return_value='windows')
     def test_auto_detects_non_local(self, _mock_os: object, _mock_subnets: object) -> None:
         """Auto-detects non-local when no interface overlap."""
-        recs = recommend_stages('8.8.8.0/24', ip_count=254, arp_supported=True)
+        recs = recommend_stages('8.8.8.0/24', ip_count=254)
         types = _stage_types(recs)
         # Non-local → only icmp
         assert types == ['icmp_discovery', 'port_scan']

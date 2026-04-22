@@ -20,7 +20,7 @@ from lanscape.core.scan_config import (
     ResilienceConfig, get_stage_config_defaults,
     STAGE_CONFIG_REGISTRY,
 )
-from lanscape.core.stage_presets import StagePreset, get_stage_presets
+from lanscape.core.stage_presets import get_stage_presets
 from lanscape.core.stage_estimates import estimate_stage_time, get_all_estimates
 from lanscape.core.stage_builder import build_stages
 from lanscape.core.stages.discovery import (
@@ -29,8 +29,9 @@ from lanscape.core.stages.discovery import (
 )
 from lanscape.core.stages.port_scan import PortScanStage
 from lanscape.core.stages.ipv6_discovery import IPv6NDPDiscoveryStage, IPv6MDNSDiscoveryStage
-from lanscape.core.scan_config import IPv6NDPDiscoveryStageConfig
+from lanscape.core.scan_config import IPv6NDPDiscoveryStageConfig, IPv6MDNSDiscoveryStageConfig
 from lanscape.core.neighbor_table import NeighborEntry, NeighborTable
+from lanscape.core.subnet_scan import SubnetScanner
 
 
 # ---------------------------------------------------------------------------
@@ -636,8 +637,8 @@ class TestStagePresets:
         """The balanced preset matches Pydantic model defaults."""
         presets = get_stage_presets()
         defaults = get_stage_config_defaults()
-        for stage_type in presets:
-            assert presets[stage_type]['balanced'] == defaults[stage_type], (
+        for stage_type, preset_map in presets.items():
+            assert preset_map['balanced'] == defaults[stage_type], (
                 f"{stage_type} balanced preset differs from default"
             )
 
@@ -1033,9 +1034,6 @@ class TestIPv6MDNSSubnetFilter:
         execute() run using a patched Zeroconf + ServiceBrowser.
         Returns the set of ip strings added to the context.
         """
-        from lanscape.core.scan_config import IPv6MDNSDiscoveryStageConfig
-        from lanscape.core.stages.ipv6_discovery import IPv6MDNSDiscoveryStage
-
         cfg = IPv6MDNSDiscoveryStageConfig(timeout=0.1)
         stage = IPv6MDNSDiscoveryStage(cfg)
         stage.running = True
@@ -1047,13 +1045,20 @@ class TestIPv6MDNSSubnetFilter:
         fake_info.server = None
 
         class FakeZeroconf:
+            """Minimal Zeroconf stub for testing."""
+
             def get_service_info(self, *_):
+                """Return the fake service info."""
                 return fake_info
+
             def close(self):
-                pass
+                """No-op close."""
 
         class FakeServiceBrowser:
+            """Minimal ServiceBrowser stub that fires add_service immediately."""
+
             def __init__(self, zc, svc_type, listener):
+                """Trigger add_service for non-meta service types."""
                 if svc_type == "_services._dns-sd._udp.local.":
                     return
                 # Immediately fire add_service for the first registered type
@@ -1132,7 +1137,7 @@ class TestFoundWithStages:
         ctx = ScanContext("10.0.0.0/24")
         device = Device(ip="10.0.0.1")
         ctx.add_device(device)
-        assert device.found_with_stages == []
+        assert not device.found_with_stages
 
     def test_pipeline_wires_stage_index(self):
         """ScanPipeline sets current_stage_index on context before each stage."""
@@ -1365,7 +1370,6 @@ class TestSubnetScannerAppendStages:
 
     def _make_scanner(self):
         """Create a SubnetScanner with a minimal pipeline (no start)."""
-        from lanscape.core.subnet_scan import SubnetScanner  # pylint: disable=import-outside-toplevel
         cfg = PipelineConfig(
             subnet='10.0.0.0/28',
             stages=[StageConfig(stage_type=StageType.ICMP_DISCOVERY)],

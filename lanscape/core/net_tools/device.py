@@ -4,6 +4,7 @@ import ipaddress
 import logging
 import socket
 import struct
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from time import sleep
 from typing import List, Dict, Optional
 
@@ -28,6 +29,7 @@ from lanscape.core.system_compat import (
     resolve_hostname_host_cmd,
     _build_ptr_query,
     _resolve_ipv6_scope_id,
+    get_local_mac_for_ip,
 )
 from lanscape.core.alt_ip_resolver import resolve_alt_ips
 from lanscape.core.neighbor_table import NeighborTableService
@@ -169,13 +171,16 @@ class Device(BaseModel):
     ports: List[int] = []
     stage: str = 'found'
     ports_scanned: int = 0
+    ports_to_scan: int = 0
     services: Dict[str, List[int]] = {}
     service_info: List[ServiceInfo] = []
     caught_errors: List[DeviceError] = []
     job_stats: Optional[Dict] = None
     alt_ips: List[str] = []
+    merged_ips: List[str] = []
     ipv4_addresses: List[str] = []
     ipv6_addresses: List[str] = []
+    found_with_stages: List[int] = []
 
     _log: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger('Device'))
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -301,10 +306,20 @@ class Device(BaseModel):
 
     @job_tracker
     def _get_mac_addresses(self):
-        """Get the possible MAC addresses of a network device given its IP address."""
+        """Get the possible MAC addresses of a network device given its IP address.
+
+        If the IP belongs to a local interface (i.e. the scanning host itself),
+        the MAC is read directly from the OS interface info because the device
+        never appears in its own ARP/neighbor table.
+        """
         if not self.macs:
-            svc = NeighborTableService.instance()
-            self.macs = svc.get_macs_wait(self.ip)
+            # Check if this IP belongs to a local interface first
+            local_mac = get_local_mac_for_ip(self.ip)
+            if local_mac:
+                self.macs = [local_mac]
+            else:
+                svc = NeighborTableService.instance()
+                self.macs = svc.get_macs_wait(self.ip)
         mac_selector.import_macs(self.macs)
         return self.macs
 
@@ -350,13 +365,20 @@ class Device(BaseModel):
 
     def _try_resolve_hostname(self) -> Optional[str]:
         """Single attempt at the full hostname resolution chain."""
-        # 1. Standard reverse DNS
+        # 1. Standard reverse DNS — run in a thread with a hard timeout so
+        # absent PTR records (common for global IPv6) don't block for 5-15s.
+        # Executor is managed manually so timeout expiry doesn't stall on
+        # shutdown(wait=True) from the context manager __exit__.
+        ex = ThreadPoolExecutor(max_workers=1)
         try:
-            hostname = socket.gethostbyaddr(self.ip)[0]
+            future = ex.submit(socket.gethostbyaddr, self.ip)
+            hostname = future.result(timeout=10.0)[0]
             if hostname:
                 return hostname
-        except socket.herror:
+        except (FuturesTimeoutError, socket.herror, OSError):
             pass
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
 
         if os_handles_hostname_resolution():
             return None
@@ -477,10 +499,16 @@ class Device(BaseModel):
             self._log.debug("Alt-IP resolution failed for %s: %s", self.ip, exc)
             self.alt_ips = []
 
-        # Classify primary IP + alt IPs into protocol buckets
-        all_ips = [self.ip] + self.alt_ips
-        self.ipv4_addresses = [ip for ip in all_ips if not is_ipv6(ip)]
-        self.ipv6_addresses = [ip for ip in all_ips if is_ipv6(ip)]
+        # Classify primary IP + alt IPs + MAC-merged IPs into protocol buckets
+        all_ips = [self.ip] + self.alt_ips + self.merged_ips
+        seen: set[str] = set()
+        unique: list[str] = []
+        for ip in all_ips:
+            if ip not in seen:
+                seen.add(ip)
+                unique.append(ip)
+        self.ipv4_addresses = [ip for ip in unique if not is_ipv6(ip)]
+        self.ipv6_addresses = [ip for ip in unique if is_ipv6(ip)]
 
     def to_result(self) -> DeviceResult:
         """Convert this Device to a DeviceResult for API/WebSocket responses."""
@@ -493,6 +521,7 @@ class Device(BaseModel):
             ))
 
         stage_map = {
+            'resolving': DeviceStage.RESOLVING,
             'found': DeviceStage.FOUND,
             'scanning': DeviceStage.SCANNING,
             'complete': DeviceStage.COMPLETE
@@ -507,12 +536,14 @@ class Device(BaseModel):
             manufacturer=self.manufacturer or self._get_manufacturer(self.get_mac()),
             ports=self.ports,
             ports_scanned=self.ports_scanned,
+            ports_to_scan=self.ports_to_scan,
             stage=device_stage,
             services=self.services,
             service_info=self.service_info,
             errors=error_infos,
             ipv4_addresses=self.ipv4_addresses,
             ipv6_addresses=self.ipv6_addresses,
+            found_with_stages=list(self.found_with_stages),
         )
 
 

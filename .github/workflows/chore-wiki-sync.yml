@@ -46,9 +46,11 @@ jobs:
           FILE_MAP["$DOCS/scanner/scan-manager.md"]="ScanManager"
           FILE_MAP["$DOCS/scanner/subnet-scanner.md"]="SubnetScanner"
           FILE_MAP["$DOCS/scanner/scanner-results.md"]="ScannerResults"
+          FILE_MAP["$DOCS/scanner/scan-pipeline.md"]="Scan-Pipeline"
 
           # Config
           FILE_MAP["$DOCS/config/scan-config.md"]="ScanConfig"
+          FILE_MAP["$DOCS/config/pipeline-config.md"]="PipelineConfig"
           FILE_MAP["$DOCS/config/sub-configs.md"]="Sub-Configs"
           FILE_MAP["$DOCS/config/enums.md"]="Enums"
 
@@ -61,7 +63,9 @@ jobs:
           LINK_MAP["scanner/scan-manager.md"]="ScanManager"
           LINK_MAP["scanner/subnet-scanner.md"]="SubnetScanner"
           LINK_MAP["scanner/scanner-results.md"]="ScannerResults"
+          LINK_MAP["scanner/scan-pipeline.md"]="Scan-Pipeline"
           LINK_MAP["config/scan-config.md"]="ScanConfig"
+          LINK_MAP["config/pipeline-config.md"]="PipelineConfig"
           LINK_MAP["config/sub-configs.md"]="Sub-Configs"
           LINK_MAP["config/enums.md"]="Enums"
           LINK_MAP["models/overview.md"]="Models"
@@ -72,12 +76,14 @@ jobs:
 
           # Also handle relative links from subdirectories (../ prefixed)
           LINK_MAP["../config/scan-config.md"]="ScanConfig"
+          LINK_MAP["../config/pipeline-config.md"]="PipelineConfig"
           LINK_MAP["../config/sub-configs.md"]="Sub-Configs"
           LINK_MAP["../config/enums.md"]="Enums"
           LINK_MAP["../models/overview.md"]="Models"
           LINK_MAP["../scanner/scan-manager.md"]="ScanManager"
           LINK_MAP["../scanner/subnet-scanner.md"]="SubnetScanner"
           LINK_MAP["../scanner/scanner-results.md"]="ScannerResults"
+          LINK_MAP["../scanner/scan-pipeline.md"]="Scan-Pipeline"
           LINK_MAP["../port-manager.md"]="PortManager"
           LINK_MAP["../net-tools.md"]="net_tools"
           LINK_MAP["../websocket-server.md"]="WebSocket-Server"
@@ -86,7 +92,9 @@ jobs:
           LINK_MAP["scan-manager.md"]="ScanManager"
           LINK_MAP["subnet-scanner.md"]="SubnetScanner"
           LINK_MAP["scanner-results.md"]="ScannerResults"
+          LINK_MAP["scan-pipeline.md"]="Scan-Pipeline"
           LINK_MAP["scan-config.md"]="ScanConfig"
+          LINK_MAP["pipeline-config.md"]="PipelineConfig"
           LINK_MAP["sub-configs.md"]="Sub-Configs"
           LINK_MAP["enums.md"]="Enums"
 
@@ -144,7 +152,9 @@ jobs:
           | **[ScanManager](ScanManager)** | Create, track, and terminate scans |
           | **[SubnetScanner](SubnetScanner)** | The scan engine under the hood |
           | **[ScannerResults](ScannerResults)** | Export results as structured data or summaries |
+          | **[Scan Pipeline](Scan-Pipeline)** | Composable stage pipeline — custom stages, progress tracking |
           | **[ScanConfig](ScanConfig)** | Configure subnets, ports, threads, and strategies |
+          | **[PipelineConfig](PipelineConfig)** | Composable pipeline — explicit stage ordering and config |
           | **[Sub-Configs](Sub-Configs)** | Fine-tune Ping, ARP, Poke, Port, and Service scanning |
           | **[Enums](Enums)** | `ScanType`, `ServiceScanStrategy`, and other enumerations |
           | **[Models](Models)** | Pydantic models — `DeviceResult`, `ScanResults`, etc. |
@@ -167,9 +177,11 @@ jobs:
           - [ScanManager](ScanManager)
           - [SubnetScanner](SubnetScanner)
           - [ScannerResults](ScannerResults)
+          - [Scan Pipeline](Scan-Pipeline)
 
           **Configuration**
           - [ScanConfig](ScanConfig)
+          - [PipelineConfig](PipelineConfig)
           - [Sub-Configs](Sub-Configs)
           - [Enums](Enums)
 

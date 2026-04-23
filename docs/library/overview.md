@@ -43,11 +43,13 @@ for device in results.devices:
 | [`ScanManager`](scanner/scan-manager.md) | Singleton that creates, tracks, and terminates scans |
 | [`SubnetScanner`](scanner/subnet-scanner.md) | The scan engine — runs device discovery and port scanning |
 | [`ScannerResults`](scanner/scanner-results.md) | Result container with export helpers (`to_results()`, `to_summary()`, etc.) |
+| [Scan Pipeline](scanner/scan-pipeline.md) | Composable stage pipeline — `ScanStageMixin`, `ScanContext`, `ScanPipeline`, `build_stages` |
 | [`ScanConfig`](config/scan-config.md) | Main scan configuration (subnet, ports, threads, sub-configs) |
+| [`PipelineConfig`](config/pipeline-config.md) | Composable pipeline configuration — explicit stage ordering, stage configs, resilience |
 | [Sub-Configs](config/sub-configs.md) | `PingConfig`, `ArpConfig`, `PokeConfig`, `ArpCacheConfig`, `PortScanConfig`, `ServiceScanConfig` |
 | [`ScanType` / `ServiceScanStrategy`](config/enums.md) | Enumerations for scan modes and service detection strategies |
 | [`PortManager`](port-manager.md) | CRUD operations for port lists |
-| [Models](models/overview.md) | Pydantic models for devices and scan results |
+| [Models](models/overview.md) | Pydantic models for devices, scan results, and stage progress |
 | [`net_tools`](net-tools.md) | Network utility functions (subnet detection, ARP support check, hostname resolution) |
 | [WebSocket Server](websocket-server.md) | Real-time WebSocket API, HTTP discovery endpoint, mDNS, and CLI arguments |
 
@@ -56,14 +58,19 @@ for device in results.devices:
 ```
 ScanManager (singleton)
   └─ SubnetScanner (one per scan)
-       ├─ Device Discovery  — find alive hosts via ICMP / ARP / Poke
-       │     (IPv6: ARP steps skipped, ICMP & Poke use AF_INET6)
-       ├─ Port Scanning     — test configured ports on each alive device
-       ├─ Service Detection  — identify what's running on open ports
+       ├─ PipelineConfig or ScanConfig (auto-converts)
+       │     └─ build_stages() → List[ScanStageMixin]
+       │
+       ├─ ScanPipeline  (sequential stage executor)
+       │     ├─ Stage 1: Discovery  (ICMP / ARP / Poke / NDP / mDNS)
+       │     ├─ Stage 2: Port Scan  (TCP connect + service detection)
+       │     ├─ Stage 3: ...        (stages can repeat / interleave)
+       │     └─ ScanContext ← shared state across all stages
+       │
        └─ ScannerResults
             ├─ to_results()   → ScanResults  (full device list + metadata)
             ├─ to_summary()   → ScanSummary  (ports & services found)
-            └─ get_metadata() → ScanMetadata (progress & status)
+            └─ get_metadata() → ScanMetadata (progress, stages[], status)
 ```
 
 ## Default Presets
@@ -152,3 +159,35 @@ config = ScanConfig(
 | Hostname (mDNS) | Queries `ip6.arpa` PTR records via `ff02::fb` multicast |
 | Hostname (NetBIOS) | Skipped — NetBIOS is IPv4-only |
 | Result sorting | IPv4 devices sort before IPv6 devices |
+
+## Pipeline Example
+
+For fine-grained control, use [`PipelineConfig`](config/pipeline-config.md) to compose an explicit stage sequence:
+
+```python
+from lanscape import ScanManager, PipelineConfig, StageConfig, StageType
+
+sm = ScanManager()
+
+config = PipelineConfig(
+    subnet="192.168.1.0/24",
+    stages=[
+        StageConfig(stage_type=StageType.ICMP_ARP_DISCOVERY),
+        StageConfig(stage_type=StageType.ARP_DISCOVERY),
+        StageConfig(
+            stage_type=StageType.PORT_SCAN,
+            config={"port_list": "medium"},
+        ),
+    ],
+)
+
+scan = sm.new_scan(config)
+sm.wait_until_complete(scan.uid)
+
+# Track per-stage progress
+meta = scan.results.get_metadata()
+for stage in meta.stages:
+    print(f"{stage.stage_name}: {stage.completed}/{stage.total} ({'done' if stage.finished else '...'})")
+```
+
+> **Backward compatible:** `ScanConfig` still works exactly as before — it converts to a pipeline internally via `.to_pipeline_config()`. See the [Scan Pipeline](scanner/scan-pipeline.md) docs for the full architecture, custom stages, and more examples.

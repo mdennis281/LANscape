@@ -2,7 +2,7 @@
 
 
 class SubnetTooLargeError(Exception):
-    """Custom exception raised when the subnet size exceeds the allowed limit."""
+    """Kept for external library compatibility. No longer raised internally."""
 
     def __init__(self, subnet, count: int = 0):
         self.subnet = subnet

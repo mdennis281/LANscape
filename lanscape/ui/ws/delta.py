@@ -131,11 +131,13 @@ class ScanDeltaTracker(DeltaTracker):
         Returns:
             Dictionary containing only changed fields:
             - 'devices': List of changed device data
+            - 'removed_ips': List of device IPs that were removed (e.g. merged)
             - 'metadata': Changed scan metadata (if any)
             - 'has_changes': Boolean indicating if there are any changes
         """
-        delta = {
+        delta: dict = {
             'devices': [],
+            'removed_ips': [],
             'metadata': None,
             'has_changes': False
         }
@@ -149,11 +151,25 @@ class ScanDeltaTracker(DeltaTracker):
 
         # Track individual device changes
         devices = scan_results.get('devices', [])
+        current_device_keys: set[str] = set()
         for device in devices:
             device_ip = device.get('ip', str(id(device)))
-            device_change = self.update(f'device_{device_ip}', device)
+            key = f'device_{device_ip}'
+            current_device_keys.add(key)
+            device_change = self.update(key, device)
             if device_change is not None:
                 delta['devices'].append(device_change)
                 delta['has_changes'] = True
+
+        # Detect removed devices (consolidated/merged away)
+        tracked_device_keys = {
+            k for k in self._states if k.startswith('device_')
+        }
+        removed_keys = tracked_device_keys - current_device_keys
+        for key in removed_keys:
+            removed_ip = key[len('device_'):]
+            delta['removed_ips'].append(removed_ip)
+            delta['has_changes'] = True
+            del self._states[key]
 
         return delta

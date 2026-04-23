@@ -133,6 +133,22 @@ Create a `ScanConfig` from a dictionary. Uses Pydantic's `model_validate()`. Inh
 
 Serialize the config to a JSON-safe dictionary. Overrides the `ConfigBase` default to use `model_dump(mode="json")` for JSON-safe output (e.g., enum values serialized as strings).
 
+---
+
+### `to_pipeline_config() -> PipelineConfig`
+
+Convert this `ScanConfig` into a [`PipelineConfig`](pipeline-config.md). Each `lookup_type` entry maps to a discovery stage, and `task_scan_ports` appends a port-scan stage. Thread counts and retry settings are carried over to the pipeline's `ResilienceConfig`.
+
+This conversion happens automatically when you pass a `ScanConfig` to `ScanManager.new_scan()` — you only need to call it explicitly if building a pipeline manually.
+
+```python
+config = ScanConfig(subnet="192.168.1.0/24", port_list="medium")
+pipeline = config.to_pipeline_config()
+# PipelineConfig with stages: [ICMP_ARP_DISCOVERY, PORT_SCAN]
+```
+
+> **See also:** [`PipelineConfig`](pipeline-config.md) for the composable alternative that lets you define custom stage sequences directly.
+
 ## Default Presets
 
 Three presets are available in `lanscape.core.scan_config.DEFAULT_CONFIGS`:

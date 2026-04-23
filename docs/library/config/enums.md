@@ -4,6 +4,47 @@ Enumeration types used across the LANscape configuration and model layers.
 
 ---
 
+## StageType
+
+`lanscape.StageType`
+
+Identifies each composable scan stage in the [pipeline architecture](../scanner/scan-pipeline.md). Used by [`StageConfig`](pipeline-config.md#stageconfig) and [`StageProgress`](../models/overview.md#stageprogress).
+
+```python
+from lanscape import StageType
+```
+
+| Value | String | Description |
+|-------|--------|-------------|
+| `StageType.ICMP_DISCOVERY` | `"icmp_discovery"` | ICMP echo request discovery |
+| `StageType.ARP_DISCOVERY` | `"arp_discovery"` | Scapy ARP broadcast (IPv4 only) |
+| `StageType.POKE_ARP_DISCOVERY` | `"poke_arp_discovery"` | TCP poke → ARP/NDP cache lookup |
+| `StageType.ICMP_ARP_DISCOVERY` | `"icmp_arp_discovery"` | ICMP ping → ARP/NDP cache fallback |
+| `StageType.IPV6_NDP_DISCOVERY` | `"ipv6_ndp_discovery"` | Multicast NDP neighbor discovery |
+| `StageType.IPV6_MDNS_DISCOVERY` | `"ipv6_mdns_discovery"` | mDNS service browsing |
+| `StageType.PORT_SCAN` | `"port_scan"` | TCP port scan with service identification |
+
+---
+
+## WarningCategory
+
+`lanscape.WarningCategory`
+
+Categorizes scan warnings for grouping in the UI. Used by [`ScanWarningInfo`](../models/overview.md#scanwarninginfo).
+
+```python
+from lanscape import WarningCategory
+```
+
+| Value | String | Description |
+|-------|--------|-------------|
+| `WarningCategory.CONCURRENCY` | `"concurrency"` | Thread multiplier was reduced due to job failures |
+| `WarningCategory.STAGE_SKIP` | `"stage_skip"` | A pipeline stage was skipped by its guard |
+| `WarningCategory.CAPABILITY` | `"capability"` | A feature is degraded (missing dependency, permission fallback) |
+| `WarningCategory.RESILIENCE` | `"resilience"` | A job failed permanently or a subsystem refresh failed |
+
+---
+
 ## ScanType
 
 `lanscape.ScanType`

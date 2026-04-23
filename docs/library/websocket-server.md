@@ -142,9 +142,11 @@ Save the `client_id` — you'll need it for `scan.subscribe` and `scan.get_delta
 
 #### `scan.start`
 
-Start a new network scan (non-blocking).
+Start a new network scan (non-blocking). Accepts either legacy [ScanConfig](config/scan-config.md) fields or a [PipelineConfig](config/pipeline-config.md) with explicit stages.
 
-**Params** — any [ScanConfig](config/scan-config.md) field:
+**Params** — either format:
+
+**Legacy format** (any [ScanConfig](config/scan-config.md) field):
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -156,6 +158,33 @@ Start a new network scan (non-blocking).
 | `task_scan_port_services` | `bool` | no | Enable service detection |
 | *...other* | | no | See [ScanConfig](config/scan-config.md) for all fields |
 
+**Pipeline format** (when `stages` key is present):
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `subnet` | `string` | yes | Target subnet |
+| `stages` | `array` | yes | Ordered list of `{ stage_type, config }` objects. See [PipelineConfig](config/pipeline-config.md). |
+| `resilience` | `object` | no | `{ t_multiplier, failure_retry_cnt, ... }` |
+| `hostname_config` | `object` | no | `{ retries, retry_delay }` |
+
+> **Auto-detection:** When the `params` object contains a `stages` key, the server parses it as `PipelineConfig`. Otherwise it's treated as a legacy `ScanConfig`.
+
+**Pipeline format example:**
+
+```json
+{
+  "type": "request",
+  "action": "scan.start",
+  "params": {
+    "subnet": "192.168.1.0/24",
+    "stages": [
+      { "stage_type": "icmp_arp_discovery", "config": {} },
+      { "stage_type": "port_scan", "config": { "port_list": "medium" } }
+    ]
+  }
+}
+```
+
 **Response data:**
 
 ```json
@@ -166,7 +195,7 @@ Start a new network scan (non-blocking).
 
 #### `scan.start_sync`
 
-Start a scan and wait until it completes before responding. Same params as `scan.start`.
+Start a scan and wait until it completes before responding. Same params as `scan.start` — accepts both legacy `ScanConfig` and `PipelineConfig` formats.
 
 **Response data:**
 

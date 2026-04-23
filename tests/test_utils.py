@@ -10,7 +10,6 @@ import time
 import pytest
 
 from lanscape.core.ip_parser import parse_ip_input
-from lanscape.core.errors import SubnetTooLargeError
 from lanscape.core import ip_parser
 from lanscape.core.decorators import timeout_enforcer
 from lanscape.core.net_tools import is_internal_block, scan_config_uses_arp
@@ -46,12 +45,6 @@ def test_parse_range_length_and_bounds():
     assert len(ips) == 3
     assert str(ips[0]) == '10.0.0.1'
     assert str(ips[-1]) == '10.0.0.3'
-
-
-def test_parse_too_large_subnet():
-    """Test that large subnets raise an appropriate exception."""
-    with pytest.raises(SubnetTooLargeError):
-        parse_ip_input('10.0.0.0/8')
 
 
 def test_parse_mixed_format_comprehensive():

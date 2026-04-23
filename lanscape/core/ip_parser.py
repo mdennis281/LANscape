@@ -2,12 +2,8 @@
 import ipaddress
 from typing import List, Union
 
-from lanscape.core.errors import SubnetTooLargeError
-
 IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
-
-MAX_IPS_ALLOWED = 100000
 
 
 def _is_ipv6(text: str) -> bool:
@@ -31,9 +27,6 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
 
     Returns:
         list: List of IPv4Address / IPv6Address objects
-
-    Raises:
-        SubnetTooLargeError: If the number of IPs exceeds MAX_IPS_ALLOWED
     """
     entries = [entry.strip() for entry in ip_input.split(',')]
     ip_ranges: List[IPAddress] = []
@@ -42,8 +35,6 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
         # Handle CIDR notation
         if '/' in entry:
             net = ipaddress.ip_network(entry, strict=False)
-            if net.num_addresses > MAX_IPS_ALLOWED:
-                raise SubnetTooLargeError(ip_input, net.num_addresses)
             if isinstance(net, ipaddress.IPv6Network):
                 # IPv6 has no broadcast address — include all except network address
                 if net.num_addresses == 1:          # /128 — single host
@@ -63,8 +54,6 @@ def parse_ip_input(ip_input: str) -> List[IPAddress]:
         else:
             ip_ranges.append(ipaddress.ip_address(entry))
 
-        if len(ip_ranges) > MAX_IPS_ALLOWED:
-            raise SubnetTooLargeError(ip_input, len(ip_ranges))
     return ip_ranges
 
 

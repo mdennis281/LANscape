@@ -185,6 +185,7 @@ class DiscoverResponse(BaseModel):
     mdns_enabled: bool
     default_route: str
     instances: list[DiscoveredInstance]
+    ws_url: str = ''
 
 
 def build_default_route(http_port: int) -> str:
@@ -196,6 +197,47 @@ def build_default_route(http_port: int) -> str:
     addrs = get_local_address_strings()
     host = addrs[0] if addrs else 'localhost'
     return f'http://{host}:{http_port}'
+
+
+def build_ws_url_for_client(client_ip: str, ws_port: int) -> str:
+    """Return the WebSocket URL that *client_ip* should use to connect.
+
+    Walks psutil interfaces to find the local address on the same subnet as
+    the requesting client, ensuring the URL reflects the correct interface
+    even when the server is multi-homed.  Falls back to the first private LAN
+    address, then ``localhost``.
+    """
+    try:
+        client_addr = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return f'ws://localhost:{ws_port}'
+
+    if client_addr.is_loopback:
+        return f'ws://localhost:{ws_port}'
+
+    stats = psutil.net_if_stats()
+    for iface, addrs in psutil.net_if_addrs().items():
+        iface_stats = stats.get(iface)
+        if not iface_stats or not iface_stats.isup:
+            continue
+        if any(v in iface.lower() for v in VIRTUAL_IFACE_NAMES):
+            continue
+        for addr in addrs:
+            if addr.family != socket.AF_INET or not addr.netmask:
+                continue
+            try:
+                network = ipaddress.ip_network(
+                    f'{addr.address}/{addr.netmask}', strict=False
+                )
+                if client_addr in network:
+                    return f'ws://{addr.address}:{ws_port}'
+            except (ValueError, OSError):
+                continue
+
+    # No subnet match — fall back to first private LAN address
+    fallback = get_local_address_strings()
+    host = fallback[0] if fallback else 'localhost'
+    return f'ws://{host}:{ws_port}'
 
 
 class DiscoveryService:

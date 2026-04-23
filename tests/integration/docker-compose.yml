@@ -8,6 +8,9 @@
 #   docker compose -f tests/integration/docker-compose.yml run scanner  # Run tests
 #   docker compose -f tests/integration/docker-compose.yml down     # Cleanup
 #
+# Exposed WebSocket endpoint for local UI troubleshooting:
+#   ws://localhost:6969
+#
 # NOTE: Docker Desktop on Windows may require "ipv6": true in daemon settings.
 
 x-common: &common
@@ -60,17 +63,17 @@ services:
   # Squid HTTP proxy (3128)
   proxy-server:
     <<: *common
-    image: ubuntu/squid:5.9-24.04_edge
+    build:
+      context: ./services/squid
+      dockerfile: Dockerfile
     container_name: lanscape-test-proxy
     hostname: proxy-server
-    volumes:
-      - ./services/squid/squid.conf:/etc/squid/squid.conf:ro
     networks:
       testnet:
         ipv4_address: 172.30.0.12
         ipv6_address: "fd00:dead:beef::12"
     healthcheck:
-      test: ["CMD-SHELL", "bash -c '(echo > /dev/tcp/localhost/3128) 2>/dev/null'"]
+      test: ["CMD", "nc", "-z", "localhost", "3128"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -236,6 +239,59 @@ services:
         condition: service_healthy
     profiles: ["scanner"]
 
+  # ── LANscape WebSocket Server (Exposed) ────────────────────────────────
+  # Keeps a WS endpoint open for local UI troubleshooting against testnet.
+  scanner-ws:
+    build:
+      context: ../../
+      dockerfile: tests/integration/Dockerfile.scanner
+    container_name: lanscape-test-scanner-ws
+    hostname: scanner-ws
+    command:
+      - "lanscape"
+      - "--ws-server"
+      - "--persistent"
+      - "--ws-port"
+      - "8766"
+      - "--loglevel"
+      - "DEBUG"
+      - "--mdns-off"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    ports:
+      - "6969:8766"
+    networks:
+      testnet:
+        ipv4_address: 172.30.0.101
+        ipv6_address: "fd00:dead:beef::101"
+      hostbridge:
+    depends_on:
+      web-server:
+        condition: service_healthy
+      mail-server:
+        condition: service_healthy
+      proxy-server:
+        condition: service_healthy
+      ssh-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ftp-server:
+        condition: service_healthy
+      dns-server:
+        condition: service_started
+      multi-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8766"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
 networks:
   testnet:
     driver: bridge
@@ -247,3 +303,5 @@ networks:
           gateway: 172.30.0.1
         - subnet: "fd00:dead:beef::/64"
           gateway: "fd00:dead:beef::1"
+  hostbridge:
+    driver: bridge

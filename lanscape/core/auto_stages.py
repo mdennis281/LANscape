@@ -1,0 +1,201 @@
+"""
+Auto-stage recommendation engine.
+
+Recommends scan stages based on subnet characteristics (size, IPv4/IPv6,
+local vs remote), system capabilities (ARP support, OS), and interface context.
+"""
+
+from typing import List, Optional
+
+from lanscape.core.models.enums import StageType
+from lanscape.core.stage_presets import StagePreset, get_stage_presets
+from lanscape.core.net_tools.subnet_utils import (
+    is_ipv6_subnet as _is_ipv6,
+    is_local_subnet as _is_local_subnet,
+    matching_interface as _matching_interface,
+    get_os_platform as _get_os_platform,
+)
+from lanscape.core.ip_parser import get_address_count
+from lanscape.core.scan_config import (
+    ICMPDiscoveryStageConfig,
+    PokeARPDiscoveryStageConfig,
+)
+
+
+# Threshold for "small" vs "large" preset selection
+_LARGE_SUBNET_THRESHOLD = 1000
+# Per-stage max subnet sizes (mirrors ClassVar constants on config classes)
+_ICMP_MAX = ICMPDiscoveryStageConfig.MAX_SUBNET_SIZE    # 25_000
+_POKE_ARP_MAX = PokeARPDiscoveryStageConfig.MAX_SUBNET_SIZE  # 64_000
+
+
+class StageRecommendation:
+    """A single recommended stage with its config and reasoning."""
+
+    def __init__(
+        self,
+        stage_type: StageType,
+        preset: StagePreset,
+        reason: str,
+    ):
+        self.stage_type = stage_type
+        self.preset = preset
+        self.reason = reason
+
+    def to_dict(self) -> dict:
+        """Serialize to a dict suitable for JSON/WS responses."""
+        presets = get_stage_presets()
+        config = presets.get(self.stage_type.value, {}).get(self.preset.value, {})
+        return {
+            'stage_type': self.stage_type.value,
+            'preset': self.preset.value,
+            'config': config,
+            'reason': self.reason,
+        }
+
+
+def _recommend_ipv4_local_windows(
+    ip_count: int, is_large: bool
+) -> Optional[List[StageRecommendation]]:
+    """Return discovery stages for a local Windows subnet, or None if unsupported."""
+    if ip_count > _POKE_ARP_MAX:
+        return []
+    if ip_count > _ICMP_MAX:
+        return [StageRecommendation(
+            StageType.POKE_ARP_DISCOVERY,
+            StagePreset.FAST,
+            f'Large local subnet on Windows ({ip_count:,} IPs)'
+            ' — Poke+ARP scales, exceeds ICMP limit',
+        )]
+    if is_large:
+        return [StageRecommendation(
+            StageType.POKE_ARP_DISCOVERY,
+            StagePreset.BALANCED,
+            'Large local subnet on Windows — Poke+ARP scales, skips ICMP wait',
+        )]
+    return [StageRecommendation(
+        StageType.ICMP_ARP_DISCOVERY,
+        StagePreset.ACCURATE,
+        'Small local subnet on Windows — ICMP+ARP is reliable',
+    )]
+
+
+def _recommend_ipv4_local_unix(
+    ip_count: int, is_large: bool
+) -> Optional[List[StageRecommendation]]:
+    """Return discovery stages for a local Linux/macOS subnet, or [] if unsupported."""
+    if ip_count > _ICMP_MAX:
+        return []
+    if is_large:
+        return [StageRecommendation(
+            StageType.ICMP_ARP_DISCOVERY,
+            StagePreset.BALANCED,
+            'Large local subnet on Linux/Mac — lightweight ICMP (poke unreliable)',
+        )]
+    return [StageRecommendation(
+        StageType.ICMP_ARP_DISCOVERY,
+        StagePreset.ACCURATE,
+        'Small local subnet on Linux/Mac — ICMP+ARP is reliable',
+    )]
+
+
+def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    subnet: str,
+    ip_count: Optional[int] = None,
+    is_ipv6: Optional[bool] = None,
+    is_local: Optional[bool] = None,
+    os_platform: Optional[str] = None,
+) -> List[StageRecommendation]:
+    """Return a list of recommended scan stages for the given subnet context.
+
+    Args:
+        subnet: The target subnet string (e.g. ``"192.168.1.0/24"``).
+        ip_count: Number of IPs in the subnet.  Computed from *subnet* if ``None``.
+        is_ipv6: Whether the subnet is IPv6.  Detected from *subnet* if ``None``.
+        is_local: Whether the subnet overlaps a local interface.  Detected if ``None``.
+        os_platform: ``'windows'``, ``'linux'``, or ``'darwin'``.  Detected if ``None``.
+
+    Returns:
+        Ordered list of :class:`StageRecommendation` objects.
+    """
+    # ── Resolve optional parameters ──────────────────────────────────
+    if is_ipv6 is None:
+        is_ipv6 = _is_ipv6(subnet)
+
+    if ip_count is None:
+        try:
+            ip_count = get_address_count(subnet)
+        except Exception:  # noqa: BLE001
+            ip_count = 0
+
+    if is_local is None:
+        is_local = _is_local_subnet(subnet)
+
+    if os_platform is None:
+        os_platform = _get_os_platform()
+
+    os_platform = os_platform.lower()
+    is_large = ip_count >= _LARGE_SUBNET_THRESHOLD
+
+    stages: List[StageRecommendation] = []
+
+    # ── IPv6 ─────────────────────────────────────────────────────────
+    if is_ipv6:
+        stages.append(StageRecommendation(
+            StageType.IPV6_NDP_DISCOVERY,
+            StagePreset.BALANCED,
+            'IPv6 subnet — NDP discovers link-local neighbors',
+        ))
+        stages.append(StageRecommendation(
+            StageType.IPV6_MDNS_DISCOVERY,
+            StagePreset.BALANCED,
+            'IPv6 subnet — mDNS finds service-announcing hosts',
+        ))
+        stages.append(StageRecommendation(
+            StageType.PORT_SCAN,
+            StagePreset.BALANCED,
+            'Port scan on discovered IPv6 hosts',
+        ))
+        return stages
+
+    # ── IPv4 — local subnet ──────────────────────────────────────────
+    # ICMP_ARP and POKE_ARP stages use OS ARP cache table queries,
+    # not scapy ARP sends, so arp_supported (scapy capability) is irrelevant here.
+    if is_local:
+        if os_platform == 'windows':
+            discovery = _recommend_ipv4_local_windows(ip_count, is_large)
+        else:
+            discovery = _recommend_ipv4_local_unix(ip_count, is_large)
+
+        if not discovery and discovery is not None:
+            return []
+        stages.extend(discovery or [])
+
+        # Always add port scan after discovery
+        preset = StagePreset.BALANCED if is_large else StagePreset.ACCURATE
+        stages.append(StageRecommendation(
+            StageType.PORT_SCAN,
+            preset,
+            f'Port scan ({"balanced" if is_large else "accurate"} — {ip_count} IPs)',
+        ))
+        return stages
+
+    # ── IPv4 — non-local ─────────────────────────────────────────────
+    if ip_count > _ICMP_MAX:
+        # No viable discovery stage for this subnet size
+        return []
+
+    preset = StagePreset.FAST if is_large else StagePreset.BALANCED
+    reason = 'Non-local subnet — ARP not usable across L2 boundary'
+
+    stages.append(StageRecommendation(
+        StageType.ICMP_DISCOVERY,
+        preset,
+        reason,
+    ))
+    stages.append(StageRecommendation(
+        StageType.PORT_SCAN,
+        preset,
+        f'Port scan ({"fast" if is_large else "balanced"} — {ip_count} IPs)',
+    ))
+    return stages

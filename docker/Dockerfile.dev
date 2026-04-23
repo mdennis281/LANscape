@@ -1,0 +1,27 @@
+# LANscape Development / Troubleshooting Image
+# Builds from local source (not PyPI) for reproducible debugging.
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpcap0.8 \
+    iproute2 \
+    iputils-ping \
+    curl \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy local source so docker troubleshooting reflects current branch changes.
+COPY . .
+
+# Editable install keeps entrypoints available while using local code.
+RUN pip install --no-cache-dir -e .
+
+EXPOSE 5001 8766
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=5 \
+  CMD curl -fsS http://localhost:5001/ > /dev/null || exit 1
+
+ENTRYPOINT ["lanscape"]

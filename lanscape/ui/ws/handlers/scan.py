@@ -14,6 +14,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from lanscape.core.subnet_scan import ScanManager, ScanConfig
+from lanscape.core.scan_config import PipelineConfig
 from lanscape.ui.ws.handlers.base import BaseHandler
 from lanscape.ui.ws.delta import ScanDeltaTracker
 
@@ -59,6 +60,9 @@ class ScanHandler(BaseHandler):
         self.register('subscribe', self._handle_subscribe)
         self.register('unsubscribe', self._handle_unsubscribe)
         self.register('list', self._handle_list)
+        self.register('history', self._handle_history)
+        self.register('append_stages', self._handle_append_stages)
+        self.register('update_stage', self._handle_update_stage)
 
     @property
     def prefix(self) -> str:
@@ -74,14 +78,16 @@ class ScanHandler(BaseHandler):
         Start a new network scan.
 
         Params:
-            subnet: Target subnet to scan
-            port_list: Name of the port list to use
-            ... (other ScanConfig parameters)
+            When 'stages' key is present, parsed as PipelineConfig.
+            Otherwise parsed as legacy ScanConfig.
 
         Returns:
             Dict with scan_id and status
         """
-        config = ScanConfig.from_dict(params)
+        if 'stages' in params:
+            config = PipelineConfig.from_dict(params)
+        else:
+            config = ScanConfig.from_dict(params)
         scan = self._scan_manager.new_scan(config)
         self.log.debug(f"Started scan {scan.uid} for {config.subnet}")
 
@@ -104,7 +110,10 @@ class ScanHandler(BaseHandler):
         Returns:
             Dict with scan_id and status='complete'
         """
-        config = ScanConfig.from_dict(params)
+        if 'stages' in params:
+            config = PipelineConfig.from_dict(params)
+        else:
+            config = ScanConfig.from_dict(params)
         scan = self._scan_manager.new_scan(config)
         self.log.info(f"Started sync scan {scan.uid} for {config.subnet}")
 
@@ -377,6 +386,103 @@ class ScanHandler(BaseHandler):
             'unsubscribed': True,
             'scan_id': scan_id,
             'client_id': client_id
+        }
+
+    def _handle_append_stages(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Append stages to an existing scan (running or complete).
+
+        Params:
+            scan_id: The scan ID to append stages to
+            stages: List of stage config dicts ({stage_type, config})
+
+        Returns:
+            Dict with success status and updated stage count
+        """
+        scan_id = self._get_param(params, 'scan_id', required=True)
+        stages = self._get_param(params, 'stages', required=True)
+
+        scan = self._scan_manager.get_scan(scan_id)
+        if scan is None:
+            raise ValueError(f"Scan not found: {scan_id}")
+
+        scan.append_stages(stages)
+        self.log.info(
+            f"Appended {len(stages)} stage(s) to scan {scan_id}"
+        )
+
+        return {
+            'success': True,
+            'scan_id': scan_id,
+            'total_stages': len(scan.pipeline.stages),
+        }
+
+    def _handle_update_stage(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Update a pending (not yet started) stage on a running scan.
+
+        Params:
+            scan_id: The scan ID
+            index: Index of the stage to replace
+            stage_type: New stage type
+            config: New stage config dict
+
+        Returns:
+            Dict with success status and updated stage count
+        """
+        scan_id = self._get_param(params, 'scan_id', required=True)
+        raw_index = self._get_param(params, 'index', required=True)
+        try:
+            index = int(raw_index)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Parameter 'index' must be an integer, got: {raw_index!r}"
+            ) from exc
+        stage_type = self._get_param(params, 'stage_type', required=True)
+        config = self._get_param(params, 'config', default={})
+
+        scan = self._scan_manager.get_scan(scan_id)
+        if scan is None:
+            raise ValueError(f"Scan not found: {scan_id}")
+
+        scan.update_stage(index, {
+            'stage_type': stage_type,
+            'config': config,
+        })
+        self.log.info(
+            f"Updated stage {index} on scan {scan_id} to {stage_type}"
+        )
+
+        return {
+            'success': True,
+            'scan_id': scan_id,
+            'index': index,
+            'total_stages': len(scan.pipeline.stages),
+        }
+
+    def _handle_history(
+        self,
+        params: dict[str, Any],  # pylint: disable=unused-argument
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Get a lightweight list of all scan IDs for history navigation.
+
+        Returns:
+            Dict with scan_ids list (newest first)
+        """
+        return {
+            'scan_ids': [
+                scan.uid for scan in reversed(self._scan_manager.scans)
+            ]
         }
 
     def _handle_list(

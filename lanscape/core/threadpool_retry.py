@@ -10,6 +10,9 @@ from threading import Lock
 
 from pydantic import BaseModel
 
+from lanscape.core.models.scan import ScanWarningInfo
+from lanscape.core.models.enums import WarningCategory
+
 
 T = TypeVar('T')  # Return type of the job function
 
@@ -52,7 +55,7 @@ class MultiplierController:
         decrease_percent: float = 0.25,
         debounce_sec: float = 5.0,
         min_multiplier: float = 0.1,
-        on_warning: Optional[Callable[[str, dict], None]] = None
+        on_warning: Optional[Callable[[ScanWarningInfo], None]] = None
     ):
         self._multiplier = initial_multiplier
         self._initial_multiplier = initial_multiplier
@@ -63,6 +66,21 @@ class MultiplierController:
         self._on_warning = on_warning
         self._lock = Lock()
         self._log = logging.getLogger('MultiplierController')
+        self._stage_name: Optional[str] = None
+
+    @property
+    def stage_name(self) -> Optional[str]:
+        """Stage name for warning attribution."""
+        return self._stage_name
+
+    @stage_name.setter
+    def stage_name(self, value: str) -> None:
+        self._stage_name = value
+
+    def emit_warning(self, warning: ScanWarningInfo) -> None:
+        """Forward a pre-built warning through the configured callback."""
+        if self._on_warning:
+            self._on_warning(warning)
 
     @property
     def multiplier(self) -> float:
@@ -108,16 +126,34 @@ class MultiplierController:
 
             # Emit warning callback if provided
             if self._on_warning:
-                warning_data: Dict[str, Any] = {
-                    'message': warning_msg,
-                    'old_multiplier': old_multiplier,
-                    'new_multiplier': self._multiplier,
-                    'decrease_percent': self._decrease_percent * 100,
-                    'timestamp': current_time,
-                }
+                old_pct = round(old_multiplier * 100)
+                new_pct = round(self._multiplier * 100)
+                dec_pct = round(self._decrease_percent * 100)
+
+                title = f"Concurrency reduced: **{old_pct}%** \u2192 **{new_pct}%**"
+
+                body_parts: List[str] = []
                 if context:
-                    warning_data.update(context)
-                self._on_warning('multiplier_reduced', warning_data)
+                    job_id = context.get('failed_job')
+                    attempt = context.get('retry_attempt')
+                    max_r = context.get('max_retries')
+                    err_msg = context.get('error_message')
+                    if job_id:
+                        body_parts.append(
+                            f"Job `{job_id}` failed"
+                            + (f" (attempt {attempt}/{max_r + 1})" if attempt else "")
+                        )
+                    if err_msg:
+                        body_parts.append(f"Error: `{err_msg}`")
+                body_parts.append(f"Decrease: **{dec_pct}%**")
+
+                self._on_warning(ScanWarningInfo(
+                    category=WarningCategory.CONCURRENCY,
+                    title=title,
+                    body="\n\n".join(body_parts) if body_parts else None,
+                    stage=self._stage_name,
+                    timestamp=current_time,
+                ))
 
             return True
 
@@ -258,6 +294,20 @@ class ThreadPoolRetryManager:
                 f'Error: {error}'
             )
             results[job.job_id] = None
+
+            # Emit resilience warning for permanent failure
+            total_attempts = job.max_retries + 1
+            self._multiplier.emit_warning(ScanWarningInfo(
+                category=WarningCategory.RESILIENCE,
+                title=f"Job permanently failed: `{job.job_id}`",
+                body=(
+                    f"Failed after **{total_attempts}** attempt"
+                    f"{'s' if total_attempts != 1 else ''}\n\n"
+                    f"Error: `{error}`"
+                ),
+                stage=self._multiplier.stage_name,
+                timestamp=time(),
+            ))
 
             # Call error callback if provided
             if self._on_job_error:

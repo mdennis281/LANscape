@@ -19,6 +19,7 @@ class RuntimeArgs(BaseModel):
     ws_server: bool = False
     ws_port: int = 8766
     mdns_enabled: bool = True
+    printer_safety: bool = True
 
 
 def was_port_explicit() -> bool:
@@ -55,6 +56,8 @@ def parse_args() -> RuntimeArgs:
                         help='Port for WebSocket server (default: 8766)')
     parser.add_argument('--mdns-off', action='store_true',
                         help='Disable mDNS service discovery')
+    parser.add_argument('--printer-mayhem', action='store_true',
+                        help='Disable printer port safety (allows probing printer ports)')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -71,6 +74,10 @@ def parse_args() -> RuntimeArgs:
     # --mdns-off -> mdns_enabled=False
     if args_dict.pop('mdns_off', False):
         args_dict['mdns_enabled'] = False
+
+    # --printer-mayhem -> printer_safety=False
+    if args_dict.pop('printer_mayhem', False):
+        args_dict['printer_safety'] = False
 
     # Only pass arguments that exist in the Args dataclass
     filtered_args = {name: args_dict[name]

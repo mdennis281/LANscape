@@ -577,6 +577,8 @@ class NeighborTableService:
         self._refresh_cond = threading.Condition()
         self._refresh_count: int = 0
         self._running = False
+        self._fetch_failure_reasons: List[str] = []
+        self._failure_lock = threading.Lock()
 
     # ── Singleton accessor ──────────────────────────────────────────
 
@@ -676,7 +678,14 @@ class NeighborTableService:
         table = self._ipv6_table if ':' in ip else self._ipv4_table
         return table.get_macs(ip)
 
-    def get_macs_wait(self, ip: str) -> List[str]:
+    def drain_fetch_failures(self) -> List[str]:
+        """Return and clear any fetch failure reasons accumulated since last drain."""
+        with self._failure_lock:
+            failures = list(self._fetch_failure_reasons)
+            self._fetch_failure_reasons.clear()
+        return failures
+
+    def get_macs_wait(self, ip: str, timeout: float | None = None) -> List[str]:
         """Return MACs for *ip*, waiting for one fresh refresh if not cached.
 
         1. Checks the current cache — returns immediately if found.
@@ -684,6 +693,11 @@ class NeighborTableService:
            (so we don't trust one already in-flight that may have
            begun before the OS cache was populated) and then **finish**.
         3. Checks the cache once more and returns the result (may be empty).
+
+        *timeout* caps each wait phase so devices absent from the neighbor
+        table (e.g. global IPv6 addresses) don't block indefinitely.
+        Defaults to ``command_timeout + refresh_interval + 1`` which is the
+        natural upper-bound for one complete refresh cycle.
         """
         macs = self.get_macs(ip)
         if macs:
@@ -692,11 +706,16 @@ class NeighborTableService:
         if not self._running:
             return []
 
+        wait_timeout = timeout if timeout is not None else (
+            self._command_timeout + self._refresh_interval + 1.0
+        )
+
         # Wait for a NEW refresh to start
         start_baseline = self._refresh_start_count
         with self._refresh_start_cond:
             self._refresh_start_cond.wait_for(
                 lambda: self._refresh_start_count > start_baseline,
+                timeout=wait_timeout,
             )
 
         # Now wait for that refresh to finish
@@ -704,6 +723,7 @@ class NeighborTableService:
         with self._refresh_cond:
             self._refresh_cond.wait_for(
                 lambda: self._refresh_count > finish_baseline,
+                timeout=wait_timeout,
             )
 
         return self.get_macs(ip)
@@ -763,6 +783,7 @@ class NeighborTableService:
     def _fetch_entries(self, want_v6: bool) -> List[NeighborEntry]:
         """Try each command in order for the given protocol. First success wins."""
         commands = get_table_commands(want_v6)
+        last_error: Optional[str] = None
         for cmd in commands:
             try:
                 output = subprocess.check_output(
@@ -780,5 +801,12 @@ class NeighborTableService:
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
                     FileNotFoundError, OSError) as exc:
                 log.debug("Command %s failed: %s", cmd[:2], exc)
+                last_error = str(exc)
                 continue
+        if last_error:
+            proto = 'IPv6' if want_v6 else 'IPv4'
+            with self._failure_lock:
+                self._fetch_failure_reasons.append(
+                    f"{proto} neighbor table refresh failed: {last_error}"
+                )
         return []

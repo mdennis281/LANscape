@@ -7,20 +7,59 @@ Provides handlers for:
 - App info (version, runtime args)
 """
 
+import ipaddress
 import traceback
 from typing import Any, Callable, Optional
 
 from lanscape.core.net_tools import (
     get_all_network_subnets, is_arp_supported, smart_select_primary_subnet
 )
-from lanscape.core.ip_parser import parse_ip_input
-from lanscape.core.errors import SubnetTooLargeError
-from lanscape.core.scan_config import get_default_configs_with_arp_fallback
+from lanscape.core.net_tools.subnet_utils import (
+    is_ipv6_subnet, is_local_subnet, matching_interface
+)
+from lanscape.core.ip_parser import parse_ip_input, get_address_count
+from lanscape.core.auto_stages import recommend_stages
+from lanscape.core.scan_config import get_stage_config_defaults
+from lanscape.core.stage_presets import get_stage_presets
+from lanscape.core.stage_estimates import estimate_stage_time
+from lanscape.core.models.enums import StageType
 from lanscape.core.version_manager import (
     get_installed_version, is_update_available, get_latest_version
 )
 from lanscape.core.runtime_args import parse_args
 from lanscape.ui.ws.handlers.base import BaseHandler
+
+
+def _format_ip_count(count: int) -> str:
+    """Format a large IP count into a human-readable abbreviated string.
+
+    Examples:
+        12_450          -> "12.45k IPs"
+        1_200_005       -> "1.2M IPs"
+        1_300_400_100   -> "1.3B IPs"
+        2_500_000_000_000 -> "2.5T IPs"
+        >= 10^15        -> scientific notation
+    """
+    if count < 1_000:
+        return f"{count} IP{'s' if count != 1 else ''}"
+    if count < 1_000_000:
+        val = count / 1_000
+        # 2 decimal places, strip trailing zeros
+        formatted = f"{val:.2f}".rstrip('0').rstrip('.')
+        return f"{formatted}k IPs"
+    if count < 1_000_000_000:
+        val = count / 1_000_000
+        formatted = f"{val:.1f}".rstrip('0').rstrip('.')
+        return f"{formatted}M IPs"
+    if count < 1_000_000_000_000:
+        val = count / 1_000_000_000
+        formatted = f"{val:.1f}".rstrip('0').rstrip('.')
+        return f"{formatted}B IPs"
+    if count < 1_000_000_000_000_000:
+        val = count / 1_000_000_000_000
+        formatted = f"{val:.1f}".rstrip('0').rstrip('.')
+        return f"{formatted}T IPs"
+    return f"{float(count):.2e} IPs"
 
 
 class ToolsHandler(BaseHandler):
@@ -30,9 +69,13 @@ class ToolsHandler(BaseHandler):
     Supports actions:
     - tools.subnet_test: Validate a subnet string
     - tools.subnet_list: List all network subnets on the system
-    - tools.config_defaults: Get default scan configurations
+    - tools.stage_defaults: Get default per-stage configurations
+    - tools.stage_presets: Get fast/balanced/accurate presets per stage
+    - tools.stage_estimate: Estimate time for one unit of work
     - tools.arp_supported: Check if ARP is supported on this system
-    - tools.app_info: Get app version, runtime args, and update status
+    - tools.app_info: Get app version, runtime args
+    - tools.auto_stages: Recommend scan stages for a subnet
+    - tools.update_check: Check for available updates
     """
 
     def __init__(self):
@@ -42,9 +85,13 @@ class ToolsHandler(BaseHandler):
         # Register handlers
         self.register('subnet_test', self._handle_subnet_test)
         self.register('subnet_list', self._handle_subnet_list)
-        self.register('config_defaults', self._handle_config_defaults)
+        self.register('auto_stages', self._handle_auto_stages)
+        self.register('stage_defaults', self._handle_stage_defaults)
+        self.register('stage_presets', self._handle_stage_presets)
+        self.register('stage_estimate', self._handle_stage_estimate)
         self.register('arp_supported', self._handle_arp_supported)
         self.register('app_info', self._handle_app_info)
+        self.register('update_check', self._handle_update_check)
 
     @property
     def prefix(self) -> str:
@@ -71,19 +118,27 @@ class ToolsHandler(BaseHandler):
             return {'valid': False, 'msg': 'Subnet cannot be blank', 'count': -1}
 
         try:
-            ips = parse_ip_input(subnet)
-            length = len(ips)
+            is_cidr = '/' in subnet and ',' not in subnet
+            if is_cidr:
+                # Fast path for CIDR: arithmetic only, no IP list allocation
+                ipaddress.ip_network(subnet, strict=False)  # validate
+                count = get_address_count(subnet)
+            else:
+                # Range / comma-separated inputs are inherently bounded
+                ips = parse_ip_input(subnet)
+                count = len(ips)
+
+            # Cap count at JS Number.MAX_SAFE_INTEGER (2^53 - 1) to avoid
+            # precision loss when the value is serialised to JSON and parsed
+            # by a JavaScript client (e.g. large IPv6 /64 subnets).
+            js_safe_count = min(count, 2**53 - 1)
             return {
                 'valid': True,
-                'msg': f"{length} IP{'s' if length > 1 else ''}",
-                'count': length
-            }
-        except SubnetTooLargeError as e:
-            return {
-                'valid': False,
-                'msg': f'subnet too large ({e.count:,} IPs)',
-                'error': traceback.format_exc(),
-                'count': e.count
+                'msg': _format_ip_count(count),
+                'count': js_safe_count,
+                'is_ipv6': is_ipv6_subnet(subnet),
+                'is_local': is_local_subnet(subnet),
+                'matching_interface': matching_interface(subnet),
             }
         except Exception:
             return {
@@ -92,6 +147,34 @@ class ToolsHandler(BaseHandler):
                 'error': traceback.format_exc(),
                 'count': -1
             }
+
+    def _handle_auto_stages(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Recommend scan stages for a subnet based on system context.
+
+        Params:
+            subnet: The target subnet string
+
+        Returns:
+            Dict with 'stages' list of recommended stage configs
+        """
+        subnet = self._get_param(params, 'subnet')
+        if not subnet:
+            return {'stages': [], 'error': 'subnet is required'}
+
+        try:
+            recommendations = recommend_stages(
+                subnet=subnet,
+            )
+            return {
+                'stages': [r.to_dict() for r in recommendations],
+            }
+        except Exception:
+            return {'stages': [], 'error': traceback.format_exc()}
 
     def _handle_subnet_list(
         self,
@@ -116,20 +199,55 @@ class ToolsHandler(BaseHandler):
         except Exception:
             return {'error': traceback.format_exc()}
 
-    def _handle_config_defaults(
+    def _handle_stage_defaults(
         self,
         params: dict[str, Any],  # pylint: disable=unused-argument
         send_event: Optional[Callable] = None  # pylint: disable=unused-argument
     ) -> dict:
         """
-        Get default scan configurations.
-
-        Adjusts presets that rely on ARP_LOOKUP when ARP is not supported.
+        Get the default configuration for each stage type.
 
         Returns:
-            Dict of preset name -> ScanConfig dict
+            Dict of stage_type -> default config dict
         """
-        return get_default_configs_with_arp_fallback(is_arp_supported())
+        return get_stage_config_defaults()
+
+    def _handle_stage_presets(
+        self,
+        params: dict[str, Any],  # pylint: disable=unused-argument
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Get fast/balanced/accurate preset configs for each stage type.
+
+        Returns:
+            Dict of stage_type -> {preset_name -> config dict}
+        """
+        return get_stage_presets()
+
+    def _handle_stage_estimate(
+        self,
+        params: dict[str, Any],
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Estimate worst-case time for one unit of work in a stage.
+
+        Params:
+            stage_type: The stage type string
+            config: The stage config dict
+
+        Returns:
+            Dict with 'seconds' float
+        """
+        stage_type_str = self._get_param(params, 'stage_type')
+        config = params.get('config', {})
+        try:
+            st = StageType(stage_type_str)
+            seconds = estimate_stage_time(st, config)
+            return {'seconds': seconds}
+        except Exception:
+            return {'error': traceback.format_exc()}
 
     def _handle_arp_supported(
         self,
@@ -150,15 +268,16 @@ class ToolsHandler(BaseHandler):
         send_event: Optional[Callable] = None  # pylint: disable=unused-argument
     ) -> dict:
         """
-        Get application info including version, runtime args, and update status.
+        Get application info (fast path — no network or ARP calls).
+
+        Expensive checks are deferred to separate actions so the UI can
+        render immediately: ARP support via ``tools.arp_supported`` and
+        update availability via ``tools.update_check``.
 
         Returns:
             Dict with app info:
             - name: Application name
             - version: Current installed version
-            - arp_supported: Whether ARP is supported
-            - update_available: Whether an update is available
-            - latest_version: Latest available version (if update available)
             - runtime_args: Dict of current runtime arguments
         """
         args = parse_args()
@@ -173,19 +292,32 @@ class ToolsHandler(BaseHandler):
         if args.logfile:
             runtime_args['logfile'] = args.logfile
 
-        result = {
+        return {
             'name': 'LANscape',
             'version': get_installed_version(),
-            'arp_supported': is_arp_supported(),
             'runtime_args': runtime_args,
         }
 
-        # Check for updates (safely)
-        try:
-            result['update_available'] = is_update_available()
-            result['latest_version'] = get_latest_version()
-        except Exception:
-            result['update_available'] = False
-            result['latest_version'] = None
+    def _handle_update_check(
+        self,
+        params: dict[str, Any],  # pylint: disable=unused-argument
+        send_event: Optional[Callable] = None  # pylint: disable=unused-argument
+    ) -> dict:
+        """
+        Check for available updates on PyPI.
 
-        return result
+        Returns:
+            Dict with:
+            - update_available: Whether a newer version exists on PyPI
+            - latest_version: Latest version string (or None)
+        """
+        try:
+            return {
+                'update_available': is_update_available(),
+                'latest_version': get_latest_version(),
+            }
+        except Exception:  # pylint: disable=broad-exception-caught
+            return {
+                'update_available': False,
+                'latest_version': None,
+            }

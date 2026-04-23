@@ -64,7 +64,8 @@ class DeviceResult(BaseModel):
     manufacturer: Optional[str] = Field(default=None, description="MAC vendor/manufacturer")
     ports: List[int] = Field(default_factory=list, description="Open ports found")
     stage: DeviceStage = Field(default=DeviceStage.FOUND, description="Current scan stage")
-    ports_scanned: int = Field(default=0, description="Number of ports tested")
+    ports_scanned: int = Field(default=0, description="Number of ports tested so far this stage")
+    ports_to_scan: int = Field(default=0, description="Total ports to test this stage")
     services: Dict[str, List[int]] = Field(
         default_factory=dict,
         description="Service name to list of ports mapping"
@@ -84,6 +85,10 @@ class DeviceResult(BaseModel):
     ipv6_addresses: List[str] = Field(
         default_factory=list,
         description="All discovered IPv6 addresses for this device"
+    )
+    found_with_stages: List[int] = Field(
+        default_factory=list,
+        description="0-based pipeline stage indexes that detected this device"
     )
 
     @computed_field  # type: ignore[misc]

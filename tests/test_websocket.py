@@ -264,9 +264,10 @@ class TestToolsHandler:
 
         assert "tools.subnet_test" in actions
         assert "tools.subnet_list" in actions
-        assert "tools.config_defaults" in actions
+        assert "tools.stage_defaults" in actions
         assert "tools.arp_supported" in actions
         assert "tools.app_info" in actions
+        assert "tools.update_check" in actions
 
     def test_handle_subnet_test_empty(self, tools_handler):
         """Test validating an empty subnet."""
@@ -340,18 +341,61 @@ class TestToolsHandler:
         assert len(result) == 3
         assert result[0]["subnet"] == "192.168.1.0/24"
 
-    def test_handle_config_defaults(self, tools_handler):
-        """Test getting default configs."""
-        with patch(
-            'lanscape.ui.ws.handlers.tools.is_arp_supported'
-        ) as mock:
-            mock.return_value = True
+    def test_handle_stage_defaults(self, tools_handler):
+        """Test getting stage config defaults."""
+        result = tools_handler.invoke("stage_defaults")
 
-            result = tools_handler.invoke("config_defaults")
+        assert "icmp_discovery" in result
+        assert "arp_discovery" in result
+        assert "poke_arp_discovery" in result
+        assert "icmp_arp_discovery" in result
+        assert "ipv6_ndp_discovery" in result
+        assert "ipv6_mdns_discovery" in result
+        assert "port_scan" in result
 
-            assert "balanced" in result
-            assert "accurate" in result
-            assert "fast" in result
+        # Verify the values are real config dicts with expected fields
+        icmp = result["icmp_discovery"]
+        assert "ping_config" in icmp
+        assert "hostname_config" in icmp
+        assert "t_cnt" in icmp
+
+        port = result["port_scan"]
+        assert "port_list" in port
+        assert "port_scan_config" in port
+        assert "service_scan_config" in port
+
+    def test_handle_stage_presets(self, tools_handler):
+        """Test getting stage presets."""
+        result = tools_handler.invoke("stage_presets")
+
+        assert "icmp_discovery" in result
+        assert "port_scan" in result
+
+        # Each stage should have all three presets
+        for stage_type, presets in result.items():
+            assert set(presets.keys()) == {"fast", "balanced", "accurate"}, (
+                f"{stage_type} missing preset(s)"
+            )
+
+        # Fast port scan uses 'small' port list
+        assert result["port_scan"]["fast"]["port_list"] == "small"
+
+    def test_handle_stage_estimate(self, tools_handler):
+        """Test getting a time estimate for a stage."""
+        result = tools_handler.invoke("stage_estimate", {
+            "stage_type": "icmp_discovery",
+            "config": {},
+        })
+        assert "seconds" in result
+        assert result["seconds"] > 0
+
+    def test_handle_stage_estimate_custom_config(self, tools_handler):
+        """Custom config changes the estimate."""
+        result = tools_handler.invoke("stage_estimate", {
+            "stage_type": "icmp_discovery",
+            "config": {"ping_config": {"timeout": 5.0, "attempts": 3}},
+        })
+        assert result["seconds"] > 2.5  # default is 2.5
 
     def test_handle_arp_supported(self, tools_handler):
         """Test checking ARP support."""
@@ -367,16 +411,10 @@ class TestToolsHandler:
             assert result["supported"] is False
 
     def test_handle_app_info(self, tools_handler):
-        """Test getting app info."""
+        """Test getting app info (fast path — no ARP or update check)."""
         with patch(
             'lanscape.ui.ws.handlers.tools.get_installed_version',
             return_value='1.2.3',
-        ), patch(
-            'lanscape.ui.ws.handlers.tools.is_arp_supported',
-            return_value=True,
-        ), patch(
-            'lanscape.ui.ws.handlers.tools.is_update_available',
-            return_value=False,
         ), patch(
             'lanscape.ui.ws.handlers.tools.parse_args',
         ) as mock_args:
@@ -384,46 +422,56 @@ class TestToolsHandler:
             mock_args.return_value.ws_port = 8766
             mock_args.return_value.loglevel = 'INFO'
             mock_args.return_value.persistent = False
-            mock_args.return_value.webapp_update = False
             mock_args.return_value.logfile = None
 
             result = tools_handler.invoke("app_info")
 
             assert result["name"] == "LANscape"
             assert result["version"] == "1.2.3"
-            assert result["arp_supported"] is True
-            assert result["update_available"] is False
             assert "runtime_args" in result
             assert result["runtime_args"]["ui_port"] == 5001
+            # ARP and update fields should NOT be present (deferred to capabilities)
+            assert "arp_supported" not in result
+            assert "update_available" not in result
 
-    def test_handle_app_info_with_update(self, tools_handler):
-        """Test getting app info when update is available."""
+    def test_handle_update_check(self, tools_handler):
+        """Test checking for updates."""
         with patch(
-            'lanscape.ui.ws.handlers.tools.get_installed_version',
-            return_value='1.2.3',
+            'lanscape.ui.ws.handlers.tools.is_update_available',
+            return_value=False,
         ), patch(
-            'lanscape.ui.ws.handlers.tools.is_arp_supported',
-            return_value=True,
-        ), patch(
+            'lanscape.ui.ws.handlers.tools.get_latest_version',
+            return_value='1.0.0',
+        ):
+            result = tools_handler.invoke("update_check")
+
+            assert result["update_available"] is False
+            assert result["latest_version"] == '1.0.0'
+
+    def test_handle_update_check_available(self, tools_handler):
+        """Test update_check when an update is available."""
+        with patch(
             'lanscape.ui.ws.handlers.tools.is_update_available',
             return_value=True,
         ), patch(
             'lanscape.ui.ws.handlers.tools.get_latest_version',
-            return_value='1.3.0',
-        ), patch(
-            'lanscape.ui.ws.handlers.tools.parse_args',
-        ) as mock_args:
-            mock_args.return_value.ui_port = 5001
-            mock_args.return_value.ws_port = 8766
-            mock_args.return_value.loglevel = 'INFO'
-            mock_args.return_value.persistent = False
-            mock_args.return_value.webapp_update = False
-            mock_args.return_value.logfile = None
-
-            result = tools_handler.invoke("app_info")
+            return_value='2.0.0',
+        ):
+            result = tools_handler.invoke("update_check")
 
             assert result["update_available"] is True
-            assert result["latest_version"] == "1.3.0"
+            assert result["latest_version"] == '2.0.0'
+
+    def test_handle_update_check_error(self, tools_handler):
+        """Test update_check when PyPI call throws."""
+        with patch(
+            'lanscape.ui.ws.handlers.tools.is_update_available',
+            side_effect=RuntimeError('network error'),
+        ):
+            result = tools_handler.invoke("update_check")
+
+            assert result["update_available"] is False
+            assert result["latest_version"] is None
 
 
 # WebSocket Server Tests

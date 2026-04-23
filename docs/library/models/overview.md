@@ -9,7 +9,8 @@ from lanscape import (
     DeviceResult, ServiceInfo, ProbeResponseInfo,
     DeviceErrorInfo, ScanErrorInfo, ScanWarningInfo,
     ScanMetadata, ScanResults, ScanSummary,
-    DeviceStage, ScanStage
+    DeviceStage, ScanStage, StageType, StageProgress,
+    StageEvalContext, WarningCategory,
 )
 ```
 
@@ -135,6 +136,42 @@ Scan progress and status metadata — the "header" for a scan.
 | `run_time` | `int` | `0` | Runtime in seconds |
 | `errors` | `List[ScanErrorInfo]` | `[]` | Scan-level errors |
 | `warnings` | `List[ScanWarningInfo]` | `[]` | Scan-level warnings |
+| `stages` | `List[StageProgress]` | `[]` | Progress snapshot for each pipeline stage (see [StageProgress](#stageprogress)) |
+| `current_stage_index` | `int \| None` | `None` | Index of the currently executing stage (0-based). `None` when no stage is running. |
+
+The `stages` and `current_stage_index` fields are populated when scans run through the [pipeline architecture](../scanner/scan-pipeline.md). They are always present — legacy `ScanConfig` scans auto-convert to a pipeline internally.
+
+---
+
+### StageProgress
+
+Progress snapshot for a single pipeline stage. Available in `ScanMetadata.stages`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `stage_name` | `str` | *required* | Human-readable stage name (e.g. `"ICMP Discovery"`) |
+| `stage_type` | [`StageType`](../config/enums.md#stagetype) | *required* | Stage type identifier |
+| `total` | `int` | `0` | Total work items in this stage |
+| `completed` | `int` | `0` | Completed work items |
+| `finished` | `bool` | `False` | Whether the stage has finished executing |
+| `skipped` | `bool` | `False` | Whether the stage was skipped by a guard |
+| `skip_reason` | `str \| None` | `None` | Reason the stage was skipped (e.g. `"ICMP discovery is IPv4-only"`) |
+
+```python
+meta = scan.results.get_metadata()
+for i, stage in enumerate(meta.stages):
+    if stage.skipped:
+        marker = "⊘"
+        detail = stage.skip_reason
+    elif stage.finished:
+        marker = "✓"
+        detail = "done"
+    else:
+        marker = "▶" if i == meta.current_stage_index else "·"
+        pct = (stage.completed / stage.total * 100) if stage.total else 0
+        detail = f"{pct:.0f}%"
+    print(f"  {marker} {stage.stage_name}: {detail}")
+```
 
 ---
 
@@ -183,36 +220,49 @@ A serializable representation of a scan-level error (as opposed to per-device er
 
 ### ScanWarningInfo
 
-A scan-level warning, typically related to automatic thread-pool tuning. When jobs fail and trigger a multiplier reduction, the warning includes contextual information about the failure — which job failed, the error message, the scan stage, and retry details.
+A scan-level warning with backend-owned Markdown formatting. Warnings are grouped by category in the UI, and each warning has a short title (always visible) and an optional body (shown on expand).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | `str` | *required* | Warning type identifier (e.g., `"multiplier_reduced"`) |
-| `message` | `str` | *required* | Human-readable warning message |
-| `old_multiplier` | `float \| None` | `None` | Previous thread multiplier value |
-| `new_multiplier` | `float \| None` | `None` | New thread multiplier value after reduction |
-| `decrease_percent` | `float \| None` | `None` | Percent decrease applied |
-| `timestamp` | `float \| None` | `None` | Unix timestamp of the warning |
-| `failed_job` | `str \| None` | `None` | The job ID (e.g., IP address) that triggered the warning |
-| `error_message` | `str \| None` | `None` | The error message from the failed job |
-| `stage` | `str \| None` | `None` | The scan stage when the warning occurred (e.g., `"scanning devices"`, `"testing ports"`) |
-| `retry_attempt` | `int \| None` | `None` | Which retry attempt failed (1-based) |
-| `max_retries` | `int \| None` | `None` | Maximum retries configured for this job type |
+| `category` | [`WarningCategory`](../config/enums.md#warningcategory) | *required* | Warning category for UI grouping |
+| `title` | `str` | *required* | Short Markdown summary (shown collapsed) |
+| `body` | `str \| None` | `None` | Longer Markdown details (shown on expand) |
+| `stage` | `str \| None` | `None` | Stage name when the warning occurred |
+| `timestamp` | `float \| None` | `None` | Unix timestamp |
 
-The contextual fields (`failed_job`, `error_message`, `stage`, `retry_attempt`, `max_retries`) are populated when a job failure triggers a thread multiplier reduction. They give visibility into *why* the scan is throttling itself.
+#### Categories
+
+| Category | When emitted |
+|----------|-------------|
+| `concurrency` | Thread multiplier reduced due to job failures |
+| `stage_skip` | A pipeline stage was skipped by its guard |
+| `capability` | A feature is degraded (e.g., missing dependency, permission fallback) |
+| `resilience` | A job failed permanently after all retries, or a subsystem refresh failed |
 
 ```python
 for warning in results.metadata.warnings:
-    print(f"[{warning.type}] {warning.message}")
-    if warning.failed_job:
-        print(f"  Failed job: {warning.failed_job}")
-        print(f"  Error:      {warning.error_message}")
-    if warning.stage:
-        print(f"  Stage:      {warning.stage}")
-    if warning.retry_attempt is not None:
-        print(f"  Retry:      {warning.retry_attempt}/{warning.max_retries}")
-    if warning.old_multiplier is not None:
-        print(f"  Multiplier: {warning.old_multiplier:.2f} -> {warning.new_multiplier:.2f}")
+    print(f"[{warning.category.value}] {warning.title}")
+    if warning.body:
+        print(f"  {warning.body}")
 ```
+
+---
+
+## Pipeline Models
+
+### StageEvalContext
+
+`lanscape.StageEvalContext`
+
+Environment context used by stage guards to decide whether a stage should run or be skipped. See the [Scan Pipeline — StageEvalContext](../scanner/scan-pipeline.md#stageevalcontext) section for full details and examples.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subnet` | `str` | Target subnet string |
+| `is_ipv6` | `bool` | Whether the target subnet is IPv6 |
+| `is_local` | `bool` | Whether the target subnet overlaps a local interface |
+| `matching_interface` | `str \| None` | Name of the overlapping local interface |
+| `arp_supported` | `bool` | Whether the system supports ARP |
+| `os_platform` | `str` | Normalised OS: `"windows"`, `"linux"`, or `"darwin"` |
 
 

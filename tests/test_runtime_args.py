@@ -86,6 +86,18 @@ class TestParseArgsCustom:
             args = parse_args()
         assert args.mdns_enabled is False
 
+    def test_printer_mayhem(self) -> None:
+        """--printer-mayhem disables printer port safety."""
+        with patch.object(sys, 'argv', ['lanscape', '--printer-mayhem']):
+            args = parse_args()
+        assert args.printer_safety is False
+
+    def test_printer_safety_default(self) -> None:
+        """printer_safety defaults to True."""
+        with patch.object(sys, 'argv', ['lanscape']):
+            args = parse_args()
+        assert args.printer_safety is True
+
     def test_invalid_loglevel_raises(self) -> None:
         """Invalid log level raises ValueError."""
         with patch.object(sys, 'argv', ['lanscape', '--loglevel', 'INVALID']):

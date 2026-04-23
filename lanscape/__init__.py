@@ -19,7 +19,23 @@ from lanscape.core.scan_config import (
     ScanType,
     NeighborTableConfig,
     HostnameConfig,
+    PipelineConfig,
+    StageConfig,
+    ICMPDiscoveryStageConfig,
+    ARPDiscoveryStageConfig,
+    PokeARPDiscoveryStageConfig,
+    ICMPARPDiscoveryStageConfig,
+    IPv6NDPDiscoveryStageConfig,
+    IPv6MDNSDiscoveryStageConfig,
+    PortScanStageConfig,
+    ResilienceConfig,
 )
+
+from lanscape.core.stage_presets import StagePreset, get_stage_presets
+from lanscape.core.stage_estimates import estimate_stage_time, get_all_estimates
+from lanscape.core.auto_stages import recommend_stages, StageRecommendation
+
+from lanscape.core.models.scan import StageEvalContext
 
 from lanscape.core.port_manager import PortManager
 
@@ -69,7 +85,25 @@ from lanscape.core.models import (
     ScanResults,
     ScanDelta,
     ScanSummary,
-    ScanListItem
+    ScanListItem,
+    StageType,
+    StageProgress,
+    WarningCategory,
+)
+
+# Scan pipeline infrastructure
+from lanscape.core.scan_stage import ScanStageMixin
+from lanscape.core.scan_context import ScanContext
+from lanscape.core.scan_pipeline import ScanPipeline
+from lanscape.core.stage_builder import build_stages
+from lanscape.core.stages import (
+    ICMPDiscoveryStage,
+    ARPDiscoveryStage,
+    PokeARPDiscoveryStage,
+    ICMPARPDiscoveryStage,
+    IPv6NDPDiscoveryStage,
+    IPv6MDNSDiscoveryStage,
+    PortScanStage,
 )
 
 # Webapp server for serving bundled React UI

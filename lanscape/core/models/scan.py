@@ -6,8 +6,47 @@ from typing import List, Optional, Any, Dict
 
 from pydantic import BaseModel, Field
 
-from lanscape.core.models.enums import ScanStage
+from lanscape.core.models.enums import ScanStage, StageType, WarningCategory
 from lanscape.core.models.device import DeviceResult
+
+
+class StageEvalContext(BaseModel):
+    """Context used by stages to decide whether they can execute."""
+    subnet: str = Field(description="Target subnet string")
+    is_ipv6: bool = Field(description="Whether the target subnet is IPv6")
+    is_local: bool = Field(
+        description="Whether the target subnet overlaps a local interface"
+    )
+    matching_interface: Optional[str] = Field(
+        default=None, description="Name of the overlapping local interface"
+    )
+    arp_supported: bool = Field(description="Whether the system supports ARP")
+    os_platform: str = Field(
+        description="Normalised OS: 'windows', 'linux', or 'darwin'"
+    )
+
+
+class StageProgress(BaseModel):
+    """Progress snapshot for a single scan stage."""
+    stage_name: str = Field(description="Human-readable stage name")
+    stage_type: StageType = Field(description="Stage type identifier")
+    total: int = Field(default=0, ge=0, description="Total work items")
+    completed: int = Field(default=0, ge=0, description="Completed work items")
+    finished: bool = Field(default=False, description="Whether stage has finished")
+    skipped: bool = Field(default=False, description="Whether stage was skipped by a guard")
+    skip_reason: Optional[str] = Field(
+        default=None, description="Reason the stage was skipped"
+    )
+    runtime: float = Field(default=0.0, ge=0, description="Elapsed seconds for this stage")
+    counter_label: str = Field(
+        default="items",
+        description="Label for the progress counter (e.g. 'IPs scanned')"
+    )
+    auto: Optional[bool] = Field(
+        default=None, description="Whether this stage was auto-recommended"
+    )
+    reason: Optional[str] = Field(default=None, description="Reason the stage was auto-recommended")
+
 
 
 class ScanErrorInfo(BaseModel):
@@ -17,18 +56,18 @@ class ScanErrorInfo(BaseModel):
 
 
 class ScanWarningInfo(BaseModel):
-    """Serializable representation of a scan-level warning."""
-    type: str = Field(description="Warning type identifier")
-    message: str = Field(description="Human-readable warning message")
-    old_multiplier: Optional[float] = Field(default=None, description="Previous multiplier")
-    new_multiplier: Optional[float] = Field(default=None, description="New multiplier")
-    decrease_percent: Optional[float] = Field(default=None, description="Percent decrease")
+    """Serializable representation of a scan-level warning.
+
+    The backend owns all formatting — ``title`` and ``body`` may contain
+    Markdown which the UI renders directly.
+    """
+    category: WarningCategory = Field(description="Warning category for grouping")
+    title: str = Field(description="Short markdown summary (shown collapsed)")
+    body: Optional[str] = Field(
+        default=None, description="Longer markdown details (shown expanded)"
+    )
+    stage: Optional[str] = Field(default=None, description="Stage name when warning occurred")
     timestamp: Optional[float] = Field(default=None, description="Unix timestamp")
-    failed_job: Optional[str] = Field(default=None, description="Job ID that triggered the warning")
-    error_message: Optional[str] = Field(default=None, description="Error from the failed job")
-    stage: Optional[str] = Field(default=None, description="Scan stage when warning occurred")
-    retry_attempt: Optional[int] = Field(default=None, description="Which retry attempt failed")
-    max_retries: Optional[int] = Field(default=None, description="Maximum retries configured")
 
 
 class ScanMetadata(BaseModel):
@@ -66,6 +105,14 @@ class ScanMetadata(BaseModel):
 
     # Warnings at scan level (e.g., multiplier reductions)
     warnings: List[ScanWarningInfo] = Field(default_factory=list, description="Scan-level warnings")
+
+    # Per-stage progress (pipeline execution)
+    stages: List[StageProgress] = Field(
+        default_factory=list, description="Progress for each pipeline stage"
+    )
+    current_stage_index: Optional[int] = Field(
+        default=None, description="Index of the currently executing stage"
+    )
 
 
 class ScanResults(BaseModel):

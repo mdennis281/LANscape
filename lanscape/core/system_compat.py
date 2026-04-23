@@ -123,17 +123,30 @@ def send_arp_request(ip: str, timeout: float = 1.0) -> tuple:
     Imports Scapy lazily so non-Scapy code paths never pay the cost.
 
     ARP is IPv4-only; calling with an IPv6 address returns ``([], [])``.
+    The outgoing interface is resolved from the OS routing table so the
+    packet is always sent on the correct adapter (e.g. not a VPN / virtual
+    interface) even when the system has multiple network adapters.
     """
     if is_ipv6(ip):
         return ([], [])
 
     from scapy.sendrecv import srp          # pylint: disable=import-outside-toplevel
     from scapy.layers.l2 import ARP, Ether  # pylint: disable=import-outside-toplevel
+    from scapy.config import conf as scapy_conf  # pylint: disable=import-outside-toplevel
+
+    # Resolve the outbound interface via Scapy's routing table so we pick
+    # the correct adapter when multiple interfaces are present (e.g. a
+    # ZeroTier / VPN adapter is the "default" but the physical NIC is the
+    # right one for a LAN target).
+    try:
+        iface = scapy_conf.route.route(ip)[0]
+    except Exception:  # pylint: disable=broad-except
+        iface = scapy_conf.iface
 
     arp_request = ARP(pdst=ip)
     broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
     packet = broadcast / arp_request
-    answered, unanswered = srp(packet, timeout=timeout, verbose=False)
+    answered, unanswered = srp(packet, timeout=timeout, verbose=False, iface=iface)
     return answered, unanswered
 
 
@@ -665,6 +678,47 @@ def clear_screen() -> None:
     os.system('cls' if psutil.WINDOWS else 'clear')
 
 
+# ── Local interface MAC lookup ──────────────────────────────────────
+
+# Cache mapping local IPs → MACs (built lazily on first call).
+_LOCAL_IP_MAC_CACHE: Optional[dict] = None
+
+
+def _build_local_ip_mac_map() -> dict[str, str]:
+    """Build a mapping of every local IP address to its interface MAC."""
+    ip_to_mac: dict[str, str] = {}
+    for _iface, addrs in psutil.net_if_addrs().items():
+        mac = None
+        ips: list[str] = []
+        for a in addrs:
+            # psutil uses AF_LINK on macOS/BSD, AF_PACKET on Linux,
+            # and a negative sentinel on Windows — all for L2 addresses.
+            if a.family in (psutil.AF_LINK, getattr(socket, 'AF_PACKET', -1)):
+                if a.address and a.address != '00:00:00:00:00:00':
+                    mac = a.address.lower().replace('-', ':')
+            elif a.family in (socket.AF_INET, socket.AF_INET6):
+                addr = a.address.split('%')[0]  # strip scope-id
+                ips.append(addr)
+        if mac:
+            for ip in ips:
+                ip_to_mac[ip] = mac
+    return ip_to_mac
+
+
+def get_local_mac_for_ip(ip: str) -> Optional[str]:
+    """Return the MAC address of the local interface that owns *ip*, or ``None``."""
+    global _LOCAL_IP_MAC_CACHE  # pylint: disable=global-statement
+    if _LOCAL_IP_MAC_CACHE is None:
+        _LOCAL_IP_MAC_CACHE = _build_local_ip_mac_map()
+    return _LOCAL_IP_MAC_CACHE.get(ip)
+
+
+def refresh_local_ip_mac_cache() -> None:
+    """Force-rebuild the local IP→MAC cache (e.g. after interface changes)."""
+    global _LOCAL_IP_MAC_CACHE  # pylint: disable=global-statement
+    _LOCAL_IP_MAC_CACHE = _build_local_ip_mac_map()
+
+
 def configure_asyncio_exception_handler(loop) -> None:
     """
     Configure a custom exception handler for asyncio event loops.
@@ -705,3 +759,73 @@ def configure_asyncio_exception_handler(loop) -> None:
             loop.default_exception_handler(context)
 
     loop.set_exception_handler(_windows_exception_handler)
+
+
+# ─── Per-device ARP/NDP cache query ────────────────────────────────
+
+# Regex for extracting a MAC from a single-target ARP/NDP result.
+# Uses {1,2} per octet because macOS arp(8) omits leading zeros
+# (e.g. "6:94:e6:c8:e4:22" instead of "06:94:e6:c8:e4:22").
+_SINGLE_ARP_MAC_RE = re.compile(
+    r'([0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}'
+    r'[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2})'
+)
+
+
+def query_single_arp_entry(ip: str, timeout: float = 3.0) -> Optional[str]:
+    """Query the OS ARP/NDP cache for a single IP and return its MAC.
+
+    This is the pre-3.5.0 style per-device subprocess approach:
+    - Windows:  ``arp -a <ip>``
+    - Linux:    ``ip neigh show <ip>``
+    - macOS:    ``arp -n <ip>``
+
+    For IPv6 targets Linux uses ``ip -6 neigh show <ip>``.
+
+    Returns the MAC address string (lowercase, colon-separated) or
+    ``None`` if the entry is not found / incomplete.
+    """
+    clean_ip = ip.split('%')[0]
+    v6 = is_ipv6(clean_ip)
+
+    try:
+        if psutil.WINDOWS:
+            if v6:
+                cmd = ['netsh', 'interface', 'ipv6', 'show', 'neighbors']
+            else:
+                cmd = ['arp', '-a', clean_ip]
+        elif psutil.LINUX:
+            flag = '-6' if v6 else '-4'
+            cmd = ['ip', flag, 'neigh', 'show', clean_ip]
+        else:
+            # macOS / BSD
+            if v6:
+                cmd = ['ndp', '-an']
+            else:
+                cmd = ['arp', '-n', clean_ip]
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=timeout, check=False
+        )
+        output = result.stdout
+
+        # For commands that dump the full table, filter for our target IP
+        if v6 and (psutil.WINDOWS or psutil.MACOS):
+            target_lines = [
+                ln for ln in output.splitlines()
+                if clean_ip in ln
+            ]
+            output = '\n'.join(target_lines)
+
+        match = _SINGLE_ARP_MAC_RE.search(output)
+        if match:
+            raw = match.group(1).lower().replace('-', ':')
+            # Zero-pad each octet (macOS omits leading zeros)
+            mac = ':'.join(o.zfill(2) for o in raw.split(':'))
+            # Reject null / broadcast MACs
+            if mac not in ('00:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff'):
+                return mac
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        pass
+    return None

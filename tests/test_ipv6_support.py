@@ -101,6 +101,49 @@ class TestSendArpRequestIpv6:
         assert unanswered == []
 
 
+class TestSendArpRequestInterfaceRouting:
+    """send_arp_request must route ARP packets via the correct interface."""
+
+    def test_uses_routed_interface_not_default(self):
+        """srp is called with the interface resolved from conf.route, not conf.iface."""
+        mock_srp = MagicMock(return_value=([], []))
+        mock_conf = MagicMock()
+        mock_conf.route.route.return_value = ('eth0_routed', '10.0.1.5', '0.0.0.0')
+        mock_conf.iface = 'zt_default'  # simulates ZeroTier as the OS default
+
+        with patch('lanscape.core.system_compat.srp', mock_srp, create=True):
+            # Patch the lazy imports inside send_arp_request
+            with patch.dict('sys.modules', {
+                'scapy.sendrecv': MagicMock(srp=mock_srp),
+                'scapy.layers.l2': MagicMock(ARP=MagicMock(return_value=MagicMock()),
+                                              Ether=MagicMock(return_value=MagicMock())),
+                'scapy.config': MagicMock(conf=mock_conf),
+            }):
+                send_arp_request('10.0.1.1', timeout=1.0)
+
+        # The iface passed to srp must be the routed one, not the default
+        _, call_kwargs = mock_srp.call_args
+        assert call_kwargs.get('iface') == 'eth0_routed'
+
+    def test_falls_back_to_default_iface_on_route_error(self):
+        """When conf.route.route raises, srp falls back to conf.iface."""
+        mock_srp = MagicMock(return_value=([], []))
+        mock_conf = MagicMock()
+        mock_conf.route.route.side_effect = Exception("no route")
+        mock_conf.iface = 'fallback_iface'
+
+        with patch.dict('sys.modules', {
+            'scapy.sendrecv': MagicMock(srp=mock_srp),
+            'scapy.layers.l2': MagicMock(ARP=MagicMock(return_value=MagicMock()),
+                                          Ether=MagicMock(return_value=MagicMock())),
+            'scapy.config': MagicMock(conf=mock_conf),
+        }):
+            send_arp_request('10.0.1.1', timeout=1.0)
+
+        _, call_kwargs = mock_srp.call_args
+        assert call_kwargs.get('iface') == 'fallback_iface'
+
+
 class TestGetPingCommandIpv6:
     """get_ping_command produces correct IPv6 commands."""
 

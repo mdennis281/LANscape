@@ -108,6 +108,47 @@ config = ScanConfig(
 
 ---
 
+## Subnet Inspection
+
+### `is_ipv6_subnet(subnet: str) -> bool`
+
+Check whether the given subnet string represents an IPv6 network.
+
+```python
+net_tools.is_ipv6_subnet("192.168.1.0/24")  # False
+net_tools.is_ipv6_subnet("fd00::/64")        # True
+```
+
+### `is_local_subnet(subnet: str) -> bool`
+
+Check whether the subnet overlaps with any local network interface on the machine.
+
+```python
+net_tools.is_local_subnet("192.168.1.0/24")  # True (if on that LAN)
+net_tools.is_local_subnet("10.99.0.0/16")    # False (no local interface)
+```
+
+### `matching_interface(subnet: str) -> str | None`
+
+Return the name of the local interface whose network overlaps the given subnet, or `None` if no match.
+
+```python
+net_tools.matching_interface("192.168.1.0/24")  # "Wi-Fi"
+net_tools.matching_interface("10.99.0.0/16")     # None
+```
+
+### `get_os_platform() -> str`
+
+Return the normalised OS platform string: `"windows"`, `"linux"`, or `"darwin"`.
+
+```python
+net_tools.get_os_platform()  # "windows"
+```
+
+> These functions are the same ones used internally by [`StageEvalContext.build()`](scanner/scan-pipeline.md#stageevalcontext) to populate the evaluation context.
+
+---
+
 ## Example: Discover and Scan
 
 ```python

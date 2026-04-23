@@ -9,13 +9,16 @@ from typing import List
 import psutil
 from scapy.error import Scapy_Exception
 
-from lanscape.core.ip_parser import get_address_count, MAX_IPS_ALLOWED, parse_ip_input
 from lanscape.core.decorators import run_once
+from lanscape.core.ip_parser import get_address_count, parse_ip_input
 from lanscape.core.scan_config import ScanType
 from lanscape.core.system_compat import (
     get_primary_interface,
     send_arp_request,
 )
+
+# Cap used in subnet listing to avoid JS integer overflow for very large IPv6 subnets
+_SUBNET_LIST_CAP = 100_000
 
 log = logging.getLogger('NetTools')
 
@@ -148,7 +151,7 @@ def get_all_network_subnets() -> List[dict]:
                     seen.add(key)
                     # Cap address_cnt to avoid JS integer overflow for large IPv6 subnets
                     raw_count = get_address_count(subnet)
-                    capped_count = min(raw_count, MAX_IPS_ALLOWED)
+                    capped_count = min(raw_count, _SUBNET_LIST_CAP)
                     subnets.append({
                         'subnet': subnet,
                         'address_cnt': capped_count,
@@ -187,7 +190,7 @@ def smart_select_primary_subnet(subnets: List[dict] = None) -> str:
         subnet_str = subnet.get("subnet", "")
         address_cnt = subnet.get("address_cnt", 0)
 
-        if address_cnt >= MAX_IPS_ALLOWED:
+        if address_cnt >= _SUBNET_LIST_CAP:
             continue
 
         if _is_deprioritized_subnet(subnet_str):
@@ -259,3 +262,62 @@ def is_arp_supported() -> bool:
         return True
     except (Scapy_Exception, PermissionError, RuntimeError, Exception):  # noqa: BLE001
         return False
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Subnet classification helpers (used by auto_stages & scan_pipeline)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def is_ipv6_subnet(subnet: str) -> bool:
+    """Return True if *subnet* is an IPv6 address, network, or range."""
+    try:
+        return isinstance(
+            ipaddress.ip_network(subnet, strict=False),
+            ipaddress.IPv6Network,
+        )
+    except ValueError:
+        return ':' in subnet.split('/')[0]
+
+
+def is_local_subnet(subnet: str) -> bool:
+    """Return True if *subnet* overlaps with any interface on this machine."""
+    try:
+        target = ipaddress.ip_network(subnet, strict=False)
+    except ValueError:
+        return False
+
+    for entry in get_all_network_subnets():
+        try:
+            iface_net = ipaddress.ip_network(entry['subnet'], strict=False)
+            if target.overlaps(iface_net):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def matching_interface(subnet: str) -> str | None:
+    """Return the name of the first interface whose subnet overlaps *subnet*."""
+    try:
+        target = ipaddress.ip_network(subnet, strict=False)
+    except ValueError:
+        return None
+
+    for entry in get_all_network_subnets():
+        try:
+            iface_net = ipaddress.ip_network(entry['subnet'], strict=False)
+            if target.overlaps(iface_net):
+                return entry.get('interface')
+        except ValueError:
+            continue
+    return None
+
+
+def get_os_platform() -> str:
+    """Return a normalised OS identifier: 'windows', 'linux', or 'darwin'."""
+    if psutil.WINDOWS:
+        return 'windows'
+    if psutil.LINUX:
+        return 'linux'
+    return 'darwin'

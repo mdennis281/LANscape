@@ -13,6 +13,7 @@ from lanscape.core.scan_config import (
     ArpConfig, PokeConfig, ArpCacheConfig
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
+from lanscape.core.neighbor_table import NeighborTableService
 from lanscape.core.system_compat import (
     icmp_requires_privileged,
     get_ping_command,
@@ -58,6 +59,18 @@ def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
 
 class IcmpLookup():
     """ICMP ping-based device reachability check."""
+    _used_fallback: bool = False
+
+    @classmethod
+    def used_fallback(cls) -> bool:
+        """Whether ICMP fell back to system ping during this stage."""
+        return cls._used_fallback
+
+    @classmethod
+    def reset_fallback_flag(cls) -> None:
+        """Reset the fallback flag (call before each scan stage)."""
+        cls._used_fallback = False
+
     @classmethod
     @job_tracker
     def execute(cls, device: Device, cfg: PingConfig) -> bool:
@@ -85,6 +98,7 @@ class IcmpLookup():
             return device.alive is True
         except SocketPermissionError:
             # Fallback to system ping command when raw sockets aren't available
+            cls._used_fallback = True
             return cls._ping_fallback(device, cfg)
 
     @classmethod
@@ -141,7 +155,6 @@ class ArpCacheLookup():
         Returns:
             bool: True if the device is found in the cache, False otherwise.
         """
-        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
         svc = NeighborTableService.instance()
 
         if not svc.is_running:

@@ -27,6 +27,7 @@ from lanscape.ui.react_proxy.discovery import (
     DiscoveryService,
     DiscoverResponse,
     build_default_route,
+    build_ws_url_for_client,
     get_local_address_strings,
 )
 from lanscape.core.system_compat import configure_asyncio_exception_handler
@@ -71,6 +72,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
     discovery: Optional['DiscoveryService'] = None
     mdns_enabled: bool = True
     default_route: str = 'http://localhost:5001'
+    ws_port: int = 8766
     _cached_version: Optional[VersionResponse] = None
 
     def __init__(self, *args, directory: str = None, **kwargs):
@@ -117,7 +119,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
         """Handle a single HTTP request, suppressing client disconnect errors."""
         try:
             super().handle_one_request()
-        except ConnectionResetError:
+        except (BrokenPipeError, ConnectionResetError):
             # Client disconnected mid-request (e.g., browser refresh) - harmless
             pass
         except OSError as exc:
@@ -137,10 +139,14 @@ class SPAHandler(SimpleHTTPRequestHandler):
         if self.discovery is not None:
             instances = self.discovery.get_instances()
 
+        client_ip = self.client_address[0]
+        ws_url = build_ws_url_for_client(client_ip, self.ws_port)
+
         response = DiscoverResponse(
             mdns_enabled=self.mdns_enabled,
             default_route=self.default_route,
             instances=instances,
+            ws_url=ws_url,
         )
 
         payload = response.model_dump_json().encode('utf-8')
@@ -312,22 +318,47 @@ class WebappServerController:
             webapp_dir: Directory containing the webapp static files
             open_browser: Whether to open a browser window
         """
-        # Start WebSocket server in a thread
+        # Start HTTP server first — the UI only needs static files to load.
+        # The WS connection will be retried by the frontend until ready.
+        log.debug('Initializing HTTP static server on 0.0.0.0:%d...', self.http_port)
+        self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
+        log.debug('HTTP server bound and ready on port %d', self.http_port)
+
+        # Tell the handler the default route, WS port, and mDNS status so
+        # /api/discover can include them in every response.
+        SPAHandler.default_route = build_default_route(self.http_port)
+        SPAHandler.mdns_enabled = self.mdns_enabled
+        SPAHandler.ws_port = self.ws_port
+
+        # Build the localhost URL for the local browser (no ws-server param;
+        # the frontend will discover the backend via mDNS or same-origin default).
+        local_url = f'http://localhost:{self.http_port}'
+
+        # Open browser immediately — HTTP server is already bound and ready.
+        if open_browser:
+            log.debug('Opening browser: %s', local_url)
+            threading.Thread(
+                target=_open_browser,
+                args=(local_url, 0, self.http_port),
+                daemon=True
+            ).start()
+
+        # Start WebSocket server in a thread (UI retries until connected)
         ws_thread = threading.Thread(
             target=self._run_ws_server,
             args=(self._on_client_change,),
             daemon=True
         )
+        log.debug('Starting WebSocket server thread...')
         ws_thread.start()
-        log.debug(f'WebSocket server started on ws://{self.host}:{self.ws_port}')
 
-        # Start HTTP server
-        self._http_server = start_static_server(webapp_dir, self.http_port, '0.0.0.0')
-
-        # Tell the handler the default route and mDNS status so
-        # /api/discover can include them in every response.
-        SPAHandler.default_route = build_default_route(self.http_port)
-        SPAHandler.mdns_enabled = self.mdns_enabled
+        # Pre-warm expensive checks in a background thread so that the
+        # first ``tools.arp_supported`` / ``tools.update_check`` request
+        # returns near-instantly.
+        log.debug('Starting pre-warm thread for ARP + PyPI cache')
+        threading.Thread(
+            target=_prewarm_capabilities, daemon=True, name='prewarm',
+        ).start()
 
         # Start mDNS discovery in a background thread (unless disabled).
         # Zeroconf() + register_service() can block on Windows (multicast socket
@@ -356,18 +387,6 @@ class WebappServerController:
             threading.Thread(target=_start_discovery, daemon=True, name='mDNS-init').start()
         else:
             log.info('mDNS service disabled')
-
-        # Build the localhost URL for the local browser (no ws-server param;
-        # the frontend will discover the backend via mDNS or same-origin default).
-        local_url = f'http://localhost:{self.http_port}'
-
-        # Open browser
-        if open_browser:
-            threading.Thread(
-                target=_open_browser,
-                args=(local_url, 1.5, self.http_port),
-                daemon=True
-            ).start()
 
         if self.persistent:
             log.info('Running in persistent mode. Press Ctrl+C to stop.')
@@ -522,6 +541,30 @@ def _format_listen_urls(http_port: int) -> str:
     return '\n'.join(f'  - {u}' for u in urls)
 
 
+def _prewarm_capabilities() -> None:
+    """Eagerly compute expensive capability checks in the background.
+
+    Called once at startup so the results are cached before the first
+    ``tools.arp_supported`` / ``tools.update_check`` request arrives from
+    the UI.  Both helpers cache their results for the process lifetime
+    (``@run_once`` / internal caching), so this is safe to call
+    concurrently.
+    """
+    # Import lazily to avoid circular imports and keep the import
+    # footprint of this module light.
+    try:
+        from lanscape.core.net_tools import is_arp_supported  # pylint: disable=import-outside-toplevel
+        is_arp_supported()
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+    try:
+        from lanscape.core.version_manager import is_update_available  # pylint: disable=import-outside-toplevel
+        is_update_available()
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+
 def _open_browser(
     url: str,
     wait: float = 1.5,
@@ -543,9 +586,12 @@ def _open_browser(
     # on headless systems and handled gracefully with our own warning.
     logging.getLogger('pwa_launcher').setLevel(logging.CRITICAL)
     try:
-        log.debug(f'Opening browser: {url}')
-        return open_pwa(url, auto_profile=False)
+        log.debug('Calling pwa_launcher.open_pwa(%s, auto_profile=False)', url)
+        result = open_pwa(url, auto_profile=False)
+        log.debug('pwa_launcher returned: %s', result)
+        return result
     except ChromiumNotFoundError:
+        log.debug('ChromiumNotFoundError — falling back to webbrowser.open')
         success = webbrowser.open(url)
         if success:
             log.warning('Chromium not found, using default browser')
@@ -556,7 +602,7 @@ def _open_browser(
                 listen_urls,
             )
     except Exception as e:
-        log.debug(f'Browser open failed: {e}')
+        log.debug('pwa_launcher.open_pwa failed: %s', e)
         listen_urls = _format_listen_urls(http_port)
         log.info('Open your browser to:\n%s', listen_urls)
     return None

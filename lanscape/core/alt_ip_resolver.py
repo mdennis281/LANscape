@@ -20,6 +20,7 @@ from lanscape.core.system_compat import (
     get_ipv6_interface_scopes,
     get_ndp_ping_command,
 )
+from lanscape.core.neighbor_table import NeighborTableService
 
 log = logging.getLogger('AltIPResolver')
 
@@ -122,7 +123,6 @@ def _alt_ips_from_neighbor_cache(mac: str, scanning_v6: bool) -> List[str]:
         if want_v6:
             _prime_ndp_cache()
 
-        from lanscape.core.neighbor_table import NeighborTableService  # pylint: disable=import-outside-toplevel
         svc = NeighborTableService.instance()
         if svc.is_running:
             return svc.get_ips_for_mac(mac, want_v6)

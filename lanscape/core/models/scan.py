@@ -8,6 +8,13 @@ from pydantic import BaseModel, Field
 
 from lanscape.core.models.enums import ScanStage, StageType, WarningCategory
 from lanscape.core.models.device import DeviceResult
+from lanscape.core.net_tools.subnet_utils import (
+    is_ipv6_subnet,
+    is_local_subnet,
+    matching_interface,
+    get_os_platform,
+    is_arp_supported,
+)
 
 
 class StageEvalContext(BaseModel):
@@ -28,15 +35,6 @@ class StageEvalContext(BaseModel):
     @classmethod
     def build(cls, subnet: str) -> 'StageEvalContext':
         """Construct from a subnet string by probing the local system."""
-        # Deferred import to avoid circular dependency:
-        # scan.py → subnet_utils → scan_config → ... → scan.py
-        from lanscape.core.net_tools.subnet_utils import (  # pylint: disable=import-outside-toplevel
-            is_ipv6_subnet,
-            is_local_subnet,
-            matching_interface,
-            get_os_platform,
-        )
-        from lanscape.core.net_tools import is_arp_supported  # pylint: disable=import-outside-toplevel
         return cls(
             subnet=subnet,
             is_ipv6=is_ipv6_subnet(subnet),

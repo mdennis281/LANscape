@@ -683,7 +683,7 @@ class NeighborTableService:
         self._fetch_failure_reasons.clear()
         return failures
 
-    def get_macs_wait(self, ip: str) -> List[str]:
+    def get_macs_wait(self, ip: str, timeout: float | None = None) -> List[str]:
         """Return MACs for *ip*, waiting for one fresh refresh if not cached.
 
         1. Checks the current cache — returns immediately if found.
@@ -691,6 +691,11 @@ class NeighborTableService:
            (so we don't trust one already in-flight that may have
            begun before the OS cache was populated) and then **finish**.
         3. Checks the cache once more and returns the result (may be empty).
+
+        *timeout* caps each wait phase so devices absent from the neighbor
+        table (e.g. global IPv6 addresses) don't block indefinitely.
+        Defaults to ``command_timeout + refresh_interval + 1`` which is the
+        natural upper-bound for one complete refresh cycle.
         """
         macs = self.get_macs(ip)
         if macs:
@@ -699,11 +704,16 @@ class NeighborTableService:
         if not self._running:
             return []
 
+        wait_timeout = timeout if timeout is not None else (
+            self._command_timeout + self._refresh_interval + 1.0
+        )
+
         # Wait for a NEW refresh to start
         start_baseline = self._refresh_start_count
         with self._refresh_start_cond:
             self._refresh_start_cond.wait_for(
                 lambda: self._refresh_start_count > start_baseline,
+                timeout=wait_timeout,
             )
 
         # Now wait for that refresh to finish
@@ -711,6 +721,7 @@ class NeighborTableService:
         with self._refresh_cond:
             self._refresh_cond.wait_for(
                 lambda: self._refresh_count > finish_baseline,
+                timeout=wait_timeout,
             )
 
         return self.get_macs(ip)

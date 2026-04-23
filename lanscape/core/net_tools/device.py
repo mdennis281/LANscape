@@ -4,6 +4,7 @@ import ipaddress
 import logging
 import socket
 import struct
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from time import sleep
 from typing import List, Dict, Optional
 
@@ -364,12 +365,15 @@ class Device(BaseModel):
 
     def _try_resolve_hostname(self) -> Optional[str]:
         """Single attempt at the full hostname resolution chain."""
-        # 1. Standard reverse DNS
+        # 1. Standard reverse DNS — run in a thread with a hard timeout so
+        # absent PTR records (common for global IPv6) don't block for 5-15s.
         try:
-            hostname = socket.gethostbyaddr(self.ip)[0]
-            if hostname:
-                return hostname
-        except socket.herror:
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                future = ex.submit(socket.gethostbyaddr, self.ip)
+                hostname = future.result(timeout=10.0)[0]
+                if hostname:
+                    return hostname
+        except (FuturesTimeoutError, socket.herror, OSError):
             pass
 
         if os_handles_hostname_resolution():

@@ -116,22 +116,27 @@ class PortScanStage(ScanStageMixin):
         device.ports_scanned = 0
         device.ports_to_scan = len(ports)
 
-        with ThreadPoolExecutor(
+        # Executor is managed manually so that on early termination
+        # shutdown(cancel_futures=True, wait=False) is not overridden by
+        # the context manager's shutdown(wait=True) on __exit__.
+        executor = ThreadPoolExecutor(
             max_workers=self.cfg.t_cnt_port,
             thread_name_prefix=f"{device.ip}-PortScan",
-        ) as executor:
+        )
+        try:
             futures = {
                 executor.submit(self._test_port, device, port): port
                 for port in ports
             }
             for future in as_completed(futures):
                 if not self.running:
-                    executor.shutdown(cancel_futures=True, wait=False)
                     break
                 try:
                     future.result()
-                except Exception as exc:
+                except Exception as exc:  # pylint: disable=broad-except
                     log.debug('Port scan future raised: %s', exc)
+        finally:
+            executor.shutdown(cancel_futures=True, wait=False)
 
         device.stage = 'complete'
         context.mark_port_scanned(device.ip, set(ports))

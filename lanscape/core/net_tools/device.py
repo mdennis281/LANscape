@@ -367,14 +367,18 @@ class Device(BaseModel):
         """Single attempt at the full hostname resolution chain."""
         # 1. Standard reverse DNS — run in a thread with a hard timeout so
         # absent PTR records (common for global IPv6) don't block for 5-15s.
+        # Executor is managed manually so timeout expiry doesn't stall on
+        # shutdown(wait=True) from the context manager __exit__.
+        ex = ThreadPoolExecutor(max_workers=1)
         try:
-            with ThreadPoolExecutor(max_workers=1) as ex:
-                future = ex.submit(socket.gethostbyaddr, self.ip)
-                hostname = future.result(timeout=10.0)[0]
-                if hostname:
-                    return hostname
+            future = ex.submit(socket.gethostbyaddr, self.ip)
+            hostname = future.result(timeout=10.0)[0]
+            if hostname:
+                return hostname
         except (FuturesTimeoutError, socket.herror, OSError):
             pass
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
 
         if os_handles_hostname_resolution():
             return None

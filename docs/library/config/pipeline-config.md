@@ -53,6 +53,8 @@ stage = StageConfig(
 |-------|------|---------|-------------|
 | `stage_type` | [`StageType`](enums.md#stagetype) | *required* | Which stage to run |
 | `config` | `Dict[str, Any]` | `{}` | Stage-specific configuration (deserialized into the appropriate model) |
+| `auto` | `bool \| None` | `None` | Whether this stage was auto-recommended by the recommendation engine |
+| `reason` | `str \| None` | `None` | Human-readable reason the stage was auto-recommended |
 
 ### `get_typed_config() -> ConfigBase`
 
@@ -183,6 +185,41 @@ Each stage type has a dedicated Pydantic config model. Pass the model's fields a
 | `t_cnt_port` | `int` | `cpu_count() × 4` | Thread count for the inner port pool (per device) |
 
 > **Incremental scanning:** `PortScanStage` only processes devices that haven't been port-scanned yet. This means you can insert multiple `PORT_SCAN` stages in a pipeline — each one only scans devices discovered since the last port-scan stage.
+
+---
+
+## Subnet Size Limits
+
+Each IPv4 enumeration stage has a `MAX_SUBNET_SIZE` class constant that caps how large a subnet it will accept. If a `PipelineConfig` is passed to `build_stages()` with a subnet that exceeds a stage's limit, a `ValueError` is raised before any IPs are allocated.
+
+| Stage | `MAX_SUBNET_SIZE` |
+|-------|-------------------|
+| `ICMP_DISCOVERY` | 25,000 IPs |
+| `ARP_DISCOVERY` | 25,000 IPs |
+| `POKE_ARP_DISCOVERY` | 64,000 IPs |
+| `ICMP_ARP_DISCOVERY` | 25,000 IPs |
+| `IPV6_NDP_DISCOVERY` | No limit (passive, not IP-enumeration) |
+| `IPV6_MDNS_DISCOVERY` | No limit (passive multicast) |
+| `PORT_SCAN` | No limit (operates on discovered devices) |
+
+---
+
+## Utilities
+
+### `get_stage_config_defaults() -> Dict[str, dict]`
+
+Returns the default configuration dict for every stage type. Useful for pre-populating a UI or generating documentation.
+
+```python
+from lanscape.core.scan_config import get_stage_config_defaults
+
+defaults = get_stage_config_defaults()
+# {
+#   "icmp_discovery": { "ping_config": {...}, "hostname_config": {...}, "t_cnt": 48 },
+#   "port_scan": { "port_list": "medium", ... },
+#   ...
+# }
+```
 
 ---
 

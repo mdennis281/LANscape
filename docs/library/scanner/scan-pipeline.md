@@ -150,18 +150,21 @@ ScanContext(subnet: str)
 |----------|------|-------------|
 | `subnet` | `str` | Target subnet string |
 | `start_time` | `float` | Unix timestamp when the context was created |
-| `devices` | `List[Device]` | Snapshot of all discovered devices |
+| `devices` | `List[Device]` | Thread-safe snapshot of all discovered devices |
 | `devices_alive` | `int` | Count of discovered devices |
 | `errors` | `List[ScanErrorInfo]` | Scan-level errors |
 | `warnings` | `List[ScanWarningInfo]` | Scan-level warnings |
+| `current_stage_index` | `int \| None` | Index of the currently executing stage (set by `ScanPipeline`) |
 
 ### Methods
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `add_device(device)` | `bool` | Add a device (deduplicated by IP). Returns `True` if added. |
+| `add_device(device)` | `bool` | Add a device (deduplicated by IP). Returns `True` if added, `False` if duplicate. If the stage index is set, it's recorded on the device. |
 | `get_unscanned_devices()` | `List[Device]` | Devices not yet port-scanned |
-| `mark_port_scanned(ip)` | `None` | Mark an IP as port-scanned |
+| `get_scanned_ports(ip)` | `Set[int]` | Returns the set of port numbers already tested for the given IP |
+| `mark_port_scanned(ip, ports=None)` | `None` | Mark an IP as having completed port scanning. Optionally pass the specific `ports: Set[int]` that were tested — these are tracked to avoid re-scanning the same ports in subsequent `PORT_SCAN` stages. |
+| `consolidate_devices()` | `int` | Merge devices sharing the same hostname or MAC (useful for IPv6 hosts with multiple addresses). Returns count of removed duplicates. |
 
 ---
 
@@ -193,6 +196,8 @@ ScanPipeline(
 |--------|-------------|
 | `execute(context)` | Run each stage in order, passing the shared context. Skips stages whose `can_execute()` guard returns a reason. |
 | `terminate()` | Terminate the current stage and skip remaining stages |
+| `append_stages(new_stages)` | Append additional stages to the pipeline. If the pipeline was already terminated, resets the terminated flag so the new stages will execute on the next `execute()` call. |
+| `update_stage(index, new_stage)` | Replace a pending (not yet started) stage at the given index with a new stage instance. Raises `ValueError` if the stage is already running or finished. |
 
 ### Properties
 
@@ -371,6 +376,10 @@ Immutable snapshot of a single stage's progress. Available in `ScanMetadata.stag
 | `finished` | `bool` | `False` | Whether the stage has finished |
 | `skipped` | `bool` | `False` | Whether the stage was skipped by a guard |
 | `skip_reason` | `str \| None` | `None` | Reason the stage was skipped |
+| `runtime` | `float` | `0.0` | Elapsed seconds for this stage |
+| `counter_label` | `str` | `"items"` | Label for the progress counter (e.g. `"IPs scanned"`) |
+| `auto` | `bool \| None` | `None` | Whether this stage was auto-recommended |
+| `reason` | `str \| None` | `None` | Human-readable reason the stage was auto-recommended |
 
 ```python
 meta = scan.results.get_metadata()
@@ -380,4 +389,134 @@ for stage in meta.stages:
     else:
         pct = (stage.completed / stage.total * 100) if stage.total else 0
         print(f"{stage.stage_name}: {pct:.0f}% ({'done' if stage.finished else 'running'})")
+```
+
+---
+
+## Auto-Stage Recommendation
+
+`lanscape.recommend_stages`
+
+The recommendation engine inspects subnet characteristics and returns an ordered list of suggested stages. The UI uses this to pre-populate the pipeline builder; you can also call it directly.
+
+```python
+from lanscape import recommend_stages
+
+recommendations = recommend_stages("192.168.1.0/24")
+for rec in recommendations:
+    print(f"{rec.stage_type.value} [{rec.preset.value}]: {rec.reason}")
+```
+
+### Function signature
+
+```python
+recommend_stages(
+    subnet: str,
+    ip_count: int | None = None,
+    is_ipv6: bool | None = None,
+    is_local: bool | None = None,
+    os_platform: str | None = None,
+) -> List[StageRecommendation]
+```
+
+All optional parameters are auto-detected from the subnet if not provided. Pass them explicitly to override detection (e.g. for testing).
+
+### StageRecommendation
+
+`lanscape.StageRecommendation`
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `stage_type` | [`StageType`](../config/enums.md#stagetype) | The recommended stage type |
+| `preset` | [`StagePreset`](#stage-presets) | The recommended tuning preset |
+| `reason` | `str` | Human-readable explanation |
+
+```python
+rec.to_dict()
+# {
+#   "stage_type": "icmp_arp_discovery",
+#   "preset": "accurate",
+#   "config": { ... },   # full config dict for the preset
+#   "reason": "Small local subnet on Windows — ICMP+ARP is reliable"
+# }
+```
+
+### Recommendation logic
+
+| Scenario | Recommended stages |
+|----------|--------------------|
+| IPv6 subnet | `IPV6_NDP_DISCOVERY` + `IPV6_MDNS_DISCOVERY` + `PORT_SCAN` |
+| Small local IPv4 (Windows) | `ICMP_ARP_DISCOVERY` (accurate) + `PORT_SCAN` (accurate) |
+| Large local IPv4 (Windows) | `POKE_ARP_DISCOVERY` (balanced) + `PORT_SCAN` (balanced) |
+| Very large local IPv4 > 25k IPs (Windows) | `POKE_ARP_DISCOVERY` (fast) + `PORT_SCAN` |
+| Small/large local IPv4 (Linux/macOS) | `ICMP_ARP_DISCOVERY` + `PORT_SCAN` |
+| Non-local IPv4 | `ICMP_DISCOVERY` + `PORT_SCAN` |
+| Non-local IPv4 > 25k IPs | *(no recommendation — too large)* |
+
+---
+
+## Stage Presets
+
+`lanscape.StagePreset` · `lanscape.get_stage_presets`
+
+Every stage type ships with three built-in tuning profiles:
+
+| Preset | Description |
+|--------|-------------|
+| `StagePreset.FAST` | Minimise scan time — reduced timeouts, fewer retries, no hostname retries |
+| `StagePreset.BALANCED` | Default Pydantic values — good accuracy/speed trade-off |
+| `StagePreset.ACCURATE` | Maximise detection reliability — more retries, longer timeouts, hostname retries |
+
+```python
+from lanscape import StagePreset, get_stage_presets, StageConfig, StageType
+
+# Get all preset configs for all stages
+presets = get_stage_presets()
+# { "icmp_discovery": {"fast": {...}, "balanced": {...}, "accurate": {...}}, ... }
+
+# Use a preset config in a StageConfig
+fast_icmp_cfg = presets["icmp_discovery"]["fast"]
+stage = StageConfig(
+    stage_type=StageType.ICMP_DISCOVERY,
+    config=fast_icmp_cfg,
+)
+```
+
+---
+
+## Stage Time Estimates
+
+`lanscape.estimate_stage_time` · `lanscape.get_all_estimates`
+
+Compute worst-case time estimates for scan stages. Useful for surfacing expected duration to users before a scan starts.
+
+```python
+from lanscape import estimate_stage_time, get_all_estimates, StageType
+
+# Single stage estimate (returns seconds per unit of work)
+# For discovery stages: seconds per IP
+# For PORT_SCAN: seconds per device
+secs = estimate_stage_time(
+    StageType.ICMP_DISCOVERY,
+    config={"ping_config": {"attempts": 2, "timeout": 1.0, "retry_delay": 0.25, "ping_count": 1}},
+)
+print(f"{secs:.2f}s per IP (worst-case)")
+
+# Multiple stages at once
+estimates = get_all_estimates({
+    "icmp_discovery": {},   # uses defaults
+    "port_scan": {"port_list": "medium"},
+})
+# { "icmp_discovery": 2.5, "port_scan": 14.8 }
+```
+
+### Estimate semantics
+
+| Stage category | Unit | Meaning |
+|----------------|------|---------|
+| IPv4 discovery (`ICMP_*`, `ARP_*`, `POKE_*`) | per IP | Worst-case seconds to probe one IP (all attempts timed out) |
+| IPv6 discovery (`IPV6_NDP_*`, `IPV6_MDNS_*`) | fixed | Fixed overhead for the whole stage |
+| `PORT_SCAN` | per device | Worst-case seconds to scan one device (all ports batched by thread count) |
+
+To estimate total scan duration, multiply by subnet size (for discovery) or alive device count (for port scan), then divide by the stage's `t_cnt` thread count.
 ```

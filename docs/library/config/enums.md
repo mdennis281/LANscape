@@ -89,8 +89,8 @@ from lanscape import ServiceScanStrategy
 | Value | String | Description |
 |-------|--------|-------------|
 | `ServiceScanStrategy.LAZY` | `"LAZY"` | A few common probes for quick identification |
-| `ServiceScanStrategy.BASIC` | `"BASIC"` | Common probes plus port-correlated probes. **Default.** |
-| `ServiceScanStrategy.AGGRESSIVE` | `"AGGRESSIVE"` | All known probes sent in parallel for maximum coverage |
+| `ServiceScanStrategy.BASIC` | `"BASIC"` | Common probes plus port-correlated probes |
+| `ServiceScanStrategy.AGGRESSIVE` | `"AGGRESSIVE"` | All known probes sent in parallel for maximum coverage. **Default.** |
 
 ---
 

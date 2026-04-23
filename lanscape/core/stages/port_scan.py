@@ -126,6 +126,7 @@ class PortScanStage(ScanStageMixin):
             }
             for future in as_completed(futures):
                 if not self.running:
+                    executor.shutdown(cancel_futures=True, wait=False)
                     break
                 try:
                     future.result()

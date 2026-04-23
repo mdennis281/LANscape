@@ -578,6 +578,7 @@ class NeighborTableService:
         self._refresh_count: int = 0
         self._running = False
         self._fetch_failure_reasons: List[str] = []
+        self._failure_lock = threading.Lock()
 
     # ── Singleton accessor ──────────────────────────────────────────
 
@@ -679,8 +680,9 @@ class NeighborTableService:
 
     def drain_fetch_failures(self) -> List[str]:
         """Return and clear any fetch failure reasons accumulated since last drain."""
-        failures = list(self._fetch_failure_reasons)
-        self._fetch_failure_reasons.clear()
+        with self._failure_lock:
+            failures = list(self._fetch_failure_reasons)
+            self._fetch_failure_reasons.clear()
         return failures
 
     def get_macs_wait(self, ip: str, timeout: float | None = None) -> List[str]:
@@ -803,7 +805,8 @@ class NeighborTableService:
                 continue
         if last_error:
             proto = 'IPv6' if want_v6 else 'IPv4'
-            self._fetch_failure_reasons.append(
-                f"{proto} neighbor table refresh failed: {last_error}"
-            )
+            with self._failure_lock:
+                self._fetch_failure_reasons.append(
+                    f"{proto} neighbor table refresh failed: {last_error}"
+                )
         return []

@@ -7,9 +7,22 @@ from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
 from lanscape.core.models.scan import StageEvalContext, StageProgress, ScanWarningInfo
 from lanscape.core.models.enums import WarningCategory
+from lanscape.core.net_tools import subnet_utils as _subnet_utils
 
 
 log = logging.getLogger(__name__)
+
+
+def build_eval_context(subnet: str) -> StageEvalContext:
+    """Construct a :class:`StageEvalContext` by probing the local system."""
+    return StageEvalContext(
+        subnet=subnet,
+        is_ipv6=_subnet_utils.is_ipv6_subnet(subnet),
+        is_local=_subnet_utils.is_local_subnet(subnet),
+        matching_interface=_subnet_utils.matching_interface(subnet),
+        arp_supported=_subnet_utils.is_arp_supported(),
+        os_platform=_subnet_utils.get_os_platform(),
+    )
 
 
 class ScanPipeline:
@@ -48,7 +61,7 @@ class ScanPipeline:
         """
         # Build eval context lazily if not provided at construction time
         if self._eval_ctx is None:
-            self._eval_ctx = StageEvalContext.build(context.subnet)
+            self._eval_ctx = build_eval_context(context.subnet)
 
         idx = 0
         while idx < len(self.stages):

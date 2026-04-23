@@ -12,7 +12,7 @@ from lanscape.core.models.enums import StageType
 from lanscape.core.models.scan import StageEvalContext, StageProgress
 from lanscape.core.scan_stage import ScanStageMixin
 from lanscape.core.scan_context import ScanContext
-from lanscape.core.scan_pipeline import ScanPipeline
+from lanscape.core.scan_pipeline import ScanPipeline, build_eval_context
 from lanscape.core.stages.discovery import (
     ICMPDiscoveryStage,
     ARPDiscoveryStage,
@@ -108,28 +108,28 @@ class TestStageEvalContext:
         assert ctx.arp_supported is True
         assert ctx.os_platform == "windows"
 
-    @patch("lanscape.core.net_tools.is_arp_supported", return_value=True)
+    @patch("lanscape.core.net_tools.subnet_utils.is_arp_supported", return_value=True)
     @patch("lanscape.core.net_tools.subnet_utils.is_ipv6_subnet", return_value=False)
     @patch("lanscape.core.net_tools.subnet_utils.is_local_subnet", return_value=True)
     @patch("lanscape.core.net_tools.subnet_utils.matching_interface", return_value="Wi-Fi")
     @patch("lanscape.core.net_tools.subnet_utils.get_os_platform", return_value="windows")
     def test_build_ipv4_local(self, _mock_os, _mock_match, _mock_local, _mock_v6, _mock_arp):
-        """build() wires subnet helpers into the model."""
-        ctx = StageEvalContext.build("192.168.1.0/24")
+        """build_eval_context() wires subnet helpers into the model."""
+        ctx = build_eval_context("192.168.1.0/24")
         assert ctx.is_ipv6 is False
         assert ctx.is_local is True
         assert ctx.matching_interface == "Wi-Fi"
         assert ctx.arp_supported is True
         assert ctx.os_platform == "windows"
 
-    @patch("lanscape.core.net_tools.is_arp_supported", return_value=False)
+    @patch("lanscape.core.net_tools.subnet_utils.is_arp_supported", return_value=False)
     @patch("lanscape.core.net_tools.subnet_utils.is_ipv6_subnet", return_value=True)
     @patch("lanscape.core.net_tools.subnet_utils.is_local_subnet", return_value=False)
     @patch("lanscape.core.net_tools.subnet_utils.matching_interface", return_value=None)
     @patch("lanscape.core.net_tools.subnet_utils.get_os_platform", return_value="linux")
     def test_build_ipv6(self, _mock_os, _mock_match, _mock_local, _mock_v6, _mock_arp):
-        """build() correctly detects IPv6."""
-        ctx = StageEvalContext.build("2001:db8::/64")
+        """build_eval_context() correctly detects IPv6."""
+        ctx = build_eval_context("2001:db8::/64")
         assert ctx.is_ipv6 is True
         assert ctx.is_local is False
 

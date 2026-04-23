@@ -8,13 +8,6 @@ from pydantic import BaseModel, Field
 
 from lanscape.core.models.enums import ScanStage, StageType, WarningCategory
 from lanscape.core.models.device import DeviceResult
-from lanscape.core.net_tools.subnet_utils import (
-    is_ipv6_subnet,
-    is_local_subnet,
-    matching_interface,
-    get_os_platform,
-    is_arp_supported,
-)
 
 
 class StageEvalContext(BaseModel):
@@ -31,18 +24,6 @@ class StageEvalContext(BaseModel):
     os_platform: str = Field(
         description="Normalised OS: 'windows', 'linux', or 'darwin'"
     )
-
-    @classmethod
-    def build(cls, subnet: str) -> 'StageEvalContext':
-        """Construct from a subnet string by probing the local system."""
-        return cls(
-            subnet=subnet,
-            is_ipv6=is_ipv6_subnet(subnet),
-            is_local=is_local_subnet(subnet),
-            matching_interface=matching_interface(subnet),
-            arp_supported=is_arp_supported(),
-            os_platform=get_os_platform(),
-        )
 
 
 class StageProgress(BaseModel):

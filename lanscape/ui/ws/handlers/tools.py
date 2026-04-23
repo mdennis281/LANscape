@@ -14,10 +14,11 @@ from typing import Any, Callable, Optional
 from lanscape.core.net_tools import (
     get_all_network_subnets, is_arp_supported, smart_select_primary_subnet
 )
-from lanscape.core.ip_parser import parse_ip_input, get_address_count
-from lanscape.core.auto_stages import (
-    recommend_stages, _is_ipv6, _is_local_subnet, _matching_interface,
+from lanscape.core.net_tools.subnet_utils import (
+    is_ipv6_subnet, is_local_subnet, matching_interface
 )
+from lanscape.core.ip_parser import parse_ip_input, get_address_count
+from lanscape.core.auto_stages import recommend_stages
 from lanscape.core.scan_config import get_stage_config_defaults
 from lanscape.core.stage_presets import get_stage_presets
 from lanscape.core.stage_estimates import estimate_stage_time
@@ -58,7 +59,7 @@ def _format_ip_count(count: int) -> str:
         val = count / 1_000_000_000_000
         formatted = f"{val:.1f}".rstrip('0').rstrip('.')
         return f"{formatted}T IPs"
-    return f"{count:.2e} IPs"
+    return f"{float(count):.2e} IPs"
 
 
 class ToolsHandler(BaseHandler):
@@ -135,9 +136,9 @@ class ToolsHandler(BaseHandler):
                 'valid': True,
                 'msg': _format_ip_count(count),
                 'count': js_safe_count,
-                'is_ipv6': _is_ipv6(subnet),
-                'is_local': _is_local_subnet(subnet),
-                'matching_interface': _matching_interface(subnet),
+                'is_ipv6': is_ipv6_subnet(subnet),
+                'is_local': is_local_subnet(subnet),
+                'matching_interface': matching_interface(subnet),
             }
         except Exception:
             return {

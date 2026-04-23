@@ -26,7 +26,7 @@ class StageEvalContext(BaseModel):
     )
 
     @classmethod
-    def build(cls, subnet: str, arp_supported: bool = True) -> 'StageEvalContext':
+    def build(cls, subnet: str) -> 'StageEvalContext':
         """Construct from a subnet string by probing the local system."""
         # Deferred import to avoid circular dependency:
         # scan.py → subnet_utils → scan_config → ... → scan.py
@@ -36,12 +36,13 @@ class StageEvalContext(BaseModel):
             matching_interface,
             get_os_platform,
         )
+        from lanscape.core.net_tools import is_arp_supported  # pylint: disable=import-outside-toplevel
         return cls(
             subnet=subnet,
             is_ipv6=is_ipv6_subnet(subnet),
             is_local=is_local_subnet(subnet),
             matching_interface=matching_interface(subnet),
-            arp_supported=arp_supported,
+            arp_supported=is_arp_supported(),
             os_platform=get_os_platform(),
         )
 

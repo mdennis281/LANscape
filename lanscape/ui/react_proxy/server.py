@@ -119,7 +119,7 @@ class SPAHandler(SimpleHTTPRequestHandler):
         """Handle a single HTTP request, suppressing client disconnect errors."""
         try:
             super().handle_one_request()
-        except ConnectionResetError:
+        except (BrokenPipeError, ConnectionResetError):
             # Client disconnected mid-request (e.g., browser refresh) - harmless
             pass
         except OSError as exc:

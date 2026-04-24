@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c:*)",
+      "Bash(python -m pylint:*)",
+      "Bash(python -m autopep8:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python -m build:*)",
+      "Bash(pytest:*)",
+      "Bash(.env/Scripts/activate:*)",
+      "Bash(source .env/bin/activate:*)",
+      "Bash(.\\.env\\Scripts\\python.exe -m:*)",
+      "Bash(.env/Scripts/python.exe -m:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(python scripts/tasks/pr_analysis.py:*)",
+      "Bash(python scripts/tasks/resolve_comment.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

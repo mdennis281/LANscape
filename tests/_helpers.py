@@ -42,10 +42,6 @@ def right_size_subnet(subnet: str = '') -> str:
     return subnet
 
 
-# -----------------------------------------------------------------------------
-# Shared test constants (formerly tests/test_globals.py)
-# -----------------------------------------------------------------------------
-
 TEST_SUBNET = f"1.1.1.1/28, {right_size_subnet()}"
 MIN_EXPECTED_RUNTIME = 0.2
 MIN_EXPECTED_ALIVE_DEVICES = 5

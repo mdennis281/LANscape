@@ -59,8 +59,17 @@ packages = { find = { include = ["lanscape*"], exclude = ["support*", "tests*"] 
 "lanscape.ui.react_build" = ["**/*"]
 
 [tool.pytest.ini_options]
-testpaths = [
-    "tests",
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-m 'not integration'"
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests (run via Docker only)",
+    "unit: marks tests as unit tests",
 ]
 
 [tool.coverage.run]

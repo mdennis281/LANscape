@@ -59,8 +59,6 @@ jobs:
           max_attempts: 2
           retry_wait_seconds: 30
           command: python -m pytest tests/ -v -n auto --dist=loadscope --maxfail=2
-        env:
-          PYTHONPATH: src
 
   coverage:
     name: Coverage Report
@@ -98,8 +96,6 @@ jobs:
               --cov=lanscape \
               --cov-report=xml:coverage.xml \
               --cov-report=term-missing:skip-covered
-        env:
-          PYTHONPATH: src
 
       - name: Upload coverage XML artifact
         if: always()

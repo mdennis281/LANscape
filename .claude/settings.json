@@ -20,7 +20,11 @@
       "Bash(gh pr list:*)",
       "Bash(gh pr checks:*)",
       "Bash(python scripts/tasks/pr_analysis.py:*)",
-      "Bash(python scripts/tasks/resolve_comment.py:*)"
+      "Bash(python scripts/tasks/resolve_comment.py:*)",
+      "Bash(.env/Scripts/python.exe scripts/tasks/devmode.py:*)",
+      "Bash(curl -s http://localhost:*)",
+      "Bash(pkill -f devmode.py:*)",
+      "Bash(taskkill /F /IM python.exe /T:*)"
     ],
     "deny": [],
     "ask": []

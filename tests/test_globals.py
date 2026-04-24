@@ -1,10 +1,9 @@
+"""DEPRECATED: constants moved to tests/_helpers.py. This shim preserves
+backward-compat imports. Safe to delete once no callers reference
+`tests.test_globals` directly.
 """
-Globals for tests in the LANscape project.
-Provides shared configuration values used across multiple test files.
-"""
-
-from tests._helpers import right_size_subnet
-
-TEST_SUBNET = f"1.1.1.1/28, {right_size_subnet()}"
-MIN_EXPECTED_RUNTIME = 0.2
-MIN_EXPECTED_ALIVE_DEVICES = 5
+from tests._helpers import (  # noqa: F401
+    TEST_SUBNET,
+    MIN_EXPECTED_RUNTIME,
+    MIN_EXPECTED_ALIVE_DEVICES,
+)

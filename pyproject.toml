@@ -62,3 +62,28 @@ packages = { find = { include = ["lanscape*"], exclude = ["support*", "tests*"] 
 testpaths = [
     "tests",
 ]
+
+[tool.coverage.run]
+source = ["lanscape"]
+branch = true
+omit = [
+    "lanscape/ui/react_build/*",
+    "*/tests/*",
+    "**/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if sys.version_info",
+]
+skip_covered = true
+precision = 2
+
+[tool.coverage.xml]
+output = "coverage.xml"

@@ -1,0 +1,107 @@
+# LANscape Integration Smoke Tests
+#
+# Fast subset of the Docker-based integration suite, gated on every PR and
+# push to main. Catches regressions in discovery, port detection, and
+# report generation without waiting for the full weekly run.
+#
+# Targets:
+#   - test_minimum_devices_found    (IPv4 discovery sanity)
+#   - test_expected_ports_detected  (port scan sanity)
+#   - test_generate_report          (end-to-end report pipeline)
+
+name: "Quality - Integration Smoke"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lanscape/**.py'
+      - 'tests/integration/**'
+      - 'docker/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lanscape/**.py'
+      - 'tests/integration/**'
+      - 'docker/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Integration Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start services
+        working-directory: tests/integration
+        run: |
+          docker compose build
+          docker compose up -d
+          echo "Waiting for services to be healthy..."
+          sleep 15
+
+      - name: Verify services are healthy
+        working-directory: tests/integration
+        run: |
+          docker compose ps
+          unhealthy=$(docker compose ps --format json | python3 -c "
+          import sys, json
+          raw = sys.stdin.read().strip()
+          try:
+              services = json.loads(raw)
+          except json.JSONDecodeError:
+              services = [json.loads(line) for line in raw.split('\n') if line.strip()]
+          if not isinstance(services, list):
+              services = [services]
+          for service in services:
+              name = service.get('Name', '')
+              health = service.get('Health', 'unknown')
+              if 'scanner' not in name and health != 'healthy':
+                  print(f'{name}: {health}')
+          " 2>/dev/null || true)
+          if [ -n "$unhealthy" ]; then
+              echo "WARNING: Some services are not healthy:"
+              echo "$unhealthy"
+          fi
+
+      - name: Run smoke integration tests
+        working-directory: tests/integration
+        env:
+          SKIP_IPV6_TESTS: "true"
+        run: |
+          docker compose run --rm \
+            -e SKIP_IPV6_TESTS=$SKIP_IPV6_TESTS \
+            scanner \
+            python -m pytest tests/integration/ \
+              -v --tb=short -x \
+              -o addopts= \
+              -k "test_minimum_devices_found or test_expected_ports_detected or test_generate_report"
+
+      - name: Upload smoke test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-smoke-report
+          path: tests/integration/results/report.txt
+          if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        working-directory: tests/integration
+        run: docker compose down -v --remove-orphans

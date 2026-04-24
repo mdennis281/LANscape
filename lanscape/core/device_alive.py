@@ -1,4 +1,10 @@
-"""Handles device alive checks using various methods."""
+"""Handles device alive checks using various methods.
+
+Each ``*Lookup`` / ``Poker`` class is a small probe primitive consumed by the
+discovery stages in :mod:`lanscape.core.stages.discovery`. They share a
+common contract: ``execute(device, cfg) -> bool`` mutates ``device.alive``
+(and ``device.macs`` where applicable) and returns the new alive state.
+"""
 
 import socket
 import subprocess
@@ -9,8 +15,7 @@ from icmplib.exceptions import SocketPermissionError
 
 from lanscape.core.net_tools import Device, DeviceError
 from lanscape.core.scan_config import (
-    ScanConfig, ScanType, PingConfig,
-    ArpConfig, PokeConfig, ArpCacheConfig
+    PingConfig, ArpConfig, PokeConfig, ArpCacheConfig
 )
 from lanscape.core.decorators import timeout_enforcer, job_tracker
 from lanscape.core.neighbor_table import NeighborTableService
@@ -22,39 +27,6 @@ from lanscape.core.system_compat import (
     is_ipv6,
     get_socket_family,
 )
-
-def is_device_alive(device: Device, scan_config: ScanConfig) -> bool:
-    """
-    Check if a device is alive based on the configured scan type.
-
-    Args:
-        device (Device): The device to check.
-        scan_config (ScanConfig): The configuration for the scan.
-
-    Returns:
-        bool: True if the device is alive, False otherwise.
-    """
-    methods = scan_config.lookup_type
-
-    if ScanType.ICMP in methods:
-        IcmpLookup.execute(device, scan_config.ping_config)
-
-    if ScanType.ARP_LOOKUP in methods and not device.alive:
-        ArpLookup.execute(device, scan_config.arp_config)
-
-    if ScanType.ICMP_THEN_ARP in methods and not device.alive:
-        IcmpLookup.execute(device, scan_config.ping_config)
-        # Only check cache if ICMP failed - cache lookup is expensive for IPv6
-        if not device.alive:
-            ArpCacheLookup.execute(device, scan_config.arp_cache_config)
-
-    if ScanType.POKE_THEN_ARP in methods and not device.alive:
-        Poker.execute(device, scan_config.poke_config)
-        # Only check cache if device not already found alive
-        if not device.alive:
-            ArpCacheLookup.execute(device, scan_config.arp_cache_config)
-
-    return device.alive is True
 
 
 class IcmpLookup():

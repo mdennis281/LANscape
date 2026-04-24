@@ -766,7 +766,12 @@ class TestServiceScanErrorPropagation:
     def test_timeout_populates_error_field(self):
         """Async timeout should populate ServiceScanResult.error."""
         mock_loop = MagicMock()
-        mock_loop.run_until_complete.side_effect = asyncio.TimeoutError()
+
+        def _close_and_timeout(coro):
+            coro.close()
+            raise asyncio.TimeoutError()
+
+        mock_loop.run_until_complete.side_effect = _close_and_timeout
         mock_loop.close = MagicMock()
 
         with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",
@@ -781,7 +786,12 @@ class TestServiceScanErrorPropagation:
     def test_generic_exception_populates_error_field(self):
         """An unexpected exception should populate ServiceScanResult.error."""
         mock_loop = MagicMock()
-        mock_loop.run_until_complete.side_effect = RuntimeError("test boom")
+
+        def _close_and_raise(coro):
+            coro.close()
+            raise RuntimeError("test boom")
+
+        mock_loop.run_until_complete.side_effect = _close_and_raise
         mock_loop.close = MagicMock()
 
         with patch("lanscape.core.service_scan.scanner.asyncio.new_event_loop",

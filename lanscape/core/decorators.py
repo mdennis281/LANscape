@@ -189,21 +189,6 @@ def job_tracker(func):
     return wrapper
 
 
-def terminator(func):
-    """
-    Decorator designed specifically for the SubnetScanner class,
-    helps facilitate termination of a job.
-    """
-    def wrapper(*args, **kwargs):
-        """Wrap the function to check if the scan is running before execution."""
-        scan = args[0]  # aka self
-        if not scan.running:
-            return None
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
 def timeout_enforcer(timeout: int, raise_on_timeout: bool = True):
     """
     Decorator to enforce a timeout on a function.

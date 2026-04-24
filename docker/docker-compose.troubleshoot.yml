@@ -70,7 +70,7 @@ services:
       start_period: 5s
 
   mock-ssh:
-    image: lscr.io/linuxserver/openssh-server:9.8_p1-r1-ls147
+    image: lscr.io/linuxserver/openssh-server:10.2_p1-r0-ls223
     container_name: lanscape-lab-ssh
     environment:
       - PUID=1000

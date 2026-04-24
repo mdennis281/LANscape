@@ -1,15 +1,6 @@
 """Custom exceptions for LANscape."""
 
 
-class SubnetTooLargeError(Exception):
-    """Kept for external library compatibility. No longer raised internally."""
-
-    def __init__(self, subnet, count: int = 0):
-        self.subnet = subnet
-        self.count = count
-        super().__init__(f"Subnet {subnet} exceeds the limit ({count:,} IPs).")
-
-
 class SubnetScanTerminationFailure(Exception):
     """Exception raised when subnet scanning threads cannot be terminated properly."""
 

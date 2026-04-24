@@ -12,7 +12,6 @@ import os
 import re
 import shutil
 import socket
-import struct
 import subprocess
 from typing import List, Optional
 
@@ -506,68 +505,6 @@ def _parse_llmnr_ptr_response(data: bytes) -> Optional[str]:
 
 # ─── Network interface helpers ──────────────────────────────────────
 
-def get_ip_address(interface: str) -> Optional[str]:
-    """Get the IPv4 address assigned to *interface*."""
-    if psutil.WINDOWS:
-        return _get_ip_address_windows(interface)
-    return _get_ip_address_unix(interface)
-
-
-def _get_ip_address_windows(interface: str) -> Optional[str]:
-    net_if_addrs = psutil.net_if_addrs()
-    if interface in net_if_addrs:
-        for addr in net_if_addrs[interface]:
-            if addr.family == socket.AF_INET:
-                return addr.address
-    return None
-
-
-def _get_ip_address_unix(interface: str) -> Optional[str]:
-    try:
-        import fcntl  # pylint: disable=import-outside-toplevel,import-error
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            return socket.inet_ntoa(fcntl.ioctl(
-                sock.fileno(),
-                0x8915,  # SIOCGIFADDR
-                struct.pack('256s', interface[:15].encode('utf-8'))
-            )[20:24])
-        finally:
-            sock.close()
-    except (IOError, ImportError):
-        return None
-
-
-def get_netmask(interface: str) -> Optional[str]:
-    """Get the netmask of *interface*."""
-    if psutil.WINDOWS:
-        return _get_netmask_windows(interface)
-    return _get_netmask_unix(interface)
-
-
-def _get_netmask_windows(interface: str) -> Optional[str]:
-    output = subprocess.check_output("ipconfig", shell=True).decode()
-    pattern = rf"{interface}.*?Subnet Mask.*?:\s+(\d+\.\d+\.\d+\.\d+)"
-    match = re.search(pattern, output, re.S)
-    return match.group(1) if match else None
-
-
-def _get_netmask_unix(interface: str) -> Optional[str]:
-    try:
-        import fcntl  # pylint: disable=import-outside-toplevel,import-error
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            return socket.inet_ntoa(fcntl.ioctl(
-                sock.fileno(),
-                0x891b,  # SIOCGIFNETMASK
-                struct.pack('256s', interface[:15].encode('utf-8'))
-            )[20:24])
-        finally:
-            sock.close()
-    except (IOError, ImportError):
-        return None
-
-
 def get_primary_interface() -> Optional[str]:
     """Detect the primary network interface (the one with a default gateway).
 
@@ -713,12 +650,6 @@ def get_local_mac_for_ip(ip: str) -> Optional[str]:
     return _LOCAL_IP_MAC_CACHE.get(ip)
 
 
-def refresh_local_ip_mac_cache() -> None:
-    """Force-rebuild the local IP→MAC cache (e.g. after interface changes)."""
-    global _LOCAL_IP_MAC_CACHE  # pylint: disable=global-statement
-    _LOCAL_IP_MAC_CACHE = _build_local_ip_mac_map()
-
-
 def configure_asyncio_exception_handler(loop) -> None:
     """
     Configure a custom exception handler for asyncio event loops.
@@ -759,73 +690,3 @@ def configure_asyncio_exception_handler(loop) -> None:
             loop.default_exception_handler(context)
 
     loop.set_exception_handler(_windows_exception_handler)
-
-
-# ─── Per-device ARP/NDP cache query ────────────────────────────────
-
-# Regex for extracting a MAC from a single-target ARP/NDP result.
-# Uses {1,2} per octet because macOS arp(8) omits leading zeros
-# (e.g. "6:94:e6:c8:e4:22" instead of "06:94:e6:c8:e4:22").
-_SINGLE_ARP_MAC_RE = re.compile(
-    r'([0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}'
-    r'[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2}[:\-][0-9a-fA-F]{1,2})'
-)
-
-
-def query_single_arp_entry(ip: str, timeout: float = 3.0) -> Optional[str]:
-    """Query the OS ARP/NDP cache for a single IP and return its MAC.
-
-    This is the pre-3.5.0 style per-device subprocess approach:
-    - Windows:  ``arp -a <ip>``
-    - Linux:    ``ip neigh show <ip>``
-    - macOS:    ``arp -n <ip>``
-
-    For IPv6 targets Linux uses ``ip -6 neigh show <ip>``.
-
-    Returns the MAC address string (lowercase, colon-separated) or
-    ``None`` if the entry is not found / incomplete.
-    """
-    clean_ip = ip.split('%')[0]
-    v6 = is_ipv6(clean_ip)
-
-    try:
-        if psutil.WINDOWS:
-            if v6:
-                cmd = ['netsh', 'interface', 'ipv6', 'show', 'neighbors']
-            else:
-                cmd = ['arp', '-a', clean_ip]
-        elif psutil.LINUX:
-            flag = '-6' if v6 else '-4'
-            cmd = ['ip', flag, 'neigh', 'show', clean_ip]
-        else:
-            # macOS / BSD
-            if v6:
-                cmd = ['ndp', '-an']
-            else:
-                cmd = ['arp', '-n', clean_ip]
-
-        result = subprocess.run(
-            cmd, capture_output=True, text=True,
-            timeout=timeout, check=False
-        )
-        output = result.stdout
-
-        # For commands that dump the full table, filter for our target IP
-        if v6 and (psutil.WINDOWS or psutil.MACOS):
-            target_lines = [
-                ln for ln in output.splitlines()
-                if clean_ip in ln
-            ]
-            output = '\n'.join(target_lines)
-
-        match = _SINGLE_ARP_MAC_RE.search(output)
-        if match:
-            raw = match.group(1).lower().replace('-', ':')
-            # Zero-pad each octet (macOS omits leading zeros)
-            mac = ':'.join(o.zfill(2) for o in raw.split(':'))
-            # Reject null / broadcast MACs
-            if mac not in ('00:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff'):
-                return mac
-    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
-        pass
-    return None

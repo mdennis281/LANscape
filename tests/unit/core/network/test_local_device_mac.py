@@ -10,12 +10,26 @@ import socket
 from collections import namedtuple
 from unittest.mock import patch, MagicMock
 
+import pytest
+
+from lanscape.core import system_compat
 from lanscape.core.net_tools.device import Device
 from lanscape.core.system_compat import (
     get_local_mac_for_ip,
-    refresh_local_ip_mac_cache,
     _build_local_ip_mac_map,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_local_ip_mac_cache():
+    """Force ``get_local_mac_for_ip`` to rebuild on the next call.
+
+    The module caches the IP→MAC map in ``_LOCAL_IP_MAC_CACHE``; tests
+    patch ``psutil.net_if_addrs`` and need a clean slate between cases.
+    """
+    system_compat._LOCAL_IP_MAC_CACHE = None  # pylint: disable=protected-access
+    yield
+    system_compat._LOCAL_IP_MAC_CACHE = None  # pylint: disable=protected-access
 
 
 # Fake psutil address entries
@@ -118,7 +132,6 @@ class TestGetLocalMacForIp:
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('de:ad:be:ef:00:01', '192.168.1.42'),
         }
-        refresh_local_ip_mac_cache()
         assert get_local_mac_for_ip('192.168.1.42') == 'de:ad:be:ef:00:01'
 
     @patch('lanscape.core.system_compat.psutil')
@@ -128,7 +141,6 @@ class TestGetLocalMacForIp:
         mock_psutil.net_if_addrs.return_value = {
             'eth0': _make_fake_addrs('de:ad:be:ef:00:01', '192.168.1.42'),
         }
-        refresh_local_ip_mac_cache()
         assert get_local_mac_for_ip('192.168.1.99') is None
 
 

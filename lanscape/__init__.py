@@ -1,4 +1,14 @@
 """Local network scanner"""
+# DHCP listener for LAN monitoring and troubleshooting
+from lanscape.core.dhcp_listener import (
+    DhcpListener,
+    DhcpFilter,
+    DhcpEvent,
+    DhcpLeaseTransaction,
+    DhcpMessageType,
+    decode_packet as decode_dhcp_packet,
+)
+
 # Scanner core functionality
 from lanscape.core.subnet_scan import (
     SubnetScanner,

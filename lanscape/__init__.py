@@ -124,3 +124,11 @@ from lanscape.core.version_manager import (
     is_update_available,
     lookup_latest_version
 )
+
+# DHCP lease request listener
+from lanscape.core.dhcp_listener import (
+    DhcpListener,
+    DhcpListenerConfig,
+    DhcpLeaseEvent,
+    DhcpMessageType,
+)

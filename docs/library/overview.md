@@ -52,6 +52,7 @@ for device in results.devices:
 | [Models](models/overview.md) | Pydantic models for devices, scan results, and stage progress |
 | [`net_tools`](net-tools.md) | Network utility functions (subnet detection, ARP support check, hostname resolution) |
 | [WebSocket Server](websocket-server.md) | Real-time WebSocket API, HTTP discovery endpoint, mDNS, and CLI arguments |
+| [`DhcpListener`](dhcp-listener.md) | Passive DHCP listener — capture and filter lease events in real time |
 
 ## Architecture Overview
 

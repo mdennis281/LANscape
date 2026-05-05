@@ -57,6 +57,9 @@ jobs:
           # Models
           FILE_MAP["$DOCS/models/overview.md"]="Models"
 
+          # DHCP Listener
+          FILE_MAP["$DOCS/dhcp-listener.md"]="DHCP-Listener"
+
           # Build reverse map: relative link target -> wiki page name
           # This handles all the cross-references between docs
           declare -A LINK_MAP
@@ -73,6 +76,7 @@ jobs:
           LINK_MAP["net-tools.md"]="net_tools"
           LINK_MAP["overview.md"]="Library-Overview"
           LINK_MAP["websocket-server.md"]="WebSocket-Server"
+          LINK_MAP["dhcp-listener.md"]="DHCP-Listener"
 
           # Also handle relative links from subdirectories (../ prefixed)
           LINK_MAP["../config/scan-config.md"]="ScanConfig"
@@ -87,6 +91,7 @@ jobs:
           LINK_MAP["../port-manager.md"]="PortManager"
           LINK_MAP["../net-tools.md"]="net_tools"
           LINK_MAP["../websocket-server.md"]="WebSocket-Server"
+          LINK_MAP["../dhcp-listener.md"]="DHCP-Listener"
 
           # Same-directory links (no path prefix)
           LINK_MAP["scan-manager.md"]="ScanManager"
@@ -161,6 +166,7 @@ jobs:
           | **[PortManager](PortManager)** | CRUD operations for port lists |
           | **[net_tools](net_tools)** | Subnet detection, ARP support, and network helpers |
           | **[WebSocket Server](WebSocket-Server)** | Real-time WebSocket API — protocol, actions, events |
+          | **[DHCP Listener](DHCP-Listener)** | Passively capture DHCP lease events in real time |
 
           ---
           *Auto-synced from [`docs/library`](https://github.com/mdennis281/LANscape/tree/main/docs/library)*

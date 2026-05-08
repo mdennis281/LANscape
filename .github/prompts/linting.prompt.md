@@ -2,7 +2,12 @@
 agent: agent
 ---
 
-Fix the linting issues by running the vscode task "Run Linter (Pylint)"
+Fix the linting issues by running the vscode task "Lint Diff (Pylint)"
+
+This task lints only files changed vs origin/main. Prefer it over "Run Linter (Pylint)"
+(full repo) because pylint's score formula divides errors by total statements — on a
+large codebase a handful of issues in new code won't move the score, making 10/10 a
+false pass. The diff task gives an accurate score scoped to changed files.
 
 If the linter result is less than 10/10, this is not acceptable and needs to be addressed.
 

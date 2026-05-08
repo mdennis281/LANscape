@@ -19,9 +19,12 @@ Things to remember, every change needs:
 - add and update unit tests under `./tests/` for any new features or changes
 
 WHEN ENHANCEMENTS COMPLETE:
-- Linting: delegate agent with prompt file: .github/prompts/Linting.prompt.md
+- Linting: spawn a subagent — DO NOT read the prompt file into this context.
+  - Tell the subagent: "Follow the instructions in .github/prompts/Linting.prompt.md and fix any issues. Return: PASSED or FAILED, and a one-line summary of what was changed or what remains broken."
+  - If the subagent returns FAILED, fix the reported issues and repeat.
 - Passing tests
   - Big changes: `Run Unit Tests` vscode task (check the output)
   - Smaller changes: `python.exe -m pytest tests/<test_file>.py -v`
 - If changes made to get tests pass, go back to WHEN ENHANCEMENTS COMPLETE
-- Wiki updates (prompt file model delegation): .github/prompts/wiki-sync.prompt.md
+- Wiki updates: spawn a subagent — DO NOT read the prompt file into this context.
+  - Tell the subagent: "Follow the instructions in .github/prompts/wiki-sync.prompt.md and sync the wiki. Return: DONE or FAILED, and a one-line summary of what docs were updated or what blocked completion."

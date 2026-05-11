@@ -331,3 +331,44 @@ def test_job_tracker_parametrized_function_calls(function_name, expected_calls):
 
     stats = JobStats()
     assert stats.finished[function_name] == expected_calls
+
+
+def test_job_tracker_nested_closure_keeps_class_prefix():
+    """
+    A `@job_tracker` closure defined inside a method must record under the
+    enclosing class's qualname (with `<locals>` stripped), not just the bare
+    function name. Regression test for a bug where every discovery stage's
+    `_check` closure collided into a single "_check" bucket in JobStats,
+    masking which stage was slow.
+    """
+
+    class StageOne:
+        """Toy stage with a `_check` closure (mirrors discovery.py)."""
+
+        def execute(self, ip_str: str):
+            """Run the closure once with the given IP."""
+            @job_tracker
+            def _check(ip: str):
+                return ip
+            return _check(ip_str)
+
+    class StageTwo:
+        """Second stage that also has a closure named `_check`."""
+
+        def execute(self, ip_str: str):
+            """Run the closure once with the given IP."""
+            @job_tracker
+            def _check(ip: str):
+                return ip
+            return _check(ip_str)
+
+    StageOne().execute("10.0.0.1")
+    StageOne().execute("10.0.0.2")
+    StageTwo().execute("10.0.0.3")
+
+    stats = JobStats()
+    # Each stage gets its own bucket — no collision.
+    assert stats.finished["StageOne._check"] == 2
+    assert stats.finished["StageTwo._check"] == 1
+    # And the bare-name fallback no longer absorbs them.
+    assert "_check" not in stats.finished

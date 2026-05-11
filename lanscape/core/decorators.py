@@ -144,24 +144,48 @@ def job_tracker(func):
     """
     def get_fxn_src_name(func, first_arg) -> str:
         """
-        Return the function name with the class name prepended if available.
+        Return the function name with the closest enclosing class prepended,
+        even when the function is a closure defined inside a method.
+
+        Python's `__qualname__` follows every function scope with a `<locals>`
+        marker; class scopes have no such marker. Walking qual_parts and
+        recording the last name whose successor is *not* `<locals>` therefore
+        yields the deepest enclosing class — letting us produce
+        "PokeARPDiscoveryStage._check" for an `@job_tracker` closure that
+        would otherwise collide with every other stage's `_check` in JobStats.
         """
         qual_parts = func.__qualname__.split(".")
+        leaf = qual_parts[-1]
 
-        # If function has class context (e.g., "ClassName.method_name")
-        if len(qual_parts) > 1:
-            cls_name = qual_parts[-2]
+        # Find deepest enclosing class (segment not followed by "<locals>",
+        # excluding the leaf itself).
+        enclosing_cls = None
+        for i in range(len(qual_parts) - 1):
+            name = qual_parts[i]
+            if name == "<locals>":
+                continue
+            if qual_parts[i + 1] != "<locals>":
+                enclosing_cls = name
 
-            if first_arg is not None:
-                # Check if first_arg is the class itself (for @classmethod)
-                if isinstance(first_arg, type) and first_arg.__name__ == cls_name:
-                    return f"{cls_name}.{func.__name__}"
+        if enclosing_cls is None:
+            return leaf
 
-                # Check if first_arg is an instance and has the expected class name
-                if hasattr(first_arg, '__class__') and first_arg.__class__.__name__ == cls_name:
-                    return f"{cls_name}.{func.__name__}"
+        if first_arg is not None:
+            # Method / classmethod: verify the call site passed an instance
+            # (or the class itself) before claiming the prefix.
+            if isinstance(first_arg, type) and first_arg.__name__ == enclosing_cls:
+                return f"{enclosing_cls}.{leaf}"
+            if hasattr(first_arg, '__class__') and first_arg.__class__.__name__ == enclosing_cls:
+                return f"{enclosing_cls}.{leaf}"
 
-        return func.__name__
+        # Closure inside a method: first_arg is not `self`, but the qualname
+        # is compile-time accurate — trust it.
+        if "<locals>" in qual_parts:
+            return f"{enclosing_cls}.{leaf}"
+
+        # Method called in an unusual way that we can't verify — preserve
+        # the original defensive fallback.
+        return leaf
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):

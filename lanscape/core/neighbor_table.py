@@ -685,6 +685,7 @@ class NeighborTableService:
             self._fetch_failure_reasons.clear()
         return failures
 
+    @job_tracker
     def get_macs_wait(self, ip: str, timeout: float | None = None) -> List[str]:
         """Return MACs for *ip*, waiting for one fresh refresh if not cached.
 
@@ -710,23 +711,62 @@ class NeighborTableService:
             self._command_timeout + self._refresh_interval + 1.0
         )
 
-        # Wait for a NEW refresh to start
-        start_baseline = self._refresh_start_count
+        start_baseline = self._wait_for_next_refresh_start(wait_timeout)
+        self._wait_for_refresh_finish(start_baseline, wait_timeout)
+
+        return self.get_macs(ip)
+
+    # Per-phase wrappers exist so @job_tracker reports phase 1 (cycle
+    # alignment) and phase 2 (refresh duration) as separate buckets — the
+    # combined `get_macs_wait` time conflates them and hides whether
+    # callers are stalled by sleep-alignment or by slow OS commands.
+    @job_tracker
+    def _wait_for_next_refresh_start(self, wait_timeout: float) -> int:
+        """Block until a refresh cycle starts after this call.
+
+        Demand-wakes the refresh loop by setting ``_wake_event`` so the next
+        ``refresh_interval`` sleep is short-circuited. Without this, callers
+        synchronize with the refresh cycle through the preceding poke
+        duration — discovery threads exiting phase 2 together, doing ~2s
+        pokes, and arriving here just as a new refresh starts, forcing them
+        to wait an entire cycle for the one *after* it. Setting the wake
+        event collapses phase 1 from ≈full-cycle to ≈0s when the loop is
+        sleeping (or ≈half a refresh when one is already in flight).
+
+        Returns the start-count baseline so phase 2 can wait specifically
+        for the refresh that this phase observed starting. Capturing it
+        here (under the cond lock) closes a race where phase 2 would
+        otherwise pick up a baseline AFTER the new refresh had already
+        finished, then wait an entire extra cycle.
+        """
         with self._refresh_start_cond:
+            start_baseline = self._refresh_start_count
+            # Cancel any pending refresh-loop sleep — there's demand now.
+            self._wake_event.set()
             self._refresh_start_cond.wait_for(
                 lambda: self._refresh_start_count > start_baseline,
                 timeout=wait_timeout,
             )
+        return start_baseline
 
-        # Now wait for that refresh to finish
-        finish_baseline = self._refresh_count
+    @job_tracker
+    def _wait_for_refresh_finish(
+        self, start_baseline: int, wait_timeout: float,
+    ) -> None:
+        """Block until the refresh that phase 1 saw starting has finished.
+
+        Uses the phase-1 ``start_baseline`` so the wait is anchored to the
+        specific refresh whose start we observed — not whatever
+        ``refresh_count`` reads at this instant. The refresh that just
+        started will, on completion, bring ``refresh_count`` strictly above
+        ``start_baseline``, regardless of whether one was already in-flight
+        at entry.
+        """
         with self._refresh_cond:
             self._refresh_cond.wait_for(
-                lambda: self._refresh_count > finish_baseline,
+                lambda: self._refresh_count > start_baseline,
                 timeout=wait_timeout,
             )
-
-        return self.get_macs(ip)
 
     def get_ips_for_mac(self, mac: str, want_v6: bool) -> List[str]:
         """Return IPs associated with *mac* for the requested protocol."""
@@ -768,8 +808,8 @@ class NeighborTableService:
             self._refresh_start_count += 1
             self._refresh_start_cond.notify_all()
 
-        v4_entries = self._fetch_entries(want_v6=False)
-        v6_entries = self._fetch_entries(want_v6=True)
+        v4_entries = self._fetch_v4_entries()
+        v6_entries = self._fetch_v6_entries()
 
         self._ipv4_table = build_table(v4_entries)
         self._ipv6_table = build_table(v6_entries)
@@ -779,6 +819,20 @@ class NeighborTableService:
             self._refresh_cond.notify_all()
 
         self._refresh_event.set()
+
+    # Thin per-protocol wrappers exist so @job_tracker records v4 and v6 fetch
+    # times in separate buckets. The combined `_do_refresh` bucket conflates
+    # them, which hides which protocol's command is the slow one when scans
+    # stall waiting for a refresh cycle.
+    @job_tracker
+    def _fetch_v4_entries(self) -> List[NeighborEntry]:
+        """IPv4 wrapper around :meth:`_fetch_entries` for per-protocol timing."""
+        return self._fetch_entries(want_v6=False)
+
+    @job_tracker
+    def _fetch_v6_entries(self) -> List[NeighborEntry]:
+        """IPv6 wrapper around :meth:`_fetch_entries` for per-protocol timing."""
+        return self._fetch_entries(want_v6=True)
 
     def _fetch_entries(self, want_v6: bool) -> List[NeighborEntry]:
         """Try each command in order for the given protocol. First success wins."""

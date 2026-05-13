@@ -665,6 +665,121 @@ class TestNeighborTableServiceLifecycle:
                 svc.stop()
 
     @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_demand_wakes_idle_refresh_loop(self, mock_check):
+        """get_macs_wait must short-circuit the refresh-loop sleep.
+
+        Without the demand-wake, callers phase-lock with the cycle through
+        the preceding poke duration and wait nearly a full cycle for the
+        next refresh start. Setting `_wake_event` from phase 1 collapses
+        that to ~refresh duration. We verify the wall-clock cost is well
+        under the configured refresh_interval.
+        """
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            # Long interval — if demand-wake is broken this test takes >5s.
+            svc.start(refresh_interval=5.0)
+            try:
+                import time
+                # Drain the initial synchronous refresh's wake notification
+                # so the loop is genuinely sleeping when we call below.
+                time.sleep(0.05)
+                t0 = time.monotonic()
+                # IP NOT in canned data — forces phase 1 to wake the loop.
+                macs = svc.get_macs_wait('10.99.99.99', timeout=10.0)
+                elapsed = time.monotonic() - t0
+                assert macs == []
+                assert elapsed < 2.0, (
+                    f"Demand-wake failed: phase 1 stalled {elapsed:.2f}s "
+                    f"with a 5s refresh_interval"
+                )
+            finally:
+                svc.stop()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_records_phase_job_stats(self, mock_check):
+        """get_macs_wait must record itself plus phase-1/phase-2 wait buckets.
+
+        Without per-phase timing, a slow ArpCacheLookup looks identical
+        whether the bottleneck is cycle-alignment (waiting for the next
+        start) or refresh duration (waiting for the in-flight finish).
+        """
+        from lanscape.core.decorators import JobStats
+        JobStats.reset_for_testing()
+
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=0.3)
+            try:
+                # IP not in the canned data — forces both wait phases.
+                svc.get_macs_wait('10.99.99.99', timeout=3.0)
+                stats = JobStats()
+                assert stats.finished['NeighborTableService.get_macs_wait'] == 1
+                assert stats.finished[
+                    'NeighborTableService._wait_for_next_refresh_start'
+                ] == 1
+                assert stats.finished[
+                    'NeighborTableService._wait_for_refresh_finish'
+                ] == 1
+            finally:
+                svc.stop()
+                JobStats.reset_for_testing()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_skips_phases_on_cache_hit(self, mock_check):
+        """Cache-hit path must not record any phase-wait stats."""
+        from lanscape.core.decorators import JobStats
+        JobStats.reset_for_testing()
+
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=10.0)
+            try:
+                # IP IS in the canned data — instant return, no wait phases.
+                macs = svc.get_macs_wait('192.168.1.1')
+                assert macs == ['aa:bb:cc:dd:ee:ff']
+                stats = JobStats()
+                assert stats.finished['NeighborTableService.get_macs_wait'] == 1
+                assert 'NeighborTableService._wait_for_next_refresh_start' not in \
+                    stats.finished
+                assert 'NeighborTableService._wait_for_refresh_finish' not in \
+                    stats.finished
+            finally:
+                svc.stop()
+                JobStats.reset_for_testing()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_fetch_records_per_protocol_job_stats(self, mock_check):
+        """v4 and v6 fetch times must be tracked under separate JobStats buckets.
+
+        Regression guard: a single ``_fetch_entries(want_v6)`` method would
+        bucket both protocols together, hiding which one is the slow command
+        when ``get_macs_wait`` starts blocking on refresh cycles.
+        """
+        from lanscape.core.decorators import JobStats
+        JobStats.reset_for_testing()
+
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=10.0)  # one synchronous refresh on start
+            try:
+                stats = JobStats()
+                assert stats.finished['NeighborTableService._fetch_v4_entries'] == 1
+                assert stats.finished['NeighborTableService._fetch_v6_entries'] == 1
+                # And the combined refresh ran exactly once (start() does one).
+                assert stats.finished['NeighborTableService._do_refresh'] == 1
+            finally:
+                svc.stop()
+                JobStats.reset_for_testing()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
     def test_command_fallback(self, mock_check):
         """If first command fails, second should be tried."""
         call_count = 0

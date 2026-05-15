@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 import websockets
 
+from lanscape.core.runtime_args import RuntimeArgs
 from lanscape.core.scan_config import ScanType
 from lanscape.ui.ws.handlers.scan import ScanHandler
 from lanscape.ui.ws.handlers.port import PortHandler
@@ -417,19 +418,34 @@ class TestToolsHandler:
             return_value='1.2.3',
         ), patch(
             'lanscape.ui.ws.handlers.tools.parse_args',
-        ) as mock_args:
-            mock_args.return_value.ui_port = 5001
-            mock_args.return_value.ws_port = 8766
-            mock_args.return_value.loglevel = 'INFO'
-            mock_args.return_value.persistent = False
-            mock_args.return_value.logfile = None
-
+            return_value=RuntimeArgs(),
+        ):
             result = tools_handler.invoke("app_info")
 
             assert result["name"] == "LANscape"
             assert result["version"] == "1.2.3"
             assert "runtime_args" in result
+            # Every RuntimeArgs field with a non-None value should be exposed
+            # so the UI never goes stale when new args are added.
+            expected_keys = {
+                name for name, value in RuntimeArgs().model_dump().items()
+                if value is not None
+            }
+            assert set(result["runtime_args"].keys()) == expected_keys
             assert result["runtime_args"]["ui_port"] == 5001
+            # logfile defaults to None and should be dropped from the payload
+            assert "logfile" not in result["runtime_args"]
+            # Per-arg metadata (CLI flag + help) sourced from argparse so
+            # UI tooltips stay in sync with the actual CLI surface.
+            assert "runtime_arg_meta" in result
+            meta = result["runtime_arg_meta"]
+            assert meta["ui_port"]["flag"] == "--ui-port"
+            assert meta["ui_port"]["help"]
+            # Inverse flags must be keyed by the RuntimeArgs field, not the
+            # argparse dest, so the UI can look them up by field name.
+            assert meta["mdns_enabled"]["flag"] == "--mdns-off"
+            assert meta["printer_safety"]["flag"] == "--printer-mayhem"
+            assert "mdns_off" not in meta
             # ARP and update fields should NOT be present (deferred to capabilities)
             assert "arp_supported" not in result
             assert "update_available" not in result

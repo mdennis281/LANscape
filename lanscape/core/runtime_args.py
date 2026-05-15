@@ -22,6 +22,16 @@ class RuntimeArgs(BaseModel):
     printer_safety: bool = True
 
 
+# Some CLI flags toggle the OPPOSITE of their dest name (e.g. --mdns-off sets
+# mdns_enabled=False). The argparse parser knows the flag and help text, and
+# this map lets the metadata helper rewrite those dests back to the RuntimeArgs
+# field name so the UI never needs to know about the inversion.
+_INVERSE_FLAG_DESTS: Dict[str, str] = {
+    'mdns_off': 'mdns_enabled',
+    'printer_mayhem': 'printer_safety',
+}
+
+
 def was_port_explicit() -> bool:
     """Check if --ui-port was explicitly provided on command line."""
     return any(arg.startswith('--ui-port') for arg in sys.argv)
@@ -32,9 +42,12 @@ def was_ws_port_explicit() -> bool:
     return any(arg.startswith('--ws-port') for arg in sys.argv)
 
 
-def parse_args() -> RuntimeArgs:
-    """
-    Parse command line arguments and return a RuntimeArgs instance.
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the argparse parser.
+
+    Extracted so :func:`parse_args` and :func:`get_arg_metadata` share a
+    single source of truth for CLI flags and help text — adding a new arg
+    here automatically surfaces it in the UI's About modal.
     """
     parser = argparse.ArgumentParser(description='LANscape')
 
@@ -46,7 +59,7 @@ def parse_args() -> RuntimeArgs:
                         help='Log output to the specified file path')
     parser.add_argument('--loglevel', default='INFO', help='Set the log level')
     parser.add_argument('--persistent', action='store_true',
-                        help='Don\'t auto-shutdown when browser closes')
+                        help='Don\'t auto-shutdown when browser disconnects from WebSocket')
     parser.add_argument('--debug', action='store_true',
                         help='Enable debug mode (sets loglevel to DEBUG and '
                              'registers debug WebSocket handlers)')
@@ -57,7 +70,45 @@ def parse_args() -> RuntimeArgs:
     parser.add_argument('--mdns-off', action='store_true',
                         help='Disable mDNS service discovery')
     parser.add_argument('--printer-mayhem', action='store_true',
-                        help='Disable printer port safety (allows probing printer ports)')
+                        help='Allows LANscape to probe printer ports, which may cause printers to spam print packet probes (not recommended, but fun)')
+
+    return parser
+
+
+def get_arg_metadata() -> Dict[str, Dict[str, Optional[str]]]:
+    """Return CLI flag and help text per :class:`RuntimeArgs` field.
+
+    Walks the same argparse parser used at startup, so the returned metadata
+    can never drift from the CLI. Inverse-flag dests are rewritten to their
+    RuntimeArgs field name (e.g. ``mdns_off`` -> ``mdns_enabled``).
+
+    Returns:
+        Dict keyed by RuntimeArgs field name, with ``flag`` and ``help`` strings.
+    """
+    parser = _build_parser()
+
+    metadata: Dict[str, Dict[str, Optional[str]]] = {}
+    # argparse's `_actions` list is private but stable; the public API doesn't
+    # expose a way to introspect registered arguments.
+    for action in parser._actions:  # pylint: disable=protected-access
+        if action.dest in ('help', 'version'):
+            continue
+        # Prefer the long flag over any short alias.
+        flag = next(
+            (s for s in action.option_strings if s.startswith('--')),
+            action.option_strings[0] if action.option_strings else None,
+        )
+        key = _INVERSE_FLAG_DESTS.get(action.dest, action.dest)
+        metadata[key] = {'flag': flag, 'help': action.help}
+
+    return metadata
+
+
+def parse_args() -> RuntimeArgs:
+    """
+    Parse command line arguments and return a RuntimeArgs instance.
+    """
+    parser = _build_parser()
 
     # Parse the arguments
     args = parser.parse_args()

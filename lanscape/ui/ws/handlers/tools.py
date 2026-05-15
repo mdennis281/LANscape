@@ -26,7 +26,7 @@ from lanscape.core.models.enums import StageType
 from lanscape.core.version_manager import (
     get_installed_version, is_update_available, get_latest_version
 )
-from lanscape.core.runtime_args import parse_args
+from lanscape.core.runtime_args import get_arg_metadata, parse_args
 from lanscape.ui.ws.handlers.base import BaseHandler
 
 
@@ -282,20 +282,21 @@ class ToolsHandler(BaseHandler):
         """
         args = parse_args()
 
-        # Build runtime args dict (excluding None values)
+        # Dump every field defined on the RuntimeArgs model so the UI sees a
+        # complete picture without this handler going stale when new args are
+        # added. None values are dropped — they represent "not set".
         runtime_args = {
-            'ui_port': args.ui_port,
-            'ws_port': args.ws_port,
-            'loglevel': args.loglevel,
-            'persistent': args.persistent,
+            key: value for key, value in args.model_dump().items()
+            if value is not None
         }
-        if args.logfile:
-            runtime_args['logfile'] = args.logfile
 
         return {
             'name': 'LANscape',
             'version': get_installed_version(),
             'runtime_args': runtime_args,
+            # CLI flag + help text per field, sourced from argparse so the
+            # UI tooltips stay in sync with the actual command-line surface.
+            'runtime_arg_meta': get_arg_metadata(),
         }
 
     def _handle_update_check(

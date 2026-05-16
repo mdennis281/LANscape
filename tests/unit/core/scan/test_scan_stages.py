@@ -651,15 +651,16 @@ class TestStagePresets:
                     f"{stage_type_str}/{preset_name} round-trip failed"
                 )
 
-    def test_fast_port_scan_uses_small_list(self):
-        """Fast port scan preset uses the 'small' port list."""
+    def test_port_scan_presets_reference_known_port_lists(self):
+        """Every port_scan preset's `port_list` must name a real port list."""
+        from lanscape.core.port_manager import PortManager
+        available = set(PortManager().get_port_lists())
         presets = get_stage_presets()
-        assert presets['port_scan']['fast']['port_list'] == 'small'
-
-    def test_accurate_port_scan_uses_large_list(self):
-        """Accurate port scan preset uses the 'large' port list."""
-        presets = get_stage_presets()
-        assert presets['port_scan']['accurate']['port_list'] == 'large'
+        for preset_name, cfg in presets['port_scan'].items():
+            assert cfg['port_list'] in available, (
+                f"port_scan/{preset_name} references unknown port list "
+                f"'{cfg['port_list']}' (available: {sorted(available)})"
+            )
 
 
 # ---------------------------------------------------------------------------

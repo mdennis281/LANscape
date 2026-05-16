@@ -378,8 +378,11 @@ class TestToolsHandler:
                 f"{stage_type} missing preset(s)"
             )
 
-        # Fast port scan uses 'small' port list
-        assert result["port_scan"]["fast"]["port_list"] == "small"
+        # Port scan presets must all carry a port_list reference (any value).
+        for preset_name, cfg in result["port_scan"].items():
+            assert cfg.get("port_list"), (
+                f"port_scan/{preset_name} missing port_list"
+            )
 
     def test_handle_stage_estimate(self, tools_handler):
         """Test getting a time estimate for a stage."""

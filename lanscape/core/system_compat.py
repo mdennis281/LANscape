@@ -618,7 +618,7 @@ def clear_screen() -> None:
 # ── Local interface MAC lookup ──────────────────────────────────────
 
 # Cache mapping local IPs → MACs (built lazily on first call).
-_local_ip_mac_cache: Optional[dict] = None
+_LOCAL_IP_MAC_CACHE: Optional[dict] = None
 
 
 def _build_local_ip_mac_map() -> dict[str, str]:
@@ -644,10 +644,10 @@ def _build_local_ip_mac_map() -> dict[str, str]:
 
 def get_local_mac_for_ip(ip: str) -> Optional[str]:
     """Return the MAC address of the local interface that owns *ip*, or ``None``."""
-    global _local_ip_mac_cache  # pylint: disable=global-statement
-    if _local_ip_mac_cache is None:
-        _local_ip_mac_cache = _build_local_ip_mac_map()
-    return _local_ip_mac_cache.get(ip)
+    global _LOCAL_IP_MAC_CACHE  # pylint: disable=global-statement
+    if _LOCAL_IP_MAC_CACHE is None:
+        _LOCAL_IP_MAC_CACHE = _build_local_ip_mac_map()
+    return _LOCAL_IP_MAC_CACHE.get(ip)
 
 
 def configure_asyncio_exception_handler(loop) -> None:

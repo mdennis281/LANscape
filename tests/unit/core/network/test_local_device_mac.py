@@ -24,12 +24,12 @@ from lanscape.core.system_compat import (
 def _reset_local_ip_mac_cache():
     """Force ``get_local_mac_for_ip`` to rebuild on the next call.
 
-    The module caches the IP→MAC map in ``_local_ip_mac_cache``; tests
+    The module caches the IP→MAC map in ``_LOCAL_IP_MAC_CACHE``; tests
     patch ``psutil.net_if_addrs`` and need a clean slate between cases.
     """
-    system_compat._local_ip_mac_cache = None  # pylint: disable=protected-access
+    system_compat._LOCAL_IP_MAC_CACHE = None  # pylint: disable=protected-access
     yield
-    system_compat._local_ip_mac_cache = None  # pylint: disable=protected-access
+    system_compat._LOCAL_IP_MAC_CACHE = None  # pylint: disable=protected-access
 
 
 # Fake psutil address entries

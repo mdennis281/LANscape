@@ -38,6 +38,7 @@ def get_changed_py_files(base_ref: str) -> list[str]:
 
 
 def main() -> None:
+    """Entry point: lint only Python files changed vs a base git ref."""
     parser = argparse.ArgumentParser(description='Pylint diff linter')
     parser.add_argument('--base', default='origin/main',
                         help='Git ref to diff against (default: origin/main)')
@@ -58,6 +59,7 @@ def main() -> None:
     result = subprocess.run(
         [python, '-m', 'pylint', '--score=yes', *files],
         cwd=PROJECT_ROOT,
+        check=False,
     )
     sys.exit(result.returncode)
 

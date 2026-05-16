@@ -75,7 +75,7 @@ def _recommend_ipv4_local_windows(
         )]
     return [StageRecommendation(
         StageType.ICMP_ARP_DISCOVERY,
-        StagePreset.ACCURATE,
+        StagePreset.BALANCED,
         'Small local subnet on Windows — ICMP+ARP is reliable',
     )]
 
@@ -94,7 +94,7 @@ def _recommend_ipv4_local_unix(
         )]
     return [StageRecommendation(
         StageType.ICMP_ARP_DISCOVERY,
-        StagePreset.ACCURATE,
+        StagePreset.BALANCED,
         'Small local subnet on Linux/Mac — ICMP+ARP is reliable',
     )]
 
@@ -172,11 +172,11 @@ def recommend_stages(  # pylint: disable=too-many-arguments,too-many-positional-
         stages.extend(discovery or [])
 
         # Always add port scan after discovery
-        preset = StagePreset.BALANCED if is_large else StagePreset.ACCURATE
+        preset = StagePreset.FAST if is_large else StagePreset.BALANCED
         stages.append(StageRecommendation(
             StageType.PORT_SCAN,
             preset,
-            f'Port scan ({"balanced" if is_large else "accurate"} — {ip_count} IPs)',
+            f'Port scan ({"fast" if is_large else "balanced"} — {ip_count} IPs)',
         ))
         return stages
 

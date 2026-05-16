@@ -43,6 +43,7 @@ class DevSetupError(RuntimeError):
 
 @dataclass
 class DevConfig:
+    """Resolved local dev environment settings loaded from ``lanscape/local/.env``."""
     ui_path: Path
     ui_dev_cmd: str
     open_browser: bool
@@ -50,6 +51,7 @@ class DevConfig:
 
     @classmethod
     def from_env(cls, env: dict[str, str]) -> 'DevConfig':
+        """Build a :class:`DevConfig` from environment-variable values."""
         ui_path_raw = env.get('LANSCAPE_UI_PATH')
         if not ui_path_raw:
             raise DevSetupError(

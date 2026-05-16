@@ -70,7 +70,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--mdns-off', action='store_true',
                         help='Disable mDNS service discovery')
     parser.add_argument('--printer-mayhem', action='store_true',
-                        help='Allows LANscape to probe printer ports, which may cause printers to spam print packet probes (not recommended, but fun)')
+                        help='Allows LANscape to probe printer ports, which may '
+                             'cause printers to spam print')
 
     return parser
 

@@ -143,13 +143,35 @@ services:
 
   # ── FTP Server ──────────────────────────────────────────────────────────
   # FTP (21)
+  #
+  # Image is pinned by digest. The default entrypoint (/bin/start_vsftpd.sh)
+  # has a race: it launches vsftpd in daemon mode, then `pgrep vsftpd >
+  # vsftpd.pid` to feed `pidproxy`. If pgrep runs before vsftpd's fork
+  # completes, the pidfile is empty and pidproxy exits 0 — the container
+  # dies cleanly within seconds, breaking every `depends_on: service_healthy`
+  # consumer. The race is invisible on Docker Desktop but reproduces on the
+  # slimmer GitHub Actions runner.
+  #
+  # Workaround: the script falls through to `exec "$@"` when given args, so
+  # we pass a small shell pipeline that (1) reuses the script's user-setup
+  # via `start_vsftpd.sh true`, (2) flips `background=YES` to `NO` in the
+  # bundled conf (the `-o` CLI override does not take precedence over the
+  # file in this build), then (3) execs vsftpd in foreground — vsftpd itself
+  # becomes PID 1, no daemonize, no pidproxy, no race.
   ftp-server:
     <<: *common
-    image: delfer/alpine-ftp-server
+    image: delfer/alpine-ftp-server@sha256:60bb774d8408d9d4d5c74d05d1c086a34ce192c6c1a142ffac268cac0dbc6fac
     container_name: lanscape-test-ftp
     hostname: ftp-server
     environment:
       - USERS=testuser|testpass
+    command:
+      - sh
+      - -c
+      - >-
+        /bin/start_vsftpd.sh true &&
+        sed -i 's/^background=YES/background=NO/' /etc/vsftpd/vsftpd.conf &&
+        exec vsftpd -opasv_min_port=21000 -opasv_max_port=21010 /etc/vsftpd/vsftpd.conf
     networks:
       testnet:
         ipv4_address: 172.30.0.16

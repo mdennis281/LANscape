@@ -141,19 +141,18 @@ _PRESETS: Dict[StageType, Dict[StagePreset, object]] = {
 
     StageType.PORT_SCAN: {
         StagePreset.FAST: PortScanStageConfig(
-            port_list="small",
-            port_scan_config=PortScanConfig(timeout=0.5, retries=0, retry_delay=0),
+            port_scan_config=PortScanConfig(timeout=1, retries=0, retry_delay=0),
             service_scan_config=ServiceScanConfig(
                 timeout=3.0,
-                lookup_type=ServiceScanStrategy.LAZY,
+                lookup_type=ServiceScanStrategy.BASIC,
             ),
         ),
         StagePreset.BALANCED: PortScanStageConfig(),
         StagePreset.ACCURATE: PortScanStageConfig(
             port_list="large",
-            port_scan_config=PortScanConfig(timeout=2.0, retries=1, retry_delay=0.3),
+            port_scan_config=PortScanConfig(timeout=2.0, retries=1),
             service_scan_config=ServiceScanConfig(
-                timeout=8.0,
+                timeout=5.0,
                 lookup_type=ServiceScanStrategy.AGGRESSIVE,
                 max_concurrent_probes=15,
             ),

@@ -553,7 +553,7 @@ Check if ARP scanning is available on the current system.
 
 #### `tools.app_info`
 
-Get application version, runtime arguments, and update status.
+Get application name, version, and the active runtime arguments with their CLI metadata.
 
 **Params:** none
 
@@ -563,17 +563,27 @@ Get application version, runtime arguments, and update status.
 {
   "name": "LANscape",
   "version": "3.0.1",
-  "arp_supported": true,
-  "update_available": false,
-  "latest_version": "3.0.1",
   "runtime_args": {
-    "port": 11000,
+    "ui_port": 5001,
     "ws_port": 8766,
     "loglevel": "INFO",
-    "persistent": false
+    "persistent": false,
+    "debug": false,
+    "ws_server": false,
+    "mdns_enabled": true,
+    "printer_safety": true
+  },
+  "runtime_arg_meta": {
+    "ui_port": { "flag": "--ui-port", "help": "Port for the web UI (default: auto)" },
+    "ws_port": { "flag": "--ws-port", "help": "Port for WebSocket server (default: 8766)" },
+    "mdns_enabled": { "flag": "--mdns-off", "help": "Disable mDNS service discovery" }
   }
 }
 ```
+
+- `runtime_args` is dumped dynamically from the `RuntimeArgs` Pydantic model — every field with a non-`None` value is included, so adding a new arg on the backend automatically appears here.
+- `runtime_arg_meta` is sourced from the same argparse parser used at startup. Each entry exposes the CLI `flag` and `help` text per RuntimeArgs field. Inverse flags (e.g. `--mdns-off` toggles `mdns_enabled`) are keyed by the field name, not the argparse dest.
+- ARP and update fields (`arp_supported`, `update_available`, `latest_version`) are NOT returned by `app_info` — they live on the separate `tools.arp_supported` and `tools.update_check` actions so this fast path stays free of network calls.
 
 ---
 

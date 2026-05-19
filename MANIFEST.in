@@ -1,3 +1,6 @@
 recursive-include lanscape/resources *.json
 recursive-include lanscape/resources *.jsonc
 recursive-include lanscape/ui/react_build *
+
+# Contributor-only dev tooling — never ship.
+prune lanscape/local

@@ -15,32 +15,12 @@ from lanscape.core.scan_config import (
 )
 from lanscape.core.models.scan import ScanWarningInfo
 from lanscape.core.net_tools.device import Device
-from lanscape.core.device_alive import IcmpLookup, ArpLookup, Poker
-from lanscape.core.system_compat import query_single_arp_entry
+from lanscape.core.device_alive import IcmpLookup, ArpLookup, ArpCacheLookup, Poker
 from lanscape.core.ip_parser import IPAddress
 from lanscape.core.decorators import job_tracker
 from lanscape.core.threadpool_retry import (
     ThreadPoolRetryManager, RetryJob, RetryConfig, MultiplierController,
 )
-
-
-def _discover_device(
-    ip: str,
-    alive_fn,
-    context: ScanContext,
-    stage: ScanStageMixin,
-    hostname_config,
-) -> None:
-    """Common pattern: check liveness, add device to context if alive."""
-    device = Device(ip=ip)
-    alive_fn(device)
-    stage.increment()
-    if device.alive:
-        stage.log.debug("[%s] alive, resolving metadata", ip)
-        device.stage = 'resolving'
-        context.add_device(device)
-        device.get_metadata(hostname_config=hostname_config)
-        device.stage = 'found'
 
 
 def _check_icmp_fallback(stage: ScanStageMixin, context: ScanContext) -> None:
@@ -264,10 +244,7 @@ class PokeARPDiscoveryStage(ScanStageMixin):
             device = Device(ip=ip_str)
             Poker.execute(device, self.cfg.poke_config)
             if not device.alive:
-                mac = query_single_arp_entry(ip_str)
-                if mac:
-                    device.alive = True
-                    device.macs = [mac]
+                ArpCacheLookup.execute(device, self.cfg.arp_cache_config)
             self.increment()
             if device.alive:
                 self.log.debug("[%s] alive via Poke→ARP", ip_str)
@@ -327,10 +304,7 @@ class ICMPARPDiscoveryStage(ScanStageMixin):
             device = Device(ip=ip_str)
             IcmpLookup.execute(device, self.cfg.ping_config)
             if not device.alive:
-                mac = query_single_arp_entry(ip_str)
-                if mac:
-                    device.alive = True
-                    device.macs = [mac]
+                ArpCacheLookup.execute(device, self.cfg.arp_cache_config)
             self.increment()
             if device.alive:
                 self.log.debug("[%s] alive via ICMP→ARP", ip_str)

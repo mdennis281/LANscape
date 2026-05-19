@@ -31,9 +31,6 @@ from lanscape.core.neighbor_table import (
     _normalize_ip,
     _normalize_mac,
 )
-from lanscape.core.system_compat import query_single_arp_entry, _SINGLE_ARP_MAC_RE
-
-
 # ═══════════════════════════════════════════════════════════════════
 #  Canned output samples
 # ═══════════════════════════════════════════════════════════════════
@@ -668,6 +665,121 @@ class TestNeighborTableServiceLifecycle:
                 svc.stop()
 
     @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_demand_wakes_idle_refresh_loop(self, mock_check):
+        """get_macs_wait must short-circuit the refresh-loop sleep.
+
+        Without the demand-wake, callers phase-lock with the cycle through
+        the preceding poke duration and wait nearly a full cycle for the
+        next refresh start. Setting `_wake_event` from phase 1 collapses
+        that to ~refresh duration. We verify the wall-clock cost is well
+        under the configured refresh_interval.
+        """
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            # Long interval — if demand-wake is broken this test takes >5s.
+            svc.start(refresh_interval=5.0)
+            try:
+                import time
+                # Drain the initial synchronous refresh's wake notification
+                # so the loop is genuinely sleeping when we call below.
+                time.sleep(0.05)
+                t0 = time.monotonic()
+                # IP NOT in canned data — forces phase 1 to wake the loop.
+                macs = svc.get_macs_wait('10.99.99.99', timeout=10.0)
+                elapsed = time.monotonic() - t0
+                assert macs == []
+                assert elapsed < 2.0, (
+                    f"Demand-wake failed: phase 1 stalled {elapsed:.2f}s "
+                    f"with a 5s refresh_interval"
+                )
+            finally:
+                svc.stop()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_records_phase_job_stats(self, mock_check):
+        """get_macs_wait must record itself plus phase-1/phase-2 wait buckets.
+
+        Without per-phase timing, a slow ArpCacheLookup looks identical
+        whether the bottleneck is cycle-alignment (waiting for the next
+        start) or refresh duration (waiting for the in-flight finish).
+        """
+        from lanscape.core.decorators import JobStats
+        JobStats.reset_for_testing()
+
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=0.3)
+            try:
+                # IP not in the canned data — forces both wait phases.
+                svc.get_macs_wait('10.99.99.99', timeout=3.0)
+                stats = JobStats()
+                assert stats.finished['NeighborTableService.get_macs_wait'] == 1
+                assert stats.finished[
+                    'NeighborTableService._wait_for_next_refresh_start'
+                ] == 1
+                assert stats.finished[
+                    'NeighborTableService._wait_for_refresh_finish'
+                ] == 1
+            finally:
+                svc.stop()
+                JobStats.reset_for_testing()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_get_macs_wait_skips_phases_on_cache_hit(self, mock_check):
+        """Cache-hit path must not record any phase-wait stats."""
+        from lanscape.core.decorators import JobStats
+        JobStats.reset_for_testing()
+
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=10.0)
+            try:
+                # IP IS in the canned data — instant return, no wait phases.
+                macs = svc.get_macs_wait('192.168.1.1')
+                assert macs == ['aa:bb:cc:dd:ee:ff']
+                stats = JobStats()
+                assert stats.finished['NeighborTableService.get_macs_wait'] == 1
+                assert 'NeighborTableService._wait_for_next_refresh_start' not in \
+                    stats.finished
+                assert 'NeighborTableService._wait_for_refresh_finish' not in \
+                    stats.finished
+            finally:
+                svc.stop()
+                JobStats.reset_for_testing()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
+    def test_fetch_records_per_protocol_job_stats(self, mock_check):
+        """v4 and v6 fetch times must be tracked under separate JobStats buckets.
+
+        Regression guard: a single ``_fetch_entries(want_v6)`` method would
+        bucket both protocols together, hiding which one is the slow command
+        when ``get_macs_wait`` starts blocking on refresh cycles.
+        """
+        from lanscape.core.decorators import JobStats
+        JobStats.reset_for_testing()
+
+        mock_check.return_value = LINUX_IPV4_NEIGH.encode()
+        with patch('lanscape.core.neighbor_table.get_table_commands') as mock_cmds:
+            mock_cmds.return_value = [['ip', 'neigh', 'show']]
+            svc = NeighborTableService.instance()
+            svc.start(refresh_interval=10.0)  # one synchronous refresh on start
+            try:
+                stats = JobStats()
+                assert stats.finished['NeighborTableService._fetch_v4_entries'] == 1
+                assert stats.finished['NeighborTableService._fetch_v6_entries'] == 1
+                # And the combined refresh ran exactly once (start() does one).
+                assert stats.finished['NeighborTableService._do_refresh'] == 1
+            finally:
+                svc.stop()
+                JobStats.reset_for_testing()
+
+    @patch('lanscape.core.neighbor_table.subprocess.check_output')
     def test_command_fallback(self, mock_check):
         """If first command fails, second should be tried."""
         call_count = 0
@@ -696,45 +808,6 @@ class TestNeighborTableServiceLifecycle:
 # ═══════════════════════════════════════════════════════════════════
 #  Live integration tests
 # ═══════════════════════════════════════════════════════════════════
-
-class TestSingleArpMacRegex:
-    """Unit tests for _SINGLE_ARP_MAC_RE — the regex used by query_single_arp_entry.
-
-    macOS arp(8) omits leading zeros per octet (e.g. ``6:94:e6:c8:e4:22``),
-    so the regex must accept 1–2 hex digits per octet.
-    """
-
-    def test_standard_full_octets(self):
-        """Matches a standard two-digit-per-octet MAC."""
-        m = _SINGLE_ARP_MAC_RE.search("? (10.0.0.1) at aa:bb:cc:dd:ee:ff on en0")
-        assert m is not None
-        assert m.group(1) == 'aa:bb:cc:dd:ee:ff'
-
-    def test_macos_single_digit_leading_octet(self):
-        """Matches macOS output where the first octet has no leading zero."""
-        line = "? (192.168.64.1) at 6:94:e6:c8:e4:22 on feth2275 ifscope [ethernet]"
-        m = _SINGLE_ARP_MAC_RE.search(line)
-        assert m is not None
-        assert m.group(1) == '6:94:e6:c8:e4:22'
-
-    def test_macos_multiple_short_octets(self):
-        """Matches when several octets have only one hex digit."""
-        line = "? (10.1.1.1) at 0:c:29:ab:cd:ef on en0 [ethernet]"
-        m = _SINGLE_ARP_MAC_RE.search(line)
-        assert m is not None
-        assert m.group(1) == '0:c:29:ab:cd:ef'
-
-    def test_windows_dash_separated(self):
-        """Matches Windows-style dash-separated MAC."""
-        line = "  10.0.0.1              00-1b-21-38-a9-64     dynamic"
-        m = _SINGLE_ARP_MAC_RE.search(line)
-        assert m is not None
-
-    def test_no_match_for_incomplete(self):
-        """Does not match '(incomplete)' entries."""
-        line = "? (10.0.0.2) at (incomplete) on en0"
-        assert _SINGLE_ARP_MAC_RE.search(line) is None
-
 
 class TestLiveWindowsArpTable:
     """Live tests against the actual Windows ARP table."""
@@ -820,91 +893,3 @@ class TestEndToEndPipeline:
             assert svc.get_mac('8.8.8.8') is None
         finally:
             svc.stop()
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Live ARP query — default gateway MAC resolution
-# ═══════════════════════════════════════════════════════════════════
-
-def _get_default_gateway_ip() -> str | None:
-    """Return the default gateway IPv4 address using the OS routing table.
-
-    Works on Windows (``route print``), Linux (``ip route``), and macOS
-    (``netstat -rn``).  Returns ``None`` if the gateway cannot be determined.
-    """
-    try:
-        if psutil.WINDOWS:
-            out = subprocess.check_output(
-                ['route', 'print', '0.0.0.0'], text=True, timeout=5,
-                stderr=subprocess.DEVNULL,
-            )
-            for line in out.splitlines():
-                parts = line.split()
-                if len(parts) >= 3 and parts[0] == '0.0.0.0' and parts[1] == '0.0.0.0':
-                    return parts[2]
-        elif psutil.LINUX:
-            out = subprocess.check_output(
-                ['ip', 'route', 'show', 'default'], text=True, timeout=5,
-                stderr=subprocess.DEVNULL,
-            )
-            for line in out.splitlines():
-                if 'default via' in line:
-                    return line.split('via')[1].split()[0]
-        else:
-            # macOS / BSD
-            out = subprocess.check_output(
-                ['netstat', '-rn'], text=True, timeout=5,
-                stderr=subprocess.DEVNULL,
-            )
-            for line in out.splitlines():
-                parts = line.split()
-                if parts and parts[0] in ('default', '0.0.0.0/0'):
-                    return parts[1]
-    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
-        pass
-    return None
-
-
-@pytest.mark.integration
-class TestLiveArpQuerySingleEntry:
-    """Live integration tests for query_single_arp_entry().
-
-    Mirrors the ARP-cache lookup that ``ping_then_arp`` (ICMP_ARP_DISCOVERY)
-    and ``poke_then_arp`` (POKE_ARP_DISCOVERY) stages perform: after a ping or
-    TCP poke warms the OS ARP cache, the stage calls ``query_single_arp_entry``
-    to retrieve the device's MAC address.
-
-    The default gateway is used as a known-reachable IPv4 target — it is
-    virtually guaranteed to be present in the ARP cache on any connected host.
-    """
-
-    def test_default_gateway_mac_resolves(self):
-        """query_single_arp_entry returns a valid MAC for the default gateway."""
-        gateway_ip = _get_default_gateway_ip()
-        if not gateway_ip:
-            pytest.skip("Could not determine default gateway — skipping live ARP test")
-
-        # Warm the ARP cache the same way ping_then_arp / poke_then_arp do:
-        # send an ICMP echo so the OS records the gateway's MAC.
-        ping_cmd = (
-            ['ping', '-n', '1', '-w', '1000', gateway_ip]
-            if psutil.WINDOWS
-            else ['ping', '-c', '1', '-W', '1', gateway_ip]
-        )
-        subprocess.run(ping_cmd, timeout=5, stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, check=False)
-
-        mac = query_single_arp_entry(gateway_ip)
-
-        assert mac is not None, (
-            f"Expected a MAC for default gateway {gateway_ip!r} but got None. "
-            "ARP cache may be empty or the gateway did not respond."
-        )
-        # Must look like a colon-separated MAC
-        parts = mac.split(':')
-        assert len(parts) == 6, f"MAC {mac!r} does not have 6 octets"
-        assert all(len(p) == 2 for p in parts), f"MAC {mac!r} has malformed octets"
-        # Must not be a null or broadcast address
-        assert mac not in ('00:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff'), (
-            f"MAC {mac!r} is invalid (null or broadcast)"
-        )

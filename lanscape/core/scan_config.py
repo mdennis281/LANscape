@@ -307,11 +307,15 @@ class ARPDiscoveryStageConfig(ConfigBase):
 
 class PokeARPDiscoveryStageConfig(ConfigBase):
     """Config for the Poke→ARP cache discovery stage."""
-    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = 64_000
+    MAX_SUBNET_SIZE: ClassVar[Optional[int]] = 128_000
     poke_config: PokeConfig = Field(default_factory=PokeConfig)
     arp_cache_config: ArpCacheConfig = Field(default_factory=ArpCacheConfig)
     hostname_config: HostnameConfig = Field(default_factory=HostnameConfig)
-    t_cnt: int = (os.cpu_count() or 4) * 6
+    # Pokes are short-lived TCP connect_ex() calls; we benefit from heavy
+    # concurrency but cap the default so high-core hosts don't exhaust
+    # file descriptors or kernel-side ephemeral ports. Users can raise this
+    # explicitly via PokeARPDiscoveryStageConfig(t_cnt=...) if needed.
+    t_cnt: int = min((os.cpu_count() or 4) * 25, 200)
 
 
 class ICMPARPDiscoveryStageConfig(ConfigBase):
@@ -348,7 +352,7 @@ class PortScanStageConfig(ConfigBase):
     service_scan_config: ServiceScanConfig = Field(default_factory=ServiceScanConfig)
     scan_services: bool = True
     t_cnt_device: int = os.cpu_count() or 4
-    t_cnt_port: int = (os.cpu_count() or 4) * 4
+    t_cnt_port: int = (os.cpu_count() or 4) * 5
 
 
 # ─── Stage config registry ─────────────────────────────────────────

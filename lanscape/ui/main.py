@@ -1,17 +1,22 @@
 """Main entry point for the LANscape application when running as a module."""
 import logging
-import socket
-import time
 import traceback
 
-import psutil
-
 from lanscape.core.logger import configure_logging
+from lanscape.ui.port_availability import (
+    get_valid_port,
+    is_port_available,
+    validate_port_available,
+)
 from lanscape.core.runtime_args import parse_args, was_port_explicit, was_ws_port_explicit
 from lanscape.core.version_manager import get_installed_version
 from lanscape.ui.ws.server import run_server
 from lanscape.ui.react_proxy import start_webapp_server
 from lanscape.core.service_scan import resources as svc_resources
+
+# Re-exports for backward compatibility with any external callers that
+# imported these from lanscape.ui.main.
+__all__ = ['main', 'get_valid_port', 'is_port_available', 'validate_port_available']
 
 log = logging.getLogger('core')
 
@@ -27,6 +32,25 @@ def main():
 
     if not args.printer_safety:
         svc_resources.PRINTER_SAFETY = False
+
+    # Source-checkout dev orchestration. `lanscape.local` is excluded from
+    # sdist/wheel builds, so installed users hit ImportError and fall through.
+    # In a source checkout with `lanscape/local/.env` configured, hot-reload
+    # dev mode replaces the default bundled-UI flow. `--ws-server` is the
+    # backend-only escape hatch (and the form the dev runner re-invokes).
+    if not args.ws_server:
+        try:
+            # pylint: disable=import-outside-toplevel
+            from lanscape.local import dev_runner, is_configured
+        except ImportError:
+            pass
+        else:
+            if is_configured():
+                dev_runner.run(args)
+                return
+            log.info(
+                'Source checkout detected. Create lanscape/local/.env to '
+                'enable hot-reload dev mode (see CONTRIBUTING.md).')
 
     try:
         _main()
@@ -98,90 +122,6 @@ def start_webapp_mode():
         log.critical(f'Webapp failed: {e}')
         log.debug(traceback.format_exc())
         raise
-
-
-def _get_bound_ports() -> set[int] | None:
-    """Return the set of all TCP ports currently bound on the system.
-
-    Returns None if the information could not be collected (e.g. access denied),
-    so callers can fall back to a direct socket check.
-    """
-    try:
-        return {
-            conn.laddr.port
-            for conn in psutil.net_connections(kind='tcp')
-            if conn.laddr
-        }
-    except (psutil.AccessDenied, OSError):
-        return None
-
-
-def _socket_port_in_use(port: int) -> bool:
-    """Fallback: attempt a non-blocking socket bind to determine if a port is in use."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.bind(('127.0.0.1', port))
-            return False
-        except OSError:
-            return True
-
-
-def is_port_available(port: int, bound_ports: set[int] | None = None) -> bool:
-    """Check if a port is available for binding."""
-    if bound_ports is not None:
-        return port not in bound_ports
-    ports = _get_bound_ports()
-    if ports is not None:
-        return port not in ports
-    # psutil was unavailable/denied; fall back to a direct socket bind test
-    return not _socket_port_in_use(port)
-
-
-def validate_port_available(port: int, flag_name: str, retries: int = 10,
-                            delay: float = 0.5) -> None:
-    """
-    Validate that an explicitly specified port is available.
-    Retries briefly to handle hot-reload scenarios where the previous
-    process hasn't released the port yet.
-    Raises an error if the port is still in use after all retries.
-    """
-    for attempt in range(retries):
-        if is_port_available(port):
-            return
-        if attempt < retries - 1:
-            log.debug(f'Port {port} in use, retrying in {delay}s '
-                      f'({attempt + 1}/{retries})')
-            time.sleep(delay)
-    raise OSError(
-        f"Port {port} is already in use. "
-        f"Either free the port or remove the {flag_name} flag to auto-"
-        f"select an available port."
-    )
-
-
-def get_valid_port(port: int) -> int:
-    """
-    Get the first available port starting from the specified port.
-
-    Args:
-        port: Starting port number to check
-
-    Returns:
-        First available port
-
-    Raises:
-        RuntimeError: If no available port found between port and 65535
-    """
-    max_port = 65535
-    start_port = port
-    bound_ports = _get_bound_ports()
-    while port <= max_port:
-        if is_port_available(port, bound_ports):
-            return port
-        port += 1
-    raise RuntimeError(
-        f"No available port found between {start_port} and {max_port}"
-    )
 
 
 if __name__ == "__main__":

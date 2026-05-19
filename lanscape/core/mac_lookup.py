@@ -85,14 +85,3 @@ class MacResolver(JobStatsMixin):
         except Exception as e:
             self.caught_errors.append(DeviceError(e))
             return []
-
-
-# Backward compatibility functions
-def lookup_mac(mac: str) -> Optional[str]:
-    """Backward compatibility function for MAC vendor lookup."""
-    return MacLookup().lookup_vendor(mac)
-
-
-def get_macs(ip: str) -> List[str]:
-    """Backward compatibility function for MAC resolution."""
-    return MacResolver().get_macs(ip)

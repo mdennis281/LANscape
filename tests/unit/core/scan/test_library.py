@@ -9,10 +9,10 @@ from lanscape.core.net_tools import smart_select_primary_subnet, _is_deprioritiz
 from lanscape.core.subnet_scan import ScanManager
 from lanscape.core.scan_config import ScanConfig, ScanType
 
-from tests.test_globals import (
+from tests._helpers import (
     TEST_SUBNET,
     MIN_EXPECTED_RUNTIME,
-    MIN_EXPECTED_ALIVE_DEVICES
+    MIN_EXPECTED_ALIVE_DEVICES,
 )
 
 

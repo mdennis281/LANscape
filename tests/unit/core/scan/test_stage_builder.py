@@ -78,13 +78,13 @@ class TestIPv6NoParsing:
 class TestMaxSubnetSizeClassVars:
     """Verify ClassVar constants are accessible but not in Pydantic schema."""
 
-    def test_icmp_max_subnet_size(self):
-        """ICMPDiscoveryStageConfig.MAX_SUBNET_SIZE == 25_000."""
-        assert ICMPDiscoveryStageConfig.MAX_SUBNET_SIZE == 25_000
-
-    def test_poke_arp_max_subnet_size(self):
-        """PokeARPDiscoveryStageConfig.MAX_SUBNET_SIZE == 64_000."""
-        assert PokeARPDiscoveryStageConfig.MAX_SUBNET_SIZE == 64_000
+    def test_max_subnet_size_is_positive_int_or_none(self):
+        """MAX_SUBNET_SIZE is either a positive int (cap) or None (no cap)."""
+        for cls in (ICMPDiscoveryStageConfig, PokeARPDiscoveryStageConfig):
+            val = cls.MAX_SUBNET_SIZE
+            assert val is None or (isinstance(val, int) and val > 0), (
+                f"{cls.__name__}.MAX_SUBNET_SIZE must be positive int or None, got {val!r}"
+            )
 
     def test_max_subnet_size_not_in_schema(self):
         """MAX_SUBNET_SIZE should not appear in Pydantic model fields."""

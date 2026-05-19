@@ -35,7 +35,12 @@ The summary shows all CI check runs with their status and conclusion. Focus on c
 
 ### 1c. Decide the Workflow
 
-r
+| Unresolved Comments | Failing Checks | Action                                   |
+|---------------------|----------------|------------------------------------------|
+| Yes                 | No             | Run **Comment Resolution** (Step 2)      |
+| No                  | Yes            | Run **Actions Troubleshooting** (Step 3) |
+| Yes                 | Yes            | Run **both** sequentially (2 -> 3)       |
+| No                  | No             | Report "PR is clean" and stop            |
 
 ---
 

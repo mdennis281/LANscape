@@ -1,9 +1,13 @@
 """Handles device alive checks using various methods.
 
-Each ``*Lookup`` / ``Poker`` class is a small probe primitive consumed by the
-discovery stages in :mod:`lanscape.core.stages.discovery`. They share a
-common contract: ``execute(device, cfg) -> bool`` mutates ``device.alive``
-(and ``device.macs`` where applicable) and returns the new alive state.
+These probe primitives are consumed by the discovery stages in
+:mod:`lanscape.core.stages.discovery`:
+
+* ``*Lookup`` classes (``IcmpLookup``, ``ArpLookup``, ``ArpCacheLookup``)
+  share the contract ``execute(device, cfg) -> bool``: mutate ``device.alive``
+  (and ``device.macs`` where applicable) and return the new alive state.
+* ``Poker.execute(device, cfg)`` is a side-effect-only primitive that warms the
+  OS ARP cache by attempting TCP connects; it returns ``None``.
 """
 
 import socket

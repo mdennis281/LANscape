@@ -20,7 +20,7 @@ Things to remember, every change needs:
 
 WHEN ENHANCEMENTS COMPLETE:
 - Linting: spawn a subagent — DO NOT read the prompt file into this context.
-  - Tell the subagent: "Follow the instructions in .github/prompts/Linting.prompt.md and fix any issues. Return: PASSED or FAILED, and a one-line summary of what was changed or what remains broken."
+  - Tell the subagent: "Follow the instructions in .github/prompts/linting.prompt.md and fix any issues. Return: PASSED or FAILED, and a one-line summary of what was changed or what remains broken."
   - If the subagent returns FAILED, fix the reported issues and repeat.
 - Passing tests
   - Big changes: `Run Unit Tests` vscode task (check the output)

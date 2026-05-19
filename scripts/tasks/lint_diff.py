@@ -24,7 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 def get_changed_py_files(base_ref: str) -> list[str]:
     """Return .py files changed relative to *base_ref* that still exist on disk."""
     result = subprocess.run(
-        ['git', 'diff', '--name-only', '--diff-filter=ACM', base_ref, '--', '*.py'],
+        ['git', 'diff', '--name-only', '--diff-filter=ACMR', base_ref, '--', '*.py'],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,

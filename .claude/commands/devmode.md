@@ -6,22 +6,32 @@ Spin up the Python WebSocket backend and the React UI together, then attach the 
 
 ### 1. Find the Python executable
 
-The virtualenv lives in the **main project root**, not the worktree. Resolve it:
+The virtualenv lives in the repo root (`.env/`). Resolve it from the current
+git toplevel so the same command works in worktrees and on any contributor's
+machine:
 
 ```bash
-VENV_PYTHON=$(ls /c/Users/Michael/projects/py-net-scan/.env/Scripts/python.exe 2>/dev/null \
-  || ls "$(git rev-parse --show-toplevel)/.env/Scripts/python.exe" 2>/dev/null \
-  || echo "python3")
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [ -x "$REPO_ROOT/.env/Scripts/python.exe" ]; then
+  VENV_PYTHON="$REPO_ROOT/.env/Scripts/python.exe"   # Windows
+elif [ -x "$REPO_ROOT/.env/bin/python" ]; then
+  VENV_PYTHON="$REPO_ROOT/.env/bin/python"           # macOS / Linux
+else
+  VENV_PYTHON="python3"
+fi
 echo "Using: $VENV_PYTHON"
 ```
 
 ### 2. Start the dev servers
 
-Run devmode.py in the background with `--no-browser` (Claude opens the browser instead).
+Dev mode now runs through `python -m lanscape --debug`; the orchestrator lives
+in `lanscape/local/dev_runner.py` and reads `lanscape/local/.env` (copy from
+`lanscape/local/.env.example` once). Set `LANSCAPE_OPEN_BROWSER=false` so the
+runner doesn't pop a PWA window — Claude opens the browser instead.
 `PYTHONIOENCODING=utf-8` is required to avoid emoji encoding errors on Windows.
 
 ```bash
-PYTHONIOENCODING=utf-8 "$VENV_PYTHON" scripts/tasks/devmode.py --no-browser
+LANSCAPE_OPEN_BROWSER=false PYTHONIOENCODING=utf-8 "$VENV_PYTHON" -m lanscape --debug
 ```
 
 Run this with `run_in_background: true`. Check the output after ~8 seconds to confirm both servers started and note the actual WS port (may auto-increment from 8766 if busy).
@@ -64,11 +74,13 @@ Use these as needed during the debugging session:
 
 ### 7. Stopping
 
-```bash
-pkill -f "devmode.py" 2>/dev/null || taskkill /F /IM python.exe /T 2>/dev/null
-```
+Send Ctrl+C / SIGINT to the `python -m lanscape --debug` task — `dev_runner.py`
+traps it and tears down the UI subprocess cleanly. If you started it via
+`run_in_background`, kill that shell task. If the user launched it manually,
+ask them to press Ctrl+C.
 
-Or tell the user to press Ctrl+C in their terminal if they launched it manually.
+Do **not** use `taskkill /F /IM python.exe /T` or `pkill -f python` — those
+kill every Python process on the machine, including unrelated tooling.
 
 ## Quick-reference ports
 

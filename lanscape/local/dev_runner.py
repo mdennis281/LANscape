@@ -106,6 +106,10 @@ def run(args: RuntimeArgs) -> None:
 
     procs: list[subprocess.Popen] = []
     stop = threading.Event()
+    # Captures the rc of the first child to exit, so callers can tell a
+    # backend/UI crash apart from a clean Ctrl+C shutdown. `None` = no child
+    # failure observed (Ctrl+C / SIGTERM path); int = failing child's rc.
+    failure_rc: list[int | None] = [None]
 
     def _shutdown(signum=None, frame=None):  # pylint: disable=unused-argument
         if stop.is_set():
@@ -138,15 +142,31 @@ def run(args: RuntimeArgs) -> None:
                 daemon=True,
             ).start()
 
-        while not stop.is_set():
-            for p in procs:
-                if p.poll() is not None:
-                    log.warning('Process exited (rc=%s); shutting down', p.returncode)
-                    _shutdown()
-                    break
-            time.sleep(0.5)
+        _supervise(procs, stop, failure_rc, _shutdown)
     finally:
         _shutdown()
+
+    if failure_rc[0] is not None:
+        sys.exit(failure_rc[0])
+
+
+def _supervise(
+    procs: list[subprocess.Popen],
+    stop: threading.Event,
+    failure_rc: list[int | None],
+    shutdown,
+) -> None:
+    """Poll children; on first exit, record a non-zero rc and tear down."""
+    while not stop.is_set():
+        for p in procs:
+            if p.poll() is not None:
+                rc = p.returncode if p.returncode is not None else 1
+                log.warning('Process exited (rc=%s); shutting down', rc)
+                if failure_rc[0] is None and rc != 0:
+                    failure_rc[0] = rc
+                shutdown()
+                return
+        time.sleep(0.5)
 
 
 def _spawn_backend(args: RuntimeArgs, config: DevConfig) -> subprocess.Popen:

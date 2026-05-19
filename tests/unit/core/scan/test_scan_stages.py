@@ -29,6 +29,7 @@ from lanscape.core.stages.discovery import (
 )
 from lanscape.core.stages.port_scan import PortScanStage
 from lanscape.core.stages.ipv6_discovery import IPv6NDPDiscoveryStage, IPv6MDNSDiscoveryStage
+from lanscape.core.port_manager import PortManager
 
 
 # ---------------------------------------------------------------------------
@@ -653,7 +654,6 @@ class TestStagePresets:
 
     def test_port_scan_presets_reference_known_port_lists(self):
         """Every port_scan preset's `port_list` must name a real port list."""
-        from lanscape.core.port_manager import PortManager
         available = set(PortManager().get_port_lists())
         presets = get_stage_presets()
         for preset_name, cfg in presets['port_scan'].items():

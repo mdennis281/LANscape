@@ -17,7 +17,34 @@ jobs:
         with:
           fetch-depth: 0          # need full history for tag comparison
 
+      # Dependabot PRs intentionally carry NO version bump: their titles are
+      # conventional-commit style (e.g. "build(deps): bump X from 1.0 to 1.1"),
+      # which means merging them does NOT start with X.Y.Z and therefore does
+      # NOT trigger a release (see release-trigger-main-push.yml). The dep bump
+      # rides along with the next human-authored release instead.
+      - name: Validate Dependabot PR title format
+        if: ${{ github.actor == 'dependabot[bot]' }}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR title: '$PR_TITLE'"
+
+          # Must be a conventional commit, e.g. build(deps): / build(deps-dev): /
+          # build(docker): / ci(actions): — must NOT start with a version (a
+          # leading X.Y.Z here would wrongly trigger the release pipeline).
+          if echo "$PR_TITLE" | grep -qP '^\d+\.\d+\.\d+'; then
+            echo "::error::Dependabot PR title must not start with a version (X.Y.Z) — that would trigger a release on merge."
+            exit 1
+          fi
+          if ! echo "$PR_TITLE" | grep -qP '^(build|chore|ci)(\([^)]+\))?: .+'; then
+            echo "::error::Dependabot PR title must be a conventional commit, e.g. 'build(deps): bump X from 1.0 to 1.1'"
+            exit 1
+          fi
+
+          echo "Format OK (Dependabot)"
+
       - name: Validate PR title format
+        if: ${{ github.actor != 'dependabot[bot]' }}
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
@@ -36,6 +63,7 @@ jobs:
           echo "Format OK"
 
       - name: Check version is higher than latest release
+        if: ${{ github.actor != 'dependabot[bot]' }}
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |

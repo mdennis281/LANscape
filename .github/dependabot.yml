@@ -8,9 +8,10 @@
 #
 # NOTE: PRs target `main`. Titles use conventional-commit prefixes below
 # (build(deps)/build(deps-dev)/build(docker)/ci(actions)). The Quality - PR
-# Title check validates these for dependabot[bot] and — crucially — they carry
-# no leading X.Y.Z, so merging a bump does NOT trigger the release pipeline
-# (see release-trigger-main-push.yml). The bump ships with the next release.
+# Title check validates these for dependabot[bot]. They carry no leading
+# X.Y.Z, so on merge the release pipeline detects the build()/ci() prefix and
+# auto-increments the PATCH version to ship the bump (see
+# release-trigger-main-push.yml).
 version: 2
 
 updates:

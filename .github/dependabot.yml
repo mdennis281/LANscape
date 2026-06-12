@@ -1,0 +1,65 @@
+# Dependabot configuration for the LANScape Python library (backend).
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+#
+# Covers three ecosystems in this repo:
+#   1. pip            — backend Python deps declared in pyproject.toml
+#   2. docker         — base images in docker/ Dockerfiles + compose services
+#   3. github-actions — action versions pinned in .github/workflows/*
+#
+# NOTE: PRs target `main`. Titles use conventional-commit prefixes below
+# (build(deps)/build(deps-dev)/build(docker)/ci(actions)). The Quality - PR
+# Title check validates these for dependabot[bot] and — crucially — they carry
+# no leading X.Y.Z, so merging a bump does NOT trigger the release pipeline
+# (see release-trigger-main-push.yml). The bump ships with the next release.
+version: 2
+
+updates:
+  # ── Backend: Python dependencies (pyproject.toml) ───────────────────────
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build(deps)"
+      prefix-development: "build(deps-dev)"
+    groups:
+      # One PR/week for all non-breaking Python bumps (runtime + dev tooling).
+      # Majors still arrive as individual PRs for deliberate review.
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # ── Docker: base images + compose service images ────────────────────────
+  # Scans docker/Dockerfile, docker/Dockerfile.arm64, docker/Dockerfile.dev
+  # and the docker/*compose*.yml files for tagged image updates.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(docker)"
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+
+  # ── CI: GitHub Actions used across workflows ────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(actions)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

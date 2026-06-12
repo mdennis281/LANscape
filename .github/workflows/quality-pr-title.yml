@@ -23,7 +23,7 @@ jobs:
       # NOT trigger a release (see release-trigger-main-push.yml). The dep bump
       # rides along with the next human-authored release instead.
       - name: Validate Dependabot PR title format
-        if: ${{ github.actor == 'dependabot[bot]' }}
+        if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
@@ -44,7 +44,7 @@ jobs:
           echo "Format OK (Dependabot)"
 
       - name: Validate PR title format
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
@@ -63,7 +63,7 @@ jobs:
           echo "Format OK"
 
       - name: Check version is higher than latest release
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |

@@ -8,11 +8,13 @@ on:
       - 'lanscape/**.py'
       - 'tests/**.py'
       - 'scripts/**.py'
+      - 'pyproject.toml'   # dependency bumps (e.g. Dependabot) must re-run tests
   push:
     branches:
       - main
     paths:
       - '**.py'
+      - 'pyproject.toml'
   schedule:
     - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday
 

@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch full history for changelog generation
           ref: ${{ inputs.tag_name }}  # Use the specific tag provided by caller
@@ -124,7 +124,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
@@ -161,7 +161,7 @@ jobs:
           echo "... (showing first 500 chars of $(wc -c < release_description.txt) total)"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.extract_info.outputs.tag_name }}
           name: "Release v${{ steps.extract_info.outputs.version }}"

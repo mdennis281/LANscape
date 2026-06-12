@@ -17,11 +17,11 @@ jobs:
         with:
           fetch-depth: 0          # need full history for tag comparison
 
-      # Dependabot PRs intentionally carry NO version bump: their titles are
-      # conventional-commit style (e.g. "build(deps): bump X from 1.0 to 1.1"),
-      # which means merging them does NOT start with X.Y.Z and therefore does
-      # NOT trigger a release (see release-trigger-main-push.yml). The dep bump
-      # rides along with the next human-authored release instead.
+      # Dependabot PRs carry NO explicit version: their titles are
+      # conventional-commit style (e.g. "build(deps): bump X from 1.0 to 1.1").
+      # On merge, release-trigger-main-push.yml detects the build()/ci() prefix
+      # and auto-increments the PATCH version to ship the bump. The title must
+      # NOT start with X.Y.Z — that path is reserved for human-chosen versions.
       - name: Validate Dependabot PR title format
         if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
         env:

@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0          # need tags to derive the next patch version
 
       - name: Extract version from commit message
         id: extract_version
@@ -26,9 +28,25 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
           VERSION_PART=$(echo "$COMMIT_MSG" | cut -d' ' -f1)
           if echo "$VERSION_PART" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
+            # Human release PR: the version is chosen explicitly in the title.
             echo "version=$VERSION_PART" >> "$GITHUB_OUTPUT"
+            echo "Explicit release version: $VERSION_PART"
+          elif echo "$COMMIT_MSG" | grep -qE '^(build|ci)\([a-z-]+\): '; then
+            # Dependabot bump (build(deps)/build(deps-dev)/build(docker)/ci(actions)).
+            # It carries no version, so auto-increment the PATCH of the latest
+            # release to actually ship the bump instead of stranding it on main.
+            LATEST_TAG=$(git tag --list 'releases/*' --sort=-v:refname | head -n 1)
+            if [ -z "$LATEST_TAG" ]; then
+              echo "No releases/* tag found to derive a patch bump from. Skipping."
+              exit 0
+            fi
+            LATEST_VERSION="${LATEST_TAG#releases/}"
+            IFS='.' read -r MAJ MIN PAT <<< "$LATEST_VERSION"
+            NEW_VERSION="${MAJ}.${MIN}.$((PAT + 1))"
+            echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "Dependabot bump detected — auto patch release: $LATEST_VERSION -> $NEW_VERSION"
           else
-            echo "Commit message does not start with a semantic version. Skipping tag creation."
+            echo "Commit message is neither a versioned release nor a Dependabot bump. Skipping tag creation."
           fi
 
       - name: Create tag

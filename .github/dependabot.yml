@@ -8,9 +8,10 @@
 #
 # NOTE: PRs target `main`. Titles use conventional-commit prefixes below
 # (build(deps)/build(deps-dev)/build(docker)/ci(actions)). The Quality - PR
-# Title check validates these for dependabot[bot] and — crucially — they carry
-# no leading X.Y.Z, so merging a bump does NOT trigger the release pipeline
-# (see release-trigger-main-push.yml). The bump ships with the next release.
+# Title check validates these for dependabot[bot]. They carry no leading
+# X.Y.Z, so on merge the release pipeline detects the build()/ci() prefix and
+# auto-increments the PATCH version to ship the bump (see
+# release-trigger-main-push.yml).
 version: 2
 
 updates:
@@ -20,19 +21,26 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "build(deps)"
       prefix-development: "build(deps-dev)"
     groups:
       # One PR/week for all non-breaking Python bumps (runtime + dev tooling).
-      # Majors still arrive as individual PRs for deliberate review.
       python-minor-patch:
         patterns:
           - "*"
         update-types:
           - minor
           - patch
+      # Majors are kept OUT of the safe group above, but still consolidated
+      # into a single PR (rather than one-per-dependency) so breaking changes
+      # get deliberate review without flooding the PR list.
+      python-major:
+        patterns:
+          - "*"
+        update-types:
+          - major
 
   # ── Docker: base images + compose service images ────────────────────────
   # Scans docker/Dockerfile, docker/Dockerfile.arm64, docker/Dockerfile.dev

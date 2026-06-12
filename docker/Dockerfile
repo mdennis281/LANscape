@@ -3,7 +3,7 @@
 
 ARG VERSION
 
-FROM --platform=linux/amd64 python:3.12-slim
+FROM --platform=linux/amd64 python:3.14-slim
 
 LABEL org.opencontainers.image.title="LANscape"
 LABEL org.opencontainers.image.description="A Python-based local network scanner with web UI"

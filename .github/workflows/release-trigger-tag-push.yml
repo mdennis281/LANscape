@@ -30,7 +30,7 @@ jobs:
       tag_ref: ${{ steps.resolve.outputs.tag_ref }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Resolve or create tag
         id: resolve

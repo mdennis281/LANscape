@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "psutil>=6.0,<7.0",
+    "psutil>=6.0,<8.0",
     "setuptools",
     "scapy>=2.3.2,<3.0",
     "tabulate==0.10.0",

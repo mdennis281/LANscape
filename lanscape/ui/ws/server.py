@@ -12,7 +12,10 @@ import uuid
 from typing import Optional, Callable
 
 import websockets
-from websockets.server import WebSocketServerProtocol
+# websockets>=15 re-exports WebSocketServerProtocol via a deprecation shim
+# (module __getattr__), which resolves at runtime but is invisible to pylint's
+# static analysis — hence the targeted no-name-in-module suppression.
+from websockets.server import WebSocketServerProtocol  # pylint: disable=no-name-in-module
 
 from lanscape.ui.ws.protocol import (
     WSRequest,

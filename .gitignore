@@ -169,3 +169,7 @@ pr-analysis/
 # tauri stuff
 node_modules
 setup_tauri
+
+# Dispatch per-task git worktrees (.dispatch/project.yaml `worktreeRoot`).
+# Resolves inside the repo, so without this every worktree is untracked noise.
+.worktrees/

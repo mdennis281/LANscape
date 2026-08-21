@@ -133,7 +133,7 @@ jobs:
             core.setOutput('run_id', String(runId));
 
       - name: Download webapp artifact from lanscape-ui
-        uses: dawidd6/action-download-artifact@v21
+        uses: dawidd6/action-download-artifact@v23
         with:
           github_token: ${{ secrets.UI_BUILD_PAT }}
           repo: mdennis281/lanscape-ui

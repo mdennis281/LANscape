@@ -7,11 +7,13 @@ on:
       - main
     paths:
       - '**.py'
+      - '.github/workflows/quality-pylint.yml'
   pull_request:
     branches:
       - main
     paths:
       - '**.py'
+      - '.github/workflows/quality-pylint.yml'   # changes here must lint themselves
 
 permissions:
   contents: read

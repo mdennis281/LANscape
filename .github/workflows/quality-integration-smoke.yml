@@ -19,6 +19,7 @@ on:
       - 'lanscape/**.py'
       - 'tests/integration/**'
       - 'docker/**'
+      - '.github/workflows/quality-integration-smoke.yml'   # changes here must run themselves
   push:
     branches:
       - main
@@ -26,6 +27,7 @@ on:
       - 'lanscape/**.py'
       - 'tests/integration/**'
       - 'docker/**'
+      - '.github/workflows/quality-integration-smoke.yml'
   workflow_dispatch:
 
 permissions:

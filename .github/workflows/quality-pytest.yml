@@ -9,12 +9,14 @@ on:
       - 'tests/**.py'
       - 'scripts/**.py'
       - 'pyproject.toml'   # dependency bumps (e.g. Dependabot) must re-run tests
+      - '.github/workflows/quality-pytest.yml'   # changes here must test themselves
   push:
     branches:
       - main
     paths:
       - '**.py'
       - 'pyproject.toml'
+      - '.github/workflows/quality-pytest.yml'
   schedule:
     - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday
 

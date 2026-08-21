@@ -1,0 +1,59 @@
+# .dispatch/ — self-contained, committable Dispatch config for this repo.
+# Discovered + loaded by Dispatch as the SOURCE OF TRUTH for authored config;
+# .data keeps only runtime state (chats, sessions, checkpoints). Safe to commit.
+name: lanscape
+worktreeRoot: .worktrees
+workflow:
+  profile: review
+  autoMerge: on-green
+
+instructions:
+  - file: house-rules.md
+
+# LANscape is a single Python package, so there is one real app here — run in
+# two documented modes. Both are the same entry point; `--ws-server` is the
+# escape hatch that skips the UI entirely (see CONTRIBUTING.md "Local dev mode").
+#
+# WHY THE COMMANDS GO THROUGH `.env\Scripts\python.exe` AND NOT BARE `python`:
+# CONTRIBUTING.md puts the virtualenv at `.env/` (not `.venv/`), and every
+# command below is an editable install of THIS checkout. Run with a bare
+# `python`, a worktree's `pip install -e .` silently repoints the global
+# `lanscape` at itself, so parallel worktrees fight over one install. Each
+# worktree therefore builds its own `.env/` in `install`.
+# Paths are Windows (cmd.exe rejects `.env/Scripts/...` with forward slashes —
+# verified). On macOS/Linux the same commands read `.env/bin/python`.
+subApps:
+  - id: lanscape
+    name: LANscape (UI + WebSocket backend)
+    cwd: .
+    install: python -m venv .env && .env\Scripts\python.exe -m pip install -e ".[dev]"
+    # In a source checkout that has `lanscape/local/.env`, this hands off to
+    # lanscape/local/dev_runner.py: Vite (from the sibling lanscape-ui repo) +
+    # a watchdog-reloading backend + a PWA window. Without that file it falls
+    # back to the bundled-UI flow, which binds both ports but serves 503 —
+    # `lanscape/ui/react_build/` is empty until release time. See house-rules.md.
+    dev: .env\Scripts\python.exe -m lanscape --ui-port {port} --ws-port {port2}
+    # `build` is deliberately NOT in the dev extras — quality-packaging.yml
+    # installs it as a separate step, so this does the same inline rather than
+    # leaving the Runner's Build button to fail on a missing module.
+    build: .env\Scripts\python.exe -m pip install --quiet build && .env\Scripts\python.exe -m build
+    # Integration tests are excluded here by pyproject's `-m 'not integration'`.
+    test: .env\Scripts\python.exe -m pytest tests/ -n auto --dist=loadscope -v
+    # 3000 = the Vite default dev_runner swaps to; 8766 = the WS default.
+    # (Outside dev mode the UI default is 5001, but --ui-port is explicit here.)
+    ports: [3000, 8766]
+    # The backend does not advertise itself — the UI takes the WS port as a
+    # query param, exactly as dev_runner.py builds it.
+    url: http://localhost:{port}?ws-server=localhost:{port2}
+
+  - id: lanscape-ws
+    name: LANscape WebSocket backend only (no UI)
+    cwd: .
+    install: python -m venv .env && .env\Scripts\python.exe -m pip install -e ".[dev]"
+    # The one mode with no external prerequisites: no sibling lanscape-ui repo,
+    # no `lanscape/local/.env`, no built webapp. Use it in a fresh worktree, or
+    # to point an already-running UI at this branch's backend.
+    dev: .env\Scripts\python.exe -m lanscape --ws-server --ws-port {port}
+    build: .env\Scripts\python.exe -m pip install --quiet build && .env\Scripts\python.exe -m build
+    test: .env\Scripts\python.exe -m pytest tests/ -n auto --dist=loadscope -v
+    ports: [8766]

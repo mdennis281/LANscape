@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'docs/library/**'
+      - '.github/workflows/chore-wiki-sync.yml'   # changes here must re-sync
   workflow_dispatch:
 
 permissions:
